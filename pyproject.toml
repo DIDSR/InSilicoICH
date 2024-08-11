@@ -20,6 +20,9 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [project.urls]
 Homepage = "https://github.com/brandonjnelsonFDA/PedSilicoICH"
 Issues = "https://github.com/brandonjnelsonFDA/PedSilicoICH/issues"
