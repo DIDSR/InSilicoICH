@@ -16,7 +16,8 @@ img = nib.load(phantom_dir/'MIDA_v1.nii')
 phantom = np.array(img.get_fdata()).transpose(1, 0, 2)
 
 with open(phantom_dir / 'MIDA_v1.txt', 'rb') as data:
-    df = pd.read_csv(StringIO(data.read().decode(errors='replace')), sep='\t', names=['grayscale','c1', 'c2', 'c3', 'material'])
+    df = pd.read_csv(StringIO(data.read().decode(errors='replace')), sep='\t',
+                     names=['grayscale', 'c1', 'c2', 'c3', 'material'])
     material_lut = df.iloc[:-8]
     temp = df.iloc[-8:, :2].set_index('grayscale').T
     nx, ny, nz, dx, dy, dz = temp.nx.item(), temp.ny.item(), temp.nz.item(), temp.dx.item()*1000, temp.dy.item()*1000, temp.dz.item()*1000

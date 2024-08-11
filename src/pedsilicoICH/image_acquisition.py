@@ -26,7 +26,12 @@ def read_dicom(dcm_fname: str) -> np.ndarray:
     return dcm.pixel_array + int(dcm.RescaleIntercept)
 
 
-def convert_to_dicom(img_slice, phantom_path, spacings):
+def convert_to_dicom(img_slice: np.ndarray, phantom_path: str, spacings: tuple):
+    '''
+    :param img_slice: input 2D ndarray to be saved
+    :param phantom_path: filename to save dicom file to
+    :param spacings: tuple containing pixel spacings in mm
+    '''
     # https://github.com/DIDSR/pediatricIQphantoms/blob/main/src/pediatricIQphantoms/make_phantoms.py#L144
     Path(phantom_path).parent.mkdir(exist_ok=True, parents=True)
     fpath = pydicom.data.get_testdata_file("CT_small.dcm")
@@ -39,13 +44,15 @@ def convert_to_dicom(img_slice, phantom_path, spacings):
 
 
 def get_projection_data(ct):
+    '''takes as input xcist cfg struct and returns ndarray'''
     return xc.rawread(ct.resultsName+'.prep', [ct.protocol.viewCount,
                                                ct.scanner.detectorRowCount,
                                                ct.scanner.detectorColCount],
                                                'float')
 
 
-def get_reconstructed_data(ct):
+def get_reconstructed_data(ct) -> np.ndarray:
+    '''takes as input xcist cfg struct and returns ndarray'''
     imsize = ct.recon.imageSize
     return xc.rawread(ct.resultsName+f'_{imsize}x{imsize}x{ct.recon.sliceCount}.raw', [ct.recon.sliceCount, imsize, imsize], 'single')
 
@@ -290,16 +297,16 @@ class CTobj():
         self.nsims = 1
         return self
 
-    def write_to_dicom(self, fname: str|Path, groundtruth=False) -> list[Path]:
+    def write_to_dicom(self, fname: str | Path, groundtruth=False) -> list[Path]:
         """
-            write ct data to DICOM file, returns list of written dicom file names
+        write ct data to DICOM file, returns list of written dicom file names
 
-            :param fname: filename to save image to (preferably with '.dcm` or related extension)
-            :param groundtruth: Optional, whether to save the ground truth phantom image (no noise, blurring, or other artifacts).
-                If True, 'self.groundtruth` is saved, if False (default) `self.recon` which contains blurring (and noise if 'add_noise`True)
-            :returns: list[Path]
+        :param fname: filename to save image to (preferably with '.dcm` or related extension)
+        :param groundtruth: Optional, whether to save the ground truth phantom image (no noise, blurring, or other artifacts).
+            If True, 'self.groundtruth` is saved, if False (default) `self.recon` which contains blurring (and noise if 'add_noise`True)
+        :returns: list[Path]
 
-            Adapted from <https://github.com/DIDSR/pediatricIQphantoms/blob/main/src/pediatricIQphantoms/make_phantoms.py#L144>
+        Adapted from <https://github.com/DIDSR/pediatricIQphantoms/blob/main/src/pediatricIQphantoms/make_phantoms.py#L144>
         """
         fpath = pydicom.data.get_testdata_file("CT_small.dcm")
         ds = pydicom.dcmread(fpath)
