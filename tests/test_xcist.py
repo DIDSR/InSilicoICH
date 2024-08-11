@@ -1,3 +1,7 @@
+'''
+test xcist CT simulation functionality
+'''
+
 from pathlib import Path
 from shutil import rmtree
 
@@ -7,8 +11,12 @@ from pedsilicoICH.image_acquisition import read_dicom, CTobj
 
 
 def get_effective_diameter(ground_truth_mu, pixel_width_mm):
-    A = np.sum(ground_truth_mu>-1000)*pixel_width_mm**2
+    '''
+    effective diameter defined in AAPM TG204: https://www.aapm.org/pubs/reports/RPT_204.pdf
+    '''
+    A = np.sum(ground_truth_mu > -1000)*pixel_width_mm**2
     return 2*np.sqrt(A/np.pi)
+
 
 test_dir = Path(__file__).parent.absolute()
 print(test_dir)
@@ -25,14 +33,19 @@ if Path(result_dir).exists():
     rmtree(result_dir)
 ct = CTobj(phantom, spacings=3*[dx], patientname='test', output_dir=result_dir)
 
+
 def test_scan():
-    views=10
+    '''
+    basic test of xcist simulations
+    '''
+    views = 10
     ct.run_scan(views=views)
     ct.run_recon(sliceCount=1)
     dcms = ct.write_to_dicom(result_dir / 'test.dcm')
-    from pathlib import Path
     dcms_in_dir = list(result_dir.glob('*.dcm'))
-    assert(ct.recon.shape==(1, 512, 512))
-    assert(ct.projections.shape==(views, ct.xcist.cfg.scanner.detectorRowCount, ct.xcist.cfg.scanner.detectorColCount))
-    assert(len(dcms) == len(ct.start_positions))
-    assert(dcms_in_dir == dcms)
+    assert ct.recon.shape == (1, 512, 512)
+    assert ct.projections.shape == (views,
+                                    ct.xcist.cfg.scanner.detectorRowCount,
+                                    ct.xcist.cfg.scanner.detectorColCount)
+    assert len(dcms) == len(ct.start_positions)
+    assert dcms_in_dir == dcms
