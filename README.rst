@@ -1,14 +1,16 @@
 CT Imaging Datasets for Pediatric Device Assessment of Intracranial Hemorrhage
 ==============================================================================
 
-.. |tests| image:: https://github.com/brandonjnelsonFDA/PedSilicoICH/actions/workflows/python-app.yml/badge.svg?branch=main
-    :alt: Package Build and Testing Status
-    :scale: 100%
-    :target: https://github.com/brandonjnelsonFDA/PedSilicoICH/actions/workflows/python-app.yml
+|tests|
 
 .. image:: project_aims.png
         :width: 800
         :align: center
+
+.. |tests| image:: https://github.com/brandonjnelsonFDA/PedSilicoICH/actions/workflows/python-app.yml/badge.svg?branch=master
+    :alt: Package Build and Testing Status
+    :scale: 100%
+    :target: https://github.com/brandonjnelsonFDA/PedSilicoICH/actions/workflows/python-app.yml
 
 **Motivation**
 Computer aided triaging (CADt) devices for intracranial hemorrhage (ICH) in the emergency room (e.g. `Rapid ICH K221456 <https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfpmn/pmn.cfm?ID=K221456>`_) is one important example where pediatric and adult cases exist in a reading queue where pediatric patients could be disadvantaged by being deprioritized for time sensitive treatment using an adult-trained AI model that extrapolates poorly to pediatric patients. While these AI/ML devices have potential to benefit pediatric patients, there is currently a lack of annotated pediatric data for evaluating the balance of risk and benefits.
