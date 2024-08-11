@@ -1,6 +1,11 @@
 CT Imaging Datasets for Pediatric Device Assessment of Intracranial Hemorrhage
 ==============================================================================
 
+.. |tests| image:: https://github.com/brandonjnelsonFDA/PedSilicoICH/actions/workflows/python-app.yml/badge.svg?branch=main
+    :alt: Package Build and Testing Status
+    :scale: 100%
+    :target: https://github.com/brandonjnelsonFDA/PedSilicoICH/actions/workflows/python-app.yml
+
 .. image:: project_aims.png
         :width: 800
         :align: center
