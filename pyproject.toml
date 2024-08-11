@@ -20,8 +20,6 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
-include-package-data = true
-
 [tool.setuptools.packages.find]
 where = ["src"]
 
