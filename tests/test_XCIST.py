@@ -12,7 +12,7 @@ def get_effective_diameter(ground_truth_mu, pixel_width_mm):
 
 test_dir = Path(__file__).parent.absolute()
 print(test_dir)
-dcm = test_dir / '350mm_CTP404_groundtruth.dcm'
+dcm = test_dir / 'CTP404_groundtruth.dcm'
 phantom = read_dicom(dcm)
 phantom = np.repeat(phantom[None], 11, axis=0)
 diameter_pixels = get_effective_diameter(phantom[0], 1)

@@ -5,7 +5,7 @@ notebooks/__pycache__
 .PedSilicoICH
 notebooks/default
 notebooks/test
-*.dcm
+
 octave-workspace
 MIDA Head Phantom
 *.raw
