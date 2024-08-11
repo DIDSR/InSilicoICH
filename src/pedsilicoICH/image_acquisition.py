@@ -16,7 +16,12 @@ from .ground_truth_definition.phantoms import voxelize_ground_truth
 install_path = Path(__file__).parent
 
 
-def read_dicom(dcm_fname):
+def read_dicom(dcm_fname: str) -> np.ndarray:
+    '''
+    Reads dicom file and returns numpy array
+
+    :param dcm_fname: dicom filename to be read
+    '''
     dcm = pydicom.read_file(dcm_fname)
     return dcm.pixel_array + int(dcm.RescaleIntercept)
 
@@ -34,7 +39,10 @@ def convert_to_dicom(img_slice, phantom_path, spacings):
 
 
 def get_projection_data(ct):
-    return xc.rawread(ct.resultsName+'.prep', [ct.protocol.viewCount, ct.scanner.detectorRowCount, ct.scanner.detectorColCount], 'float')
+    return xc.rawread(ct.resultsName+'.prep', [ct.protocol.viewCount,
+                                               ct.scanner.detectorRowCount,
+                                               ct.scanner.detectorColCount],
+                                               'float')
 
 
 def get_reconstructed_data(ct):
@@ -42,24 +50,24 @@ def get_reconstructed_data(ct):
     return xc.rawread(ct.resultsName+f'_{imsize}x{imsize}x{ct.recon.sliceCount}.raw', [ct.recon.sliceCount, imsize, imsize], 'single')
 
 
-def initialize_xcist(ground_truth_image, spacings=(1,1,1), output_dir='default', phantom_id='default', materials=None):
+def initialize_xcist(ground_truth_image, spacings=(1, 1, 1),
+                     output_dir='default', phantom_id='default',
+                     materials=None):
     '''
     :param fov: in mm
     :param spacings: z, x, y in mm
     '''
     print('Initializing Scanner object...')
     print(''.join(10*['-']))
-    
     # load defaults
     ct = xc.CatSim(install_path/'defaults/Phantom_Default',
                    install_path/'defaults/Physics_Default',
                    install_path/'defaults/Protocol_Default',
                    install_path/'defaults/Recon_Default',
                    install_path/'defaults/Scanner_Default')
-    
-    ct.cfg.waitForKeypress=False
+
+    ct.cfg.waitForKeypress = False
     ct.cfg.do_Recon = True
-    
 
     # prepare directories
     output_dir = Path(output_dir)
@@ -72,7 +80,7 @@ def initialize_xcist(ground_truth_image, spacings=(1,1,1), output_dir='default',
     # prepare material density arrays from ground truth phantom
     if ground_truth_image.ndim == 2:
         ground_truth_image = ground_truth_image[None]
-    
+
     dicom_path = phantom_path / 'dicom'
     for slice_id, img in enumerate(ground_truth_image):
         dicom_filename = dicom_path / f'1-{slice_id:03d}.dcm'    
@@ -82,58 +90,65 @@ def initialize_xcist(ground_truth_image, spacings=(1,1,1), output_dir='default',
     print('Scanner Ready')
     return ct
 
-_table_speed = {'Low': 26.67, 'Intermediate': 48, 'High': 64} # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5711061/
+
+_table_speed = {'Low': 26.67, 'Intermediate': 48, 'High': 64}
+# https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5711061/
+
 
 class CTobj():
     """
         A class to hold CT simulation data and run simulations
 
         :param phantom: phantom object to be scanned
-        :param framework: Optional, CT simulation framework options include `['CATSIM'] <https://github.com/JeffFessler/mirt>`_
+        :param framework: Optional, CT simulation framework options include
+        `['CATSIM'] <https://github.com/JeffFessler/mirt>`_
         :returns: None
-        
+
         See also <https://github.com/DIDSR/pediatricIQphantoms/blob/main/src/pediatricIQphantoms/make_phantoms.py#L19>
     """
-    def __init__(self, phantom, spacings, patientname="default", patientid=0, age=0, studyname="default", studyid=0, seriesname="default", seriesid=0, framework='CATSIM', output_dir=None, materials:dict|None=None) -> None:
+    def __init__(self, phantom, spacings, patientname="default", patientid=0,
+                 age=0, studyname="default", studyid=0, seriesname="default",
+                 seriesid=0, framework='CATSIM', output_dir=None,
+                 materials: dict | None = None) -> None:
         """Constructor method
         """
-        output_dir =  output_dir or f'{patientname}'
+        output_dir = output_dir or f'{patientname}'
         self.output_dir = Path(output_dir)
-        self.phantom=phantom
-        self.spacings=spacings
-        self.age=age
-        self.patientname=patientname
-        self.patientid=patientid
-        self.studyname=studyname or self.patientname
-        self.studyid=studyid
-        self.seriesname=seriesname
-        self.seriesid=seriesid
-        self.framework=framework
-        self.ndetectors=900
-        self.nangles=1000
-        self.detector_size=1
-        self.recon=None
-        self.projections=None
-        self.groundtruth=None
+        self.phantom = phantom
+        self.spacings = spacings
+        self.age = age
+        self.patientname = patientname
+        self.patientid = patientid
+        self.studyname = studyname or self.patientname
+        self.studyid = studyid
+        self.seriesname = seriesname
+        self.seriesid = seriesid
+        self.framework = framework
+        self.ndetectors = 900
+        self.nangles = 1000
+        self.detector_size = 1
+        self.recon = None
+        self.projections = None
+        self.groundtruth = None
         self.patient_diameter = 18
-        
+
         self.xcist = initialize_xcist(self.phantom, self.spacings, output_dir=self.output_dir,
                                       phantom_id=patientid, materials=materials)
         self.start_positions = self.calculate_start_positions()
 
     def calculate_start_positions(self):
-        # determine number of axial scans required to cover the phantom
+        'determine number of axial scans required to cover the phantom'
         detector_width = self.xcist.scanner.detectorRowCount * self.xcist.scanner.detectorRowSize
         magnification = self.xcist.scanner.sdd / self.xcist.scanner.sid
         detector_width_at_isocenter = detector_width / magnification
-        
+
         safe_width_at_isocenter = detector_width_at_isocenter - 2*self.xcist.scanner.detectorRowSize
-    
         self.scan_width = self.xcist.cfg.protocol.rotationTime * self.xcist.cfg.protocol.tableSpeed + safe_width_at_isocenter
         self.total_scan_length = self.spacings[0]*self.phantom.shape[0]
         return np.arange(-self.total_scan_length/2, self.total_scan_length/2, self.scan_width)
 
-    def get_phantom(self):
+    def get_phantom(self) -> np.ndarray:
+        'returns ground truth phantom as ndarray'
         gt_dicoms = list(Path(self.xcist.cfg.phantom.filename).parent.rglob('*.dcm'))
         return np.stack([read_dicom(o) for o in gt_dicoms])
 
@@ -148,25 +163,25 @@ class CTobj():
             self.xcist.cfg.protocol.tableSpeed = _table_speed[table_speed]
         else:
             self.xcist.cfg.protocol.tableSpeed = table_speed
-        
+
         self.start_positions = self.calculate_start_positions()
         start_positions = self.start_positions.copy()
         if startZ is not None:
             if startZ < start_positions.min():
                 raise ValueError(f'startZ is outside the range of valid start positions: {self.start_positions}')
-            start_positions = start_positions[start_positions>startZ]
+            start_positions = start_positions[start_positions > startZ]
         if endZ is not None:
             if endZ > self.start_positions.max():
                 raise ValueError(f'startZ is outside the range of valid start positions: {self.start_positions}')
-            start_positions = start_positions[start_positions<endZ]
+            start_positions = start_positions[start_positions < endZ]
 
         plt.imshow(self.phantom.sum(axis=1)[::-1], cmap='gray', origin='upper', extent=[-self.phantom.shape[0]*self.spacings[0]/2, self.phantom.shape[0]*self.spacings[0]/2,
                                                                                         self.start_positions[0]+self.total_scan_length, self.start_positions[0]])
-        plt.hlines(y=start_positions[0], xmin=-self.phantom.shape[0]*self.spacings[0]/2, xmax=self.phantom.shape[0]*self.spacings[0]/2, color='red')
+        plt.hlines(y=start_positions[0], xmin=-self.phantom.shape[0]*self.spacings[0] / 2, xmax=self.phantom.shape[0]*self.spacings[0]/2, color='red')
         plt.annotate('Start', (0, start_positions[0]-10), horizontalalignment='center')
-        
+
         plt.hlines(y=start_positions[-1] + self.scan_width, xmin=-self.phantom.shape[0]*self.spacings[0]/2, xmax=self.phantom.shape[0]*self.spacings[0]/2, color='red')
-        plt.annotate('Stop', (0, start_positions[-1]+ self.scan_width +10), horizontalalignment='center')
+        plt.annotate('Stop', (0, start_positions[-1] + self.scan_width + 10), horizontalalignment='center')
 
         plt.annotate(f'{len(start_positions)} scans required', xy=(0, (start_positions[0]+start_positions[-1])/2), horizontalalignment='center')
         plt.annotate('', xy=(40, start_positions[0]), xytext=(40, start_positions[-1] + self.scan_width), arrowprops=dict(facecolor='black', shrink=0.05))
@@ -184,7 +199,8 @@ class CTobj():
         repr += f'\nProjections: {self.projections.shape}'
         return repr
 
-    def run_scan(self, mA=200, kVp=120, startZ=None, endZ=None, views=None, verbose=False, table_speed=0):
+    def run_scan(self, mA=200, kVp=120, startZ=None, endZ=None, views=None,
+                 verbose=False, table_speed=0):
         """
             Runs the CT simulation using the stored parameters.
 
@@ -196,7 +212,6 @@ class CTobj():
             :param verbose: optional boolean, if True prints out status updates, if False they are suppressed.
             :param table_speed: optional [float, str] str options include 'Low': 26.67, 'Intermediate': 48, 'High': 64, units in mm/s
         """
-            # update parameters and raise Value Errors if needd
         self.xcist.cfg.protocol.mA = mA
         kVp_options = [70, 80, 90, 100, 110, 120, 130, 140]
         if kVp not in kVp_options:
@@ -207,30 +222,29 @@ class CTobj():
             self.xcist.cfg.protocol.tableSpeed = _table_speed[table_speed]
         else:
             self.xcist.cfg.protocol.tableSpeed = table_speed
-        
+
         self.start_positions = self.calculate_start_positions()
         start_positions = self.start_positions
-        
+
         if startZ:
             if startZ < start_positions.min():
                 raise ValueError(f'startZ is outside the range of valid start positions: {self.start_positions}')
-            start_positions = start_positions[start_positions>startZ]
+            start_positions = start_positions[start_positions > startZ]
         if endZ:
             if endZ > start_positions.max():
                 raise ValueError(f'startZ is outside the range of valid start positions: {self.start_positions}')
-            start_positions = start_positions[start_positions<endZ]
+            start_positions = start_positions[start_positions < endZ]
 
         if views:
             self.xcist.cfg.protocol.viewCount = views
             self.xcist.protocol.stopViewId = self.xcist.cfg.protocol.startViewId+self.xcist.cfg.protocol.viewCount-1
-            self.xcist.cfg.protocol.viewsPerRotation =views
-        
+            self.xcist.cfg.protocol.viewsPerRotation = views
+
         self.results_dir = self.output_dir / 'simulations' / f'{self.patientid}'
         self.results_dir.mkdir(exist_ok=True, parents=True)    
         self.xcist.protocol.spectrumFilename = f"tungsten_tar7.0_{int(kVp)}_filt.dat" # name of the spectrum file
         self.xcist.cfg.experimentDirectory = str(self.results_dir)
-        
-        recons = []
+
         projections = []
         for idx, table_position in enumerate(start_positions):
             print(f'scan: {idx+1}/{len(start_positions)}')
@@ -243,6 +257,7 @@ class CTobj():
         return self
 
     def run_recon(self, fov=None, sliceThickness=None, sliceCount=None, mu_water=None, preview=False):
+        'perform reconstruction and save to .recon attribute'
         if sliceThickness:
             self.xcist.recon.sliceThickness = sliceThickness
         if mu_water:
@@ -258,7 +273,6 @@ class CTobj():
             self.xcist.cfg.recon.sliceCount = sliceCount
         if fov:
             self.xcist.cfg.recon.fov = fov
-    
         print(f'fov size: {self.xcist.cfg.recon.fov}')
 
         self.xcist.cfg.recon.displayImagePictures = preview
@@ -275,8 +289,8 @@ class CTobj():
         self.I0 = self.xcist.cfg.protocol.mA
         self.nsims = 1
         return self
-    
-    def write_to_dicom(self, fname:str|Path, groundtruth=False) -> list[Path]:
+
+    def write_to_dicom(self, fname: str|Path, groundtruth=False) -> list[Path]:
         """
             write ct data to DICOM file, returns list of written dicom file names
 
@@ -298,30 +312,29 @@ class CTobj():
         ds.InstitutionName = 'FDA/CDRH/OSEL/DIDSR'
         ds.StudyDate = ds.InstanceCreationDate
         ds.StudyTime = ds.InstanceCreationTime
-        
         ds.PatientName = self.patientname
         ds.SeriesNumber = self.seriesid
-        
         ds.PatientAge = f'{int(self.age):03d}Y'
         ds.PatientID = f'{int(self.patientid):03d}'
-        del(ds.PatientWeight)
-        del(ds.ContrastBolusRoute)
-        del(ds.ContrastBolusAgent)
+        del ds.PatientWeight
+        del ds.ContrastBolusRoute
+        del ds.ContrastBolusAgent
         ds.ImageComments = f"effctive diameter [cm]: {self.patient_diameter/10}"
         ds.ScanOptions = self.xcist.cfg.protocol.scanTrajectory.upper()
         ds.ReconstructionDiameter = self.xcist.cfg.recon.fov
         ds.ConvolutionKernel = self.xcist.cfg.recon.kernelType
         ds.Exposure = self.xcist.cfg.protocol.mA
-        
+
         # load image data
         ds.StudyDescription = f"{self.I0} photons " + self.seriesname + " " + ds.ConvolutionKernel + self.xcist.cfg.recon.reconType
-        if self.recon.ndim == 2: self.recon = self.recon[None]
+        if self.recon.ndim == 2:
+            self.recon = self.recon[None]
         nslices, ds.Rows, ds.Columns = self.recon.shape
 
         ds.SpacingBetweenSlices = ds.SliceThickness
         ds.DistanceSourceToDetector = self.xcist.cfg.scanner.sdd
         ds.DistanceSourceToPatient = self.xcist.cfg.scanner.sid
-        
+
         ds.PixelSpacing = [self.xcist.cfg.recon.fov/self.xcist.cfg.recon.imageSize, self.xcist.cfg.recon.fov/self.xcist.cfg.recon.imageSize]
         ds.SliceThickness = ds.PixelSpacing[0]
 
@@ -331,7 +344,7 @@ class CTobj():
         end = ds.SeriesInstanceUID.split('.')[-1]
         new_end = str(int(end) + self.studyid)
         ds.SeriesInstanceUID = ds.SeriesInstanceUID.replace(end, new_end)
-        
+
         # study instance uid unique for each series
         end = ds.StudyInstanceUID.split('.')[-1]
         new_end = str(int(end) + self.studyid)
@@ -343,9 +356,10 @@ class CTobj():
         # saveout slices as individual dicom files
         fnames = []
         vol = self.groundtruth if groundtruth else self.recon
-        if vol.ndim == 2: vol = vol[None]
+        if vol.ndim == 2:
+            vol = vol[None]
         for slice_idx, array_slice in enumerate(vol):
-            ds.InstanceNumber = slice_idx + 1 # image number
+            ds.InstanceNumber = slice_idx + 1  # image number
             # SOP instance UID changes every slice
             end = ds.SOPInstanceUID.split('.')[-1]
             new_end = str(int(end) + slice_idx + self.studyid + self.seriesid)
