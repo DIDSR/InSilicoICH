@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+import numpy as np
+from pedsilicoICH.image_acquisition import read_dicom
 
 # https://radiopaedia.org/articles/windowing-ct?lang=us
 display_settings = {
@@ -48,3 +50,34 @@ from ipywidgets import interact, IntSlider
 
 def scrollview(phantom):
     interact(lambda idx: ctshow(phantom[idx]), idx=IntSlider(value=phantom.shape[0]//2, min=0, max=phantom.shape[0]-1))
+
+def load_vol(file_list):
+    return np.stack(list(map(read_dicom, file_list)))
+
+def get_lesion_coords(mask):
+    z_loc = mask.mean(axis=1).mean(axis=1).argmax()
+    x_loc = mask.mean(axis=0).mean(axis=0).argmax()
+    y_loc = mask.mean(axis=0).mean(axis=1).argmax()
+    return z_loc, x_loc, y_loc
+
+def browse_studies(metadata, name='case_000', display='soft tissues', slice_idx=0, f=None, ax=None):
+    patient = metadata[(metadata['name']==name)].iloc[slice_idx]
+    dcm_file = patient['image file']
+    img = read_dicom(dcm_file)
+        
+    ww, wl = display_settings[display]
+    minn = wl - ww/2
+    maxx = wl + ww/2
+    if (f is None) or (ax is None):
+        f, ax = plt.subplots()
+    im = ax.imshow(img, cmap='gray', vmin=minn, vmax=maxx)
+    plt.colorbar(im, ax=ax, label=f'HU | {display} [ww: {ww}, wl: {wl}]')
+    ax.set_title(patient['name'])
+
+def study_viewer(metadata): 
+    viewer = lambda **kwargs: browse_studies(metadata, **kwargs)
+    slices = list(range(168)) # fix later to be dynamic
+    interact(viewer,
+             name=metadata.name.unique(),
+             display=display_settings.keys(),
+             slice_idx=IntSlider(value=slices[len(slices)//2], min=min(slices), max=max(slices)))
