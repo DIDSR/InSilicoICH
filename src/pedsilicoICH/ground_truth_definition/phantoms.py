@@ -1,5 +1,10 @@
+'''
+module for working with phantoms
+'''
+
 from pathlib import Path
 from . import dicom_to_voxelized_phantom
+
 
 def voxelize_ground_truth(dicom_path, phantom_path, material_threshold_dict=None):
     """
@@ -35,5 +40,5 @@ phantom.overwrite = True                   # Flag to overwrite existing files wi
 
     with open(dicom_to_voxel_cfg, 'w') as f:
         f.write(cfg_file_str)
-    
+
     dicom_to_voxelized_phantom.run_from_config(dicom_to_voxel_cfg)
