@@ -77,16 +77,19 @@ while case_count < desired_cases:
     dcm_files = ct.write_to_dicom(dicom_path / f'{patient_name}.dcm')
     # figure out how to save out ground truth lesion segmentation, currently only save coordinates
 
-    lesion_only = CTobj(np.where(lesion_image > 0, 0, - 1000), spacings=(dz, dx, dy),
-                        patientname='lesion only', output_dir=output_dir / 'lesion only',
-                        materials={'ICRU_lung_adult_healthy':-1000, 'water': 0})
-    lesion_only.xcist.cfg.physics.energyCount = 2
-    lesion_only.xcist.cfg.physics.monochromatic = 0
-    lesion_only.xcist.cfg.physics.enableElectronicNoise = 0
-    lesion_only.xcist.cfg.physics.enableQuantumNoise = 0
-    lesion_only.run_scan(mA=500, startZ=startZ, endZ=endZ, views=100)
-    lesion_only.run_recon(fov=fov)
-    lesion_only.recon = lesion_only.recon > - 950
+    # lesion_only = CTobj(np.where(lesion_image > 0, 0, - 1000), spacings=(dz, dx, dy),
+    #                     patientname='lesion only', output_dir=output_dir / 'lesion only',
+    #                     materials={'ICRU_lung_adult_healthy':-1000, 'water': 0})
+    # lesion_only.xcist.cfg.physics.energyCount = 2
+    # lesion_only.xcist.cfg.physics.monochromatic = 0
+    # lesion_only.xcist.cfg.physics.enableElectronicNoise = 0
+    # lesion_only.xcist.cfg.physics.enableQuantumNoise = 0
+    # lesion_only.run_scan(mA=500, startZ=startZ, endZ=endZ, views=100)
+    # lesion_only.run_recon(fov=fov)
+    # lesion_only.recon = lesion_only.recon > - 950
+
+    lesion_only = ct
+    lesion_only.recon = ct.get_lesion_mask(lesion_image, startZ=startZ, endZ=endZ)
 
     dicom_path = output_dir / 'lesion_masks'
     mask_files = lesion_only.write_to_dicom(dicom_path / f'{patient_name}_mask.dcm')

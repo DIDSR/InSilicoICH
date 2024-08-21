@@ -3,6 +3,7 @@ Module responsible for CT image acquisition simulation
 """
 
 from pathlib import Path
+from shutil import rmtree
 from datetime import datetime
 
 import numpy as np
@@ -106,14 +107,29 @@ class CTobj():
     """
         A class to hold CT simulation data and run simulations
 
-        :param phantom: phantom object to be scanned
-        :param framework: Optional, CT simulation framework options include
-        `['CATSIM'] <https://github.com/JeffFessler/mirt>`_
+        :param phantom: 3D phantom volume to be scanned, voxels in units of
+            approximate CT Numbers [HU], typically in python coordinates (z, x, y)
+            where z is perpendicular to the axial plane made by x and y.
+            See <https://en.wikipedia.org/wiki/Hounsfield_scale#Values_for_different_body_tissues_and_material> for some suggested values for common materials
+        :param spacings: tuple of voxel sizes of phantom volume in mm (dz, dx, dy)
+        :param patientname: patient identifier to be saved in DICOM header
+        :param patientid: int, patient identifier to be saved in DICOM header
+        :param age: float, in years to be saved in DICOM header
+        :param studyname: str, study identifier to be saved in DICOM header
+        :param studyid: int, study identifier to be saved in DICOM header
+        :param seriesname: str, series identifier to be saved in DICOM header
+        :param seriesid: int, series identifier to be saved in DICOM header
+        :param output_dir: optional directory to save the intermediate and
+            final simulation results, defaults to current working directory
+        :param framework: Optional, CT simulation framework options include `['CATSIM']`
+        :param materials: Optional dictionary of {material name: HU value}, used for construction volume fraction maps in XCIST,
+            see materials and thresholds from this XCIST example: https://github.com/xcist/phantoms-voxelized/blob/main/DICOM_to_voxelized/DICOM_to_voxelized_example_head.cfg
+
         :returns: None
 
         See also <https://github.com/DIDSR/pediatricIQphantoms/blob/main/src/pediatricIQphantoms/make_phantoms.py#L19>
     """
-    def __init__(self, phantom, spacings, patientname="default", patientid=0,
+    def __init__(self, phantom: np.ndarray, spacings: tuple, patientname="default", patientid=0,
                  age=0, studyname="default", studyid=0, seriesname="default",
                  seriesid=0, framework='CATSIM', output_dir=None,
                  materials: dict | None = None) -> None:
@@ -158,6 +174,24 @@ class CTobj():
         'returns ground truth phantom as ndarray'
         gt_dicoms = list(Path(self.xcist.cfg.phantom.filename).parent.rglob('*.dcm'))
         return np.stack([read_dicom(o) for o in gt_dicoms])
+
+    def get_lesion_mask(self, ground_truth_lesion, startZ=None, endZ=None):
+        '''takes lesion in object space and returns a mask in CT image space
+        for the given imaging system'''
+        lesion_only = CTobj(np.where(ground_truth_lesion > 0, 0, - 1000),
+                            spacings=self.spacings,
+                            patientname='lesion only',
+                            materials={
+                                'ICRU_lung_adult_healthy': -1000,
+                                'water': 0})
+        lesion_only.xcist.cfg.physics.energyCount = 2
+        lesion_only.xcist.cfg.physics.monochromatic = 0
+        lesion_only.xcist.cfg.physics.enableElectronicNoise = 0
+        lesion_only.xcist.cfg.physics.enableQuantumNoise = 0
+        lesion_only.run_scan(mA=500, views=100, startZ=startZ, endZ=endZ)
+        lesion_only.run_recon()
+        rmtree(lesion_only.output_dir)
+        return lesion_only.recon > - 950
 
     def scout_view(self, startZ=None, endZ=None, table_speed=0):
         '''
