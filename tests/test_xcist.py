@@ -33,7 +33,7 @@ result_dir = test_dir / 'test_result'
 if Path(result_dir).exists():
     rmtree(result_dir)
 
-radius = 5
+radius = 6
 contrast = 400
 img_w_lesion, lesion_vol, (z, x, y) = add_random_sphere_lesion(phantom,
                                                                phantom == 0,
