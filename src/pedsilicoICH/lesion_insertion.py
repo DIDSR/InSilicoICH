@@ -8,10 +8,21 @@ from .lesion_definition import spherical_lesion
 
 def add_random_sphere_lesion(vol: np.ndarray, mask: np.ndarray,
                              radius: list[int] = [20],
-                             contrast: list[int] = [-100]):
+                             contrast: list[int] = [-100]) -> tuple:
     '''
     adds lesion to vol in random location within mask of size radius
-    and contrast level contrast'''
+    and contrast level contrast
+
+    :param vol: array to insert lesion into
+    :param mask: mask that specifies limits inside the `vol` of
+        potential insertion locations
+    :param radius: int or list of ints, radius of the sphere lesion,
+        if provided a list it will make concentric lesions
+    :param contrast: int or list of ints, contrast of the sphere lesion,
+        if provided a list it will make concentric lesions of contrasts
+
+    :returns: img_w_lesion, lesion_vol, (z, x, y)
+    '''
     if not isinstance(radius, list):
         radius = [radius]
     if not isinstance(contrast, list):

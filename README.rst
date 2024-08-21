@@ -42,14 +42,27 @@ Installation
 
 Tested on python 3.11.3
 
-Layout
-------
+Module Layout
+-------------
 
 .. image:: module_layout.png
         :width: 800
         :align: center
 
-The accompanying
+Repository Contents
+-------------------
+
+**notebooks**: for introducing concepts, developing methods, scratch work, and running experiments
+
+- notebooks/00_basic_eda.ipynb: exploratory data analysis of the Hssayeni et 2020 dataset [Aim 1.1]
+- notebooks/01_ct_head_simulations.ipynb: introduce CT simulation pipeline concepts with MIDA head phantom [Aim 1.2]
+- notebooks/02_MRI_brain_atlas_groundtruth.ipynb: expand simultions to include NIH MRI brain atlases as ground truth [Aim 1.2]
+- notebooks/viewing_simulation_results.ipynb: for viewing the simulation results from CT_dataset_pipeline.py
+- notebooks/IQ_evaluations.ipynb: basic evaluations for quality assurance of XCIST simulations and phantoms
+
+**scripts**: for generating data sets and more production ready
+
+CT_dataset_pipeline.py: used for generating the in silico dataset
 
 Useful Links
 ------------
