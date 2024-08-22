@@ -137,6 +137,8 @@ class CTobj():
         """
         output_dir = output_dir or f'{patientname}'
         self.output_dir = Path(output_dir)
+        if self.output_dir.exists():
+            rmtree(self.output_dir)
         self.phantom = phantom
         self.spacings = spacings
         self.age = age
