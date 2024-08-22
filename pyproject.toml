@@ -8,6 +8,7 @@ description = "CT Simulations of virtual pediatric intracranial hemorrhage for c
 readme = "README.rst"
 requires-python = ">=3.8"
 dependencies = [
+  "monai",
   "pandas",
   "numpy",
   "pydicom",

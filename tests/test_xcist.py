@@ -1,22 +1,17 @@
 '''
 test xcist CT simulation functionality
 '''
-
 from pathlib import Path
 from shutil import rmtree
 
 import numpy as np
+from monai.transforms import RandAffine
 
 from pedsilicoICH.image_acquisition import read_dicom, CTobj
 from pedsilicoICH.lesion_insertion import add_random_sphere_lesion
+from pedsilicoICH.artifact_generation import transform_image_label_pair
 
-
-def get_effective_diameter(ground_truth_mu, pixel_width_mm):
-    '''
-    effective diameter defined in AAPM TG204: https://www.aapm.org/pubs/reports/RPT_204.pdf
-    '''
-    A = np.sum(ground_truth_mu > -1000)*pixel_width_mm**2
-    return 2*np.sqrt(A/np.pi)
+from utils import get_effective_diameter, cosine_similarity
 
 
 test_dir = Path(__file__).parent.absolute()
@@ -84,3 +79,28 @@ def test_get_lesion_mask_slicecount_1():
     rel_error = (predicted_volume - measured_volume)/predicted_volume
     tol = 0.5
     assert rel_error < tol
+
+
+def test_transform_image_label_pair():
+    '''
+    tests that the patient positioning augmentation actually applies and
+    that following augmentation the result is not the same as the original,
+    also tests repeatability by providing a random seed
+    '''
+    transform = RandAffine(prob=0.5,
+                           rotate_range=[np.pi/4, np.pi/20, np.pi/20],
+                           translate_range=[10, 10, 10],
+                           scale_range=[0.1, 0.1, 0.1],
+                           padding_mode="border")
+    img_augmented, lesion_augmented = transform_image_label_pair(transform,
+                                                                 img_w_lesion,
+                                                                 lesion_vol,
+                                                                 seed=42)
+      
+    # tests that the augmented results are different from the original
+    assert cosine_similarity(img_augmented, img_w_lesion) < cosine_similarity(img_w_lesion, img_w_lesion)
+    assert cosine_similarity(lesion_augmented, lesion_vol) < cosine_similarity(lesion_vol, lesion_vol)
+
+    # tests repeatability given a seed value
+    assert np.isclose(cosine_similarity(img_augmented, img_w_lesion), 0.869, atol=1e-4)
+    assert cosine_similarity(lesion_augmented, lesion_vol) == 0
