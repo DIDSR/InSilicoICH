@@ -5,9 +5,11 @@ from io import StringIO
 import pandas as pd
 import nibabel as nib
 import numpy as np
+from monai.transforms import RandAffine
 
 from pedsilicoICH.image_acquisition import CTobj
 from pedsilicoICH.lesion_insertion import add_random_sphere_lesion
+from pedsilicoICH.artifact_generation import transform_image_label_pair
 
 # %% [markdown]
 # Define Ground Truth Head
@@ -28,20 +30,31 @@ phantom[phantom == 50] = -1000  # air
 for idx, row in material_lut[~material_lut['CT Number [HU]'].isna()].iterrows():
     phantom[phantom == row.grayscale] = row['CT Number [HU]']
 
-base_dir = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/MIDA_analytical_sphere_ICH')
+# %% [markdown]
+# Define simulation parameters
+base_dir = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/MIDA_sphere_ICH_position_augmentation') # output directory to save simulation results
+# consider turning this script into a command line function, similar to https://github.com/bnel1201/Virtual-Patient-CT-Simulations/blob/PedSilicoICH-Pilot/run_xcat.py
+# it makes the files more annoying to develop, but avoids having different developers have personal copies just to update output directories
 
 desired_cases = 100
-case_count = 0
 
+add_positioning_augmentation = True  # whether to apply random rotation, translation, and resizing of the ground truth phantom head, see line 78 for default parameters
+
+# simple sphere lesion settings
 min_radius, max_radius = 2, 20
 min_contrast, max_contrast = 20, 200
+material = 'white_matter'  # brain region where lesion will be inserted options based on `material_lut` materials
+
+# scan acquisition settings
 startZ = -95
 endZ = 75
 views = 1000
 fov = 250
 mA = 200
 kVp = 120
+# End of user defined settings
 
+# define empty list of metadata columns to store in the resulting dataframe
 names = []
 files = []
 masks = []
@@ -51,8 +64,7 @@ center_x_list = []
 center_y_list = []
 center_z_list = []
 
-material = 'white_matter'
-
+case_count = 0
 while case_count < desired_cases:
     print(f'Case count number: {case_count}')
     radius = np.random.randint(min_radius, max_radius)
@@ -66,6 +78,17 @@ while case_count < desired_cases:
         print('Failed to insert lesion, continuing...')
         continue
 
+    if add_positioning_augmentation:
+        transform = RandAffine(prob=0.5,
+                               rotate_range=[np.pi/4, np.pi/20, np.pi/20],
+                               translate_range=[10, 10, 10],
+                               scale_range=[0.1, 0.1, 0.1],
+                               padding_mode="border")
+        img_w_lesion, lesion_image = transform_image_label_pair(transform,
+                                                                img_w_lesion,
+                                                                lesion_image,
+                                                                seed=42)
+
     patient_name = f'case_{case_count:03d}'
     output_dir = base_dir / patient_name
     output_dir.mkdir(exist_ok=True, parents=True)
@@ -75,18 +98,6 @@ while case_count < desired_cases:
     ct.run_recon(fov=fov)
     dicom_path = output_dir / 'dicoms'
     dcm_files = ct.write_to_dicom(dicom_path / f'{patient_name}.dcm')
-    # figure out how to save out ground truth lesion segmentation, currently only save coordinates
-
-    # lesion_only = CTobj(np.where(lesion_image > 0, 0, - 1000), spacings=(dz, dx, dy),
-    #                     patientname='lesion only', output_dir=output_dir / 'lesion only',
-    #                     materials={'ICRU_lung_adult_healthy':-1000, 'water': 0})
-    # lesion_only.xcist.cfg.physics.energyCount = 2
-    # lesion_only.xcist.cfg.physics.monochromatic = 0
-    # lesion_only.xcist.cfg.physics.enableElectronicNoise = 0
-    # lesion_only.xcist.cfg.physics.enableQuantumNoise = 0
-    # lesion_only.run_scan(mA=500, startZ=startZ, endZ=endZ, views=100)
-    # lesion_only.run_recon(fov=fov)
-    # lesion_only.recon = lesion_only.recon > - 950
 
     lesion_only = ct
     lesion_only.recon = ct.get_lesion_mask(lesion_image, startZ=startZ, endZ=endZ)
