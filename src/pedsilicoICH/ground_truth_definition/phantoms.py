@@ -8,8 +8,19 @@ from io import StringIO
 import numpy as np
 import nibabel as nib
 import pandas as pd
+from monai.transforms import Resize
 
 from . import dicom_to_voxelized_phantom
+
+
+def get_mean_age(age_range: str):
+    return (float(age_range.split('-')[1])+float(age_range.split('-')[0]))/2
+
+
+def resize(phantom, shape):
+    resize = Resize(max(shape), size_mode='longest')
+    resized = resize(phantom[None])[0]
+    return resized
 
 
 def voxelize_ground_truth(dicom_path, phantom_path, material_threshold_dict=None):
@@ -66,9 +77,8 @@ class Phantom:
 
 
 class MIDA_Head(Phantom):
-    def __init__(self, phantom_dir, csf_HU=15, gm_HU=45, wm_HU=20, skull_HU=1000):
+    def __init__(self, phantom_dir, csf_HU=15, gm_HU=45, wm_HU=20, skull_HU=1000, shape=None):
         super().__init__(phantom_dir)
-
         self.age = 39  # median american age
         self.csf_HU = csf_HU
         self.gm_HU = gm_HU
@@ -76,6 +86,19 @@ class MIDA_Head(Phantom):
         self.skull_HU = skull_HU
         self.air_HU = -1000
         self.material_lut = self._load_material_LUT()
+
+        img = nib.load(self.phantom_dir/'MIDA_v1.nii')
+        self._phantom = np.array(img.get_fdata()).transpose(1, 0, 2)
+
+        original_shape = self._phantom.shape
+        if shape:
+            self._phantom = resize(self._phantom, shape)
+            new_shape = self._phantom.shape
+            new_spacings = np.array(original_shape) / np.array(new_shape) * [self.dz, self.dx, self.dy]
+            self.dz, self.dx, self.dy = new_spacings
+        else:
+            shape = original_shape
+        self.nz, self.nx, self.ny = shape
 
     def _load_material_LUT(self):
 
@@ -138,10 +161,8 @@ class MIDA_Head(Phantom):
         return material_lut[~material_lut['CT Number [HU]'].isna()]
 
     def get_CT_number_phantom(self):
-
+        phantom = self._phantom
         material_lut = self.material_lut
-        img = nib.load(self.phantom_dir/'MIDA_v1.nii')
-        phantom = np.array(img.get_fdata()).transpose(1, 0, 2)
         phantom[phantom == 50] = -1000  # air
         for _, row in material_lut[~material_lut['CT Number [HU]'].isna()].iterrows():
             phantom[phantom == row.grayscale] = row['CT Number [HU]']
@@ -153,10 +174,6 @@ class MIDA_Head(Phantom):
         return self.get_CT_number_phantom() == self.materials[material]
 
 
-def get_mean_age(age_range: str):
-    return (float(age_range.split('-')[1])+float(age_range.split('-')[0]))/2
-
-
 class NIHPD_Head(Phantom):
     '''
     loads MR brain atlas of mean `age`, downloaded from <https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1> and saved in `base_dir`
@@ -166,7 +183,7 @@ class NIHPD_Head(Phantom):
     :param symmetry: optional, the atlases are provided in their natural asymmetric or artificially generated symmetric state, default is asymmetric, see article for more details: 
     1. Fonov V, Evans AC, Botteron K, Almli CR, McKinstry RC, Collins DL. Unbiased average age-appropriate atlases for pediatric studies. NeuroImage. 2011;54(1):313-327. doi:10.1016/j.neuroimage.2010.07.033
     '''
-    def __init__(self, phantom_dir, age: float, symmetric=False, csf_HU = 15, gm_HU = 45, wm_HU = 20, skull_HU = 1000):
+    def __init__(self, phantom_dir, age: float, symmetric=False, csf_HU=15, gm_HU=45, wm_HU=20, skull_HU=1000, shape=None):
         super().__init__(phantom_dir)
         self.age = age
         self.csf_HU = csf_HU
@@ -177,7 +194,7 @@ class NIHPD_Head(Phantom):
 
         nii_files = list(self.phantom_dir.glob('*.nii'))
         age_ranges = [o.stem.split('_')[2] for o in nii_files]
-        ages = {get_mean_age(o) : o for o in age_ranges}
+        ages = {get_mean_age(o): o for o in age_ranges}
 
         if age not in ages:
             raise ValueError(f'age {age} not in {sorted(ages.keys())}')
@@ -189,31 +206,47 @@ class NIHPD_Head(Phantom):
         nib_img = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_pdw.nii')
         header = nib_img.header
         self.dx, self.dy, self.dz = header['pixdim'][1:4]
-        
+
         self.csf = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_csf.nii').get_fdata().transpose(2, 1, 0)[:,::-1,:]
         self.gm = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_gm.nii').get_fdata().transpose(2, 1, 0)[:,::-1,:]
         self.wm = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_wm.nii').get_fdata().transpose(2, 1, 0)[:,::-1,:]
         self.mask = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_mask.nii').get_fdata().transpose(2, 1, 0)[:,::-1,:]
         self.pdw = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_pdw.nii').get_fdata().transpose(2, 1, 0)[:,::-1,:]
 
+        original_shape = self.csf.shape
+        if shape:
+            self.csf = resize(self.csf, shape)
+            new_shape = self.csf.shape
+            self.gm = resize(self.gm, shape)
+            self.wm = resize(self.wm, shape)
+            self.mask = resize(self.mask, shape)
+            self.pdw = resize(self.pdw, shape)
+
+            new_spacings = np.array(original_shape) / np.array(new_shape) * [self.dz, self.dx, self.dy]
+            self.dz, self.dx, self.dy = new_spacings
+        else:
+            shape = original_shape
+        self.nz, self.nx, self.ny = shape
+
         skull = (self.mask == 0)*self.pdw / self.pdw.max()
         skull[skull < 0.1] = 0
         self.skull = skull
 
     def get_CT_number_phantom(self):
-        
+
         phantom = self.csf*self.csf_HU + self.gm*self.gm_HU + self.wm*self.wm_HU + self.skull*self.skull_HU
         phantom[phantom==0] = self.air_HU
-        return phantom
+        return phantom.numpy()
 
-    def get_material_mask(self, material):            
+    def get_material_mask(self, material):
+        if material not in self.materials:
+            raise ValueError(f'{material} not in {self.materials.keys()}')
         if material == 'white matter':
-            return self.wm > 0.3
+            mask = self.wm > 0.3
 
         if material == 'gray matter':
-            return self.gm > 0.3
+            mask = self.gm > 0.3
 
         if material == 'CSF':
-            return self.csf > 0.3
-            
-        raise ValueError(f'{material} not in {self.materials.keys()}')
+            mask = self.csf > 0.3
+        return mask.astype(int)

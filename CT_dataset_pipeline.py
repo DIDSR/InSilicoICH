@@ -1,38 +1,29 @@
 # %%
 from pathlib import Path
-from io import StringIO
+from random import choice
 
 import pandas as pd
-import nibabel as nib
 import numpy as np
 from monai.transforms import RandAffine
 
+from pedsilicoICH.ground_truth_definition.phantoms import NIHPD_Head, MIDA_Head
 from pedsilicoICH.image_acquisition import CTobj
 from pedsilicoICH.lesion_insertion import add_random_sphere_lesion
 from pedsilicoICH.artifact_generation import transform_image_label_pair
 
 # %% [markdown]
 # Define Ground Truth Head
-phantom_dir = Path('MIDA Head Phantom')
-img = nib.load(phantom_dir/'MIDA_v1.nii')
-phantom = np.array(img.get_fdata()).transpose(1, 0, 2)
 
-with open(phantom_dir / 'MIDA_v1.txt', 'rb') as data:
-    df = pd.read_csv(StringIO(data.read().decode(errors='replace')), sep='\t',
-                     names=['grayscale', 'c1', 'c2', 'c3', 'material'])
-    material_lut = df.iloc[:-8]
-    temp = df.iloc[-8:, :2].set_index('grayscale').T
-    nx, ny, nz, dx, dy, dz = temp.nx.item(), temp.ny.item(), temp.nz.item(), temp.dx.item()*1000, temp.dy.item()*1000, temp.dz.item()*1000
+nihpd_dir = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/brain_atlases/obj1_analyze/')
+MIDA_dir = Path('MIDA Head Phantom')
+mida_shape = MIDA_Head(MIDA_dir).get_CT_number_phantom().shape
 
-material_lut = pd.read_csv('notebooks/material_lut.csv')
-
-phantom[phantom == 50] = -1000  # air
-for idx, row in material_lut[~material_lut['CT Number [HU]'].isna()].iterrows():
-    phantom[phantom == row.grayscale] = row['CT Number [HU]']
+nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
+possible_ages = nihpd_ages + ['adult']
 
 # %% [markdown]
 # Define simulation parameters
-base_dir = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/MIDA_sphere_ICH_position_augmentation') # output directory to save simulation results
+base_dir = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/mixed_datasets_sphere_ICH') # output directory to save simulation results
 # consider turning this script into a command line function, similar to https://github.com/bnel1201/Virtual-Patient-CT-Simulations/blob/PedSilicoICH-Pilot/run_xcat.py
 # it makes the files more annoying to develop, but avoids having different developers have personal copies just to update output directories
 
@@ -43,10 +34,10 @@ add_positioning_augmentation = True  # whether to apply random rotation, transla
 # simple sphere lesion settings
 min_radius, max_radius = 2, 20
 min_contrast, max_contrast = 20, 200
-material = 'white_matter'  # brain region where lesion will be inserted options based on `material_lut` materials
+material = 'white matter'  # brain region where lesion will be inserted options based on `material_lut` materials
 
 # scan acquisition settings
-startZ = -95
+startZ = -75 # TODO: make dynamic, this should be patient specific, not hard coded
 endZ = 75
 views = 1000
 fov = 250
@@ -55,6 +46,7 @@ kVp = 120
 # End of user defined settings
 
 # define empty list of metadata columns to store in the resulting dataframe
+ages = []
 names = []
 files = []
 masks = []
@@ -70,10 +62,19 @@ while case_count < desired_cases:
     radius = np.random.randint(min_radius, max_radius)
     contrast = np.random.randint(min_contrast, max_contrast)
 
-    ground_truth_image = phantom
+    age = choice(possible_ages)
+    if age == 'adult':
+        phantom = MIDA_Head(MIDA_dir)
+    else:
+        phantom = NIHPD_Head(nihpd_dir, age=age, shape=mida_shape)
+    ground_truth_image = phantom.get_CT_number_phantom()
+
     try:
-        brain_mask = ground_truth_image == material_lut.loc[material_lut['xcist material']==material]['CT Number [HU]'].iloc[1]   
-        img_w_lesion, lesion_image, lesion_coords = add_random_sphere_lesion(ground_truth_image, brain_mask, radius=radius, contrast=contrast)
+        brain_mask = phantom.get_material_mask(material)
+        img_w_lesion, lesion_image, lesion_coords = add_random_sphere_lesion(ground_truth_image,
+                                                                             brain_mask,
+                                                                             radius=radius,
+                                                                             contrast=contrast)
     except:
         print('Failed to insert lesion, continuing...')
         continue
@@ -92,21 +93,26 @@ while case_count < desired_cases:
     patient_name = f'case_{case_count:03d}'
     output_dir = base_dir / patient_name
     output_dir.mkdir(exist_ok=True, parents=True)
-    ct = CTobj(img_w_lesion, spacings=(dz, dx, dy), patientname=patient_name,
-               studyname='full volume long scan', output_dir=output_dir)
+    ct = CTobj(img_w_lesion, spacings=(phantom.dz, phantom.dx, phantom.dy),
+               patientname=patient_name,
+               age=age,
+               studyname='full volume long scan',
+               output_dir=output_dir)
     ct.run_scan(startZ=startZ, endZ=endZ, views=views, mA=mA, kVp=kVp)
     ct.run_recon(fov=fov)
     dicom_path = output_dir / 'dicoms'
     dcm_files = ct.write_to_dicom(dicom_path / f'{patient_name}.dcm')
 
     lesion_only = ct
-    lesion_only.recon = ct.get_lesion_mask(lesion_image, startZ=startZ, endZ=endZ)
+    lesion_only.recon = ct.get_lesion_mask(lesion_image,
+                                           startZ=startZ, endZ=endZ)
 
     dicom_path = output_dir / 'lesion_masks'
     mask_files = lesion_only.write_to_dicom(dicom_path / f'{patient_name}_mask.dcm')
 
     for f, m in zip(dcm_files, mask_files):
         names.append(patient_name)
+        ages.append(age)
         files.append(f)
         masks.append(m)
         contrast_list.append(contrast)
