@@ -16,10 +16,10 @@ from pedsilicoICH.artifact_generation import transform_image_label_pair
 
 nihpd_dir = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/brain_atlases/obj1_analyze/')
 MIDA_dir = Path('MIDA Head Phantom')
-mida_shape = MIDA_Head(MIDA_dir).get_CT_number_phantom().shape
 
 nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
-possible_ages = nihpd_ages + ['adult']
+mida_age = 38  # add 38 as the median US adult age to represent MIDA, consider other identifiers when adding more patients
+possible_ages = nihpd_ages + [mida_age]
 
 # %% [markdown]
 # Define simulation parameters
@@ -37,8 +37,10 @@ min_contrast, max_contrast = 20, 200
 material = 'white matter'  # brain region where lesion will be inserted options based on `material_lut` materials
 
 # scan acquisition settings
-startZ = -75 # TODO: make dynamic, this should be patient specific, not hard coded
-endZ = 75
+dynamic_scan_range = True
+if not dynamic_scan_range:
+    startZ = None
+    endZ = None  # if none, will default to the full possible scan range
 views = 1000
 fov = 250
 mA = 200
@@ -56,6 +58,8 @@ center_x_list = []
 center_y_list = []
 center_z_list = []
 
+mida_shape = MIDA_Head(MIDA_dir).get_CT_number_phantom().shape # for consistent phantom sizes
+
 case_count = 0
 while case_count < desired_cases:
     print(f'Case count number: {case_count}')
@@ -63,7 +67,7 @@ while case_count < desired_cases:
     contrast = np.random.randint(min_contrast, max_contrast)
 
     age = choice(possible_ages)
-    if age == 'adult':
+    if age == mida_age:
         phantom = MIDA_Head(MIDA_dir)
     else:
         phantom = NIHPD_Head(nihpd_dir, age=age, shape=mida_shape)
@@ -98,6 +102,10 @@ while case_count < desired_cases:
                age=age,
                studyname='full volume long scan',
                output_dir=output_dir)
+
+    if dynamic_scan_range:
+        startZ, endZ = ct.recommend_scan_range()
+
     ct.run_scan(startZ=startZ, endZ=endZ, views=views, mA=mA, kVp=kVp)
     ct.run_recon(fov=fov)
     dicom_path = output_dir / 'dicoms'

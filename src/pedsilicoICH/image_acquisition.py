@@ -172,6 +172,24 @@ class CTobj():
         self.total_scan_length = self.spacings[0]*self.phantom.shape[0]
         return np.arange(-self.total_scan_length/2, self.total_scan_length/2, self.scan_width)
 
+    def recommend_scan_range(self, threshold=-950) -> tuple:
+        '''
+        returns recommended startZ and endZ based on scout scan
+        attenuation profile
+
+        threshold [HU] determines minimum attenuating regions to keep
+        '''
+        scout_profile = self.phantom[::-1].mean(axis=(1, 2))
+        suggested_start_idx = np.argmax(np.diff(scout_profile > threshold)) + 1
+        suggested_start_mm = self.start_positions[0] + suggested_start_idx * self.spacings[0]
+
+        if np.all(scout_profile[suggested_start_idx:] > threshold):
+            suggested_end_mm = self.start_positions[-1]
+        else:
+            suggested_end_idx = np.argmax(np.diff(scout_profile[suggested_start_idx:] > threshold)) + 1
+            suggested_end_mm = self.start_positions[0] + suggested_end_idx * self.spacings[0]
+        return (suggested_start_mm, suggested_end_mm)
+
     def get_phantom(self) -> np.ndarray:
         'returns ground truth phantom as ndarray'
         gt_dicoms = list(Path(self.xcist.cfg.phantom.filename).parent.rglob('*.dcm'))
