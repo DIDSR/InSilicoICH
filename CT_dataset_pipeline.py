@@ -1,3 +1,22 @@
+# %% [markdown]
+# # CT_dataset_pipeline
+#
+# runs CT simulations given inputs of a voxelized
+# head phantom with ICH lesion insertion and scan acquisition parameters.
+#
+# Outputs:
+#
+# 1. a directory structure with dicom images for each simulation run and
+# 2. a CSV file containing relevant simulation metadata. This metadata
+# includes:
+#  - a summary of simulation inputs such as patient identifiers (name, age),
+#    as well as lesion insertion parameters (radius and center coordinates
+#    in case of a spherical ICH)
+#  - a summary of simulation outputs such as saved file locations of the dicom
+#    images "image file" as well as lesion segmentation masks 'mask file'
+#    lesion volume [mL] is also provided based on the measured lesion volume
+#    following CT simulation - this should be similar to volume predicted by
+#    the input radius
 # %%
 from pathlib import Path
 from random import choice
@@ -57,6 +76,7 @@ radius_list = []
 center_x_list = []
 center_y_list = []
 center_z_list = []
+lesion_volume_list = []
 
 mida_shape = MIDA_Head(MIDA_dir).get_CT_number_phantom().shape # for consistent phantom sizes
 
@@ -112,9 +132,11 @@ while case_count < desired_cases:
     dcm_files = ct.write_to_dicom(dicom_path / f'{patient_name}.dcm')
 
     lesion_only = ct
-    lesion_only.recon = ct.get_lesion_mask(lesion_image,
-                                           startZ=startZ, endZ=endZ)
+    mask = ct.get_lesion_mask(lesion_image,
+                              startZ=startZ, endZ=endZ)
+    vol_ml = np.prod(lesion_only.spacings) * mask.sum() / 1000
 
+    lesion_only.recon = mask
     dicom_path = output_dir / 'lesion_masks'
     mask_files = lesion_only.write_to_dicom(dicom_path / f'{patient_name}_mask.dcm')
 
@@ -128,13 +150,17 @@ while case_count < desired_cases:
         center_x_list.append(lesion_coords[0])
         center_y_list.append(lesion_coords[1])
         center_z_list.append(lesion_coords[2])
+        lesion_volume_list.append(vol_ml)
+
     case_count += 1
     metadata = pd.DataFrame({'name': names,
+                             'age': ages,
                              'contrast': contrast_list,
                              'radius': radius_list,
                              'center x': center_x_list,
                              'center y': center_y_list,
                              'center z': center_z_list,
+                             'lesion volume [mL]': lesion_volume_list,
                              'image file': files,
                              'mask file': masks})
     metadata.to_csv(base_dir / 'metadata.csv', index=False)
