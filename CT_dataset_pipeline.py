@@ -42,7 +42,7 @@ possible_ages = nihpd_ages + [mida_age]
 
 # %% [markdown]
 # Define simulation parameters
-base_dir = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/mixed_datasets_sphere_ICH') # output directory to save simulation results
+output_directory = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/mixed_datasets_sphere_ICH') # output directory to save simulation results
 # consider turning this script into a command line function, similar to https://github.com/bnel1201/Virtual-Patient-CT-Simulations/blob/PedSilicoICH-Pilot/run_xcat.py
 # it makes the files more annoying to develop, but avoids having different developers have personal copies just to update output directories
 
@@ -56,10 +56,10 @@ min_contrast, max_contrast = 20, 200
 material = 'white matter'  # brain region where lesion will be inserted options based on `material_lut` materials
 
 # scan acquisition settings
-dynamic_scan_range = True
+dynamic_scan_range = True  # used to determine z range covering the z extent of the head, can handle different sized heads e.g. peds vs adults
 if not dynamic_scan_range:
     startZ = None
-    endZ = None  # if none, will default to the full possible scan range
+    endZ = None  # if none, will default to the full possible scan range units in mm, centered at 0, see ct.scout_view() for examples
 views = 1000
 fov = 250
 mA = 200
@@ -78,13 +78,11 @@ center_y_list = []
 center_z_list = []
 lesion_volume_list = []
 
-mida_shape = MIDA_Head(MIDA_dir).get_CT_number_phantom().shape # for consistent phantom sizes
+mida_shape = MIDA_Head(MIDA_dir).get_CT_number_phantom().shape  # for consistent phantom sizes
 
 case_count = 0
 while case_count < desired_cases:
     print(f'Case count number: {case_count}')
-    radius = np.random.randint(min_radius, max_radius)
-    contrast = np.random.randint(min_contrast, max_contrast)
 
     age = choice(possible_ages)
     if age == mida_age:
@@ -93,6 +91,8 @@ while case_count < desired_cases:
         phantom = NIHPD_Head(nihpd_dir, age=age, shape=mida_shape)
     ground_truth_image = phantom.get_CT_number_phantom()
 
+    radius = np.random.randint(min_radius, max_radius)
+    contrast = np.random.randint(min_contrast, max_contrast)
     try:
         brain_mask = phantom.get_material_mask(material)
         img_w_lesion, lesion_image, lesion_coords = add_random_sphere_lesion(ground_truth_image,
@@ -114,7 +114,7 @@ while case_count < desired_cases:
                                                                 lesion_image)
 
     patient_name = f'case_{case_count:03d}'
-    output_dir = base_dir / patient_name
+    output_dir = output_directory / patient_name
     output_dir.mkdir(exist_ok=True, parents=True)
     ct = CTobj(img_w_lesion, spacings=(phantom.dz, phantom.dx, phantom.dy),
                patientname=patient_name,
@@ -162,4 +162,4 @@ while case_count < desired_cases:
                              'lesion volume [mL]': lesion_volume_list,
                              'image file': files,
                              'mask file': masks})
-    metadata.to_csv(base_dir / 'metadata.csv', index=False)
+    metadata.to_csv(output_directory / 'metadata.csv', index=False)
