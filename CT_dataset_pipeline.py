@@ -111,8 +111,7 @@ while case_count < desired_cases:
                                padding_mode="border")
         img_w_lesion, lesion_image = transform_image_label_pair(transform,
                                                                 img_w_lesion,
-                                                                lesion_image,
-                                                                seed=42)
+                                                                lesion_image)
 
     patient_name = f'case_{case_count:03d}'
     output_dir = base_dir / patient_name
