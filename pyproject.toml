@@ -12,7 +12,7 @@ dependencies = [
   "scikit-image",
   "scipy",
   "matplotlib",
-  "opencv",
+  "opencv-python",
   "monai",
   "pandas",
   "numpy",
