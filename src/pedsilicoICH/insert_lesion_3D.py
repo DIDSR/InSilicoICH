@@ -1,14 +1,14 @@
-from pathlib import Path
-import nibabel as nib
+# from pathlib import Path
+# import nibabel as nib
 import numpy as np
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import matplotlib as mpl
 import random
-import sys
+# import sys
 import math
 import skimage as ski
 import scipy
-import cv2
+# import cv2
 import time
 
 # Jayse Weaver 08/26/24
@@ -18,17 +18,17 @@ import time
 # Only inserts epidural/subdural lesions, will be merged with other lesion types
 
 # the goal is to re-write this script as a function that can work on any atlas/phantom
-def insert_dural_3D(header, volume, boundary, skull, init_slice, hematoma_type, verbose, plot_opt):
+def insert_dural_3D(spacing, volume, boundary, init_slice, hematoma_type, verbose=False):
 
-    print('starting code')
+    # print('starting code')
 
-    start_t = time.perf_counter()
+    # start_t = time.perf_counter()
 
-    # options and initial set up
-    plot_intermediate = False # true if plotting intermediate steps is desired
-    plot_final = plot_opt
-    save_output = True
-    [dx, dy, dz] = header['pixdim'][1:4] # set resolution, mm
+    # # options and initial set up
+    # plot_intermediate = False # true if plotting intermediate steps is desired
+    # plot_final = plot_opt
+    # save_output = True
+    [dx, dy, dz] = spacing # set resolution, mm
     distances = [50/dx, 75/dx] # length range in mm, will divide by voxel size (assuming isotropic) to convert
 
     num_slices = 11 # number of slices to have hemorrhage, try to make this odd
@@ -36,14 +36,14 @@ def insert_dural_3D(header, volume, boundary, skull, init_slice, hematoma_type, 
     iter_flag = True
     rows, cols, slices = volume.shape
 
-    desired_thickness = 0.5 # slice thickness in mm
+    # desired_thickness = 0.5 # slice thickness in mm
     hemisphere = random.choice(['left', 'right']) # can either be random or pre-defined
 
     if verbose: print("Creating synthetic " + hematoma_type + " hemorrhage in " + hemisphere + " hemisphere")
 
     # create an all-yellow colormap to use for hemorrhage "segmentation" (make sure mask values are 1)
-    yellow, norm = mpl.colors.from_levels_and_colors(levels=[0, 1], colors=['blue', 'yellow'], extend='max')
-    red, norm = mpl.colors.from_levels_and_colors(levels=[0, 1], colors=['blue', 'red'], extend='max')
+    # yellow, norm = mpl.colors.from_levels_and_colors(levels=[0, 1], colors=['blue', 'yellow'], extend='max')
+    # red, norm = mpl.colors.from_levels_and_colors(levels=[0, 1], colors=['blue', 'red'], extend='max')
 
     ## FIX THIS LATER
     # # select a single axial slice to speed up computations
@@ -109,13 +109,6 @@ def insert_dural_3D(header, volume, boundary, skull, init_slice, hematoma_type, 
             # find closest boundary point to previous start
             distance_idx = np.zeros((len(dura_idx),2))
 
-            # plt.figure(figsize=(10,10))
-            # plt.imshow(dura_route)
-            # plt.scatter(orig_start[0], orig_start[1], s=100, c='green', marker='x') 
-            # plt.scatter(orig_end[0], orig_end[1], s=100, c='red', marker='x')
-            # plt.imshow(np.ma.masked_where(temp_boundary != 1.0, temp_boundary), cmap=yellow, norm=norm, alpha=0.5)
-            # plt.show()
-
             distance_from_start = np.zeros(len(dura_idx))
             distance_from_end = np.zeros(len(dura_idx))
             for i in range(len(dura_idx)):
@@ -142,21 +135,14 @@ def insert_dural_3D(header, volume, boundary, skull, init_slice, hematoma_type, 
             # find closest boundary point to previous start
             distance_idx = np.zeros((len(dura_idx),2))
 
-            # plt.figure(figsize=(10,10))
-            # plt.imshow(dura_route)
-            # plt.scatter(orig_start[0], orig_start[1], s=100, c='green', marker='x') 
-            # plt.scatter(orig_end[0], orig_end[1], s=100, c='red', marker='x')
-            # plt.imshow(np.ma.masked_where(temp_boundary != 1.0, temp_boundary), cmap=yellow, norm=norm, alpha=0.5)
-            # plt.show()
-
             distance_from_start = np.zeros(len(dura_idx))
             distance_from_end = np.zeros(len(dura_idx))
             for i in range(len(dura_idx)):
                 distance_from_start[i] = math.sqrt((orig_start[0] - dura_idx[i][0])**2 + (orig_start[1] - dura_idx[i][1])**2)
                 distance_from_end[i] = math.sqrt((orig_end[0] - dura_idx[i][0])**2 + (orig_end[1] - dura_idx[i][1])**2)
 
-            new_start = dura_idx[np.argmin(distance_from_start)]
-            new_end = dura_idx[np.argmin(distance_from_end)]
+            # new_start = dura_idx[np.argmin(distance_from_start)]
+            # new_end = dura_idx[np.argmin(distance_from_end)]
 
             filled_array, boundary_coords, connect_coords = connect_points(start=orig_start, end=orig_end, boundary=temp_boundary, hematoma_type=hematoma_type)
 

@@ -11,7 +11,21 @@ from pedsilicoICH.image_acquisition import read_dicom, CTobj
 from pedsilicoICH.lesion_insertion import add_random_sphere_lesion
 from pedsilicoICH.artifact_generation import transform_image_label_pair
 
-from utils import get_effective_diameter, cosine_similarity
+
+def get_effective_diameter(ground_truth_mu, pixel_width_mm):
+    '''
+    effective diameter defined in AAPM TG204: https://www.aapm.org/pubs/reports/RPT_204.pdf
+    '''
+    A = np.sum(ground_truth_mu > -1000)*pixel_width_mm**2
+    return 2*np.sqrt(A/np.pi)
+
+
+def cosine_similarity(a, b):
+    a = a.ravel()
+    b = b.ravel()
+    a = a.astype(float)
+    b = b.astype(float)
+    return np.dot(a, b)/(np.linalg.norm(a)*np.linalg.norm(b))
 
 
 test_dir = Path(__file__).parent.absolute()
