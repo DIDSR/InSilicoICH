@@ -17,7 +17,7 @@
 #    lesion volume [mL] is also provided based on the measured lesion volume
 #    following CT simulation - this should be similar to volume predicted by
 #    the input radius
-# %%
+
 from pathlib import Path
 from random import choice
 
@@ -33,7 +33,8 @@ from pedsilicoICH.lesion_insertion import (add_random_sphere_lesion,
 from pedsilicoICH.artifact_generation import transform_image_label_pair
 
 # %% [markdown]
-# Define Ground Truth Head
+# # Start of User Defined Settings
+# ## Define Ground Truth Head
 
 nihpd_dir = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/brain_atlases/obj1_analyze/')
 MIDA_dir = Path('MIDA Head Phantom')
@@ -43,7 +44,7 @@ mida_age = 38  # add 38 as the median US adult age to represent MIDA, consider o
 possible_ages = nihpd_ages + [mida_age]
 
 # %% [markdown]
-# Define simulation parameters
+# ## Define simulation parameters
 output_directory = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/mixed_datasets_mixed_lesions') # output directory to save simulation results
 # consider turning this script into a command line function, similar to https://github.com/bnel1201/Virtual-Patient-CT-Simulations/blob/PedSilicoICH-Pilot/run_xcat.py
 # it makes the files more annoying to develop, but avoids having different developers have personal copies just to update output directories
@@ -58,7 +59,8 @@ min_radius, max_radius = 2, 20  # applied only to spheres, TODO turn to volume t
 min_contrast, max_contrast = 20, 200
 material = 'white matter'  # brain region where SPHERE lesion will be inserted options based on `material_lut` materials
 
-# scan acquisition settings
+# %% [markdown]
+# ## Define scan acquisition settings
 dynamic_scan_range = True  # used to determine z range covering the z extent of the head, can handle different sized heads e.g. peds vs adults
 if not dynamic_scan_range:
     startZ = None
@@ -67,7 +69,9 @@ views = 1000
 fov = 250
 mA = 200
 kVp = 120
-# End of user defined settings
+
+# %% [markdown]
+# ## End of user defined settings
 
 # define empty list of metadata columns to store in the resulting dataframe
 ages = []
@@ -81,6 +85,9 @@ center_x_list = []
 center_y_list = []
 center_z_list = []
 lesion_volume_list = []
+
+# %% [markdown]
+# ## Start simulation runs
 
 mida_shape = MIDA_Head(MIDA_dir).get_CT_number_phantom().shape  # for consistent phantom sizes
 
@@ -183,3 +190,5 @@ while case_count < desired_cases:
                              'image file': files,
                              'mask file': masks})
     metadata.to_csv(output_directory / 'metadata.csv', index=False)
+
+# %%
