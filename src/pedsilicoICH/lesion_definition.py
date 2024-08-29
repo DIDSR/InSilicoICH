@@ -32,21 +32,24 @@ def spherical_lesion(phantom: np.ndarray,
 def insert_dural_3D(spacing, volume, dura_map, init_slice, hematoma_type):
 
     boundary = dura_map
-    [dx, dy, dz] = spacing  # set resolution, mm
+    [dz, dy, dx] = spacing  # set resolution, mm
     distances = [50/dx, 75/dx]  # length range in mm, will divide by voxel size (assuming isotropic) to convert
 
     num_slices = 11  # number of slices to have hemorrhage, try to make this odd
     slice_counter = 0  # will iterate on this
     iter_flag = True
-    slices, cols, rows = volume.shape
+    slices, rows, cols = volume.shape
 
     # desired_thickness = 0.5 # slice thickness in mm
     hemisphere = random.choice(['left', 'right'])  # can either be random or pre-defined
 
     if hemisphere == 'left':
-        boundary[:, (int(cols/2) - 10):None, :] = 0.0
+        boundary[:, :, (int(cols/2) - 10):None] = 0.0
     elif hemisphere == 'right':
-        boundary[:, :(int(cols/2) + 10), :] = 0.0
+        boundary[:, :, :(int(cols/2) + 10)] = 0.0
+
+    import matplotlib.pyplot as plt
+    plt.imshow(boundary[150, :, :])
 
     hemorrhage_mask = np.zeros_like(boundary)
     while iter_flag:
@@ -82,50 +85,37 @@ def insert_dural_3D(spacing, volume, dura_map, init_slice, hematoma_type):
 
             slice_counter += 1
 
-        if slice_counter <= (num_slices-1)/2:
-            # now do other slices
-            temp_boundary = boundary[init_slice-slice_counter]
-            # print(temp_boundary.shape)
-            dura_idx = np.argwhere(temp_boundary == 1.0)
-            # find closest boundary point to previous start
-            distance_idx = np.zeros((len(dura_idx),2))
+        # this is a bit messy but it will work for intended purpose: 
+        # starting from hemorrhage origin, move down while shrinking distance between start/end point
+        # then, move up from hemorrhage origin while doing the same
+        if slice_counter <= (num_slices-1)/2: # move down from hemorrhage origin
+            slice_idx = slice_counter
+        elif slice_counter > (num_slices-1)/2: # start moving up from hemorrhage origin
+            slice_idx = -1*(slice_counter - int((num_slices-1)/2))
 
-            distance_from_start = np.zeros(len(dura_idx))
-            distance_from_end = np.zeros(len(dura_idx))
-            for i in range(len(dura_idx)):
-                distance_from_start[i] = math.sqrt((orig_start[0] - dura_idx[i][0])**2 + (orig_start[1] - dura_idx[i][1])**2)
-                distance_from_end[i] = math.sqrt((orig_end[0] - dura_idx[i][0])**2 + (orig_end[1] - dura_idx[i][1])**2)
+        temp_boundary = boundary[init_slice-slice_idx]
+        dura_idx = np.argwhere(temp_boundary == 1.0)
+        # find closest boundary point to previous start
+        distance_idx = np.zeros((len(dura_idx),2))
 
-            filled_array, _, _ = connect_points(start=orig_start, end=orig_end, boundary=temp_boundary, hematoma_type=hematoma_type)
+        distance_from_start = np.zeros(len(dura_idx))
+        distance_from_end = np.zeros(len(dura_idx))
+        for i in range(len(dura_idx)):
+            distance_from_start[i] = math.sqrt((orig_start[0] - dura_idx[i][0])**2 + (orig_start[1] - dura_idx[i][1])**2)
+            distance_from_end[i] = math.sqrt((orig_end[0] - dura_idx[i][0])**2 + (orig_end[1] - dura_idx[i][1])**2)
 
-            hemorrhage_mask[init_slice-slice_counter] = filled_array
+        new_start = dura_idx[np.argmin(distance_from_start)]
+        new_end = dura_idx[np.argmin(distance_from_end)]
 
-            slice_counter += 1
+        filled_array, _, _ = connect_points(start=new_start, end=new_end, boundary=temp_boundary, hematoma_type=hematoma_type)
 
-            if slice_counter == num_slices:
-                iter_flag = False
+        hemorrhage_mask[init_slice-slice_idx] = filled_array
 
-        elif slice_counter > (num_slices-1)/2:
-            # now do slices above origin
-            temp_boundary = boundary[init_slice-int((num_slices-1)/2)+slice_counter]
-            dura_idx = np.argwhere(temp_boundary == 1.0)
-            # print('Processing slice: ' + str(init_slice - slice_counter))
-            # find closest boundary point to previous start
-            distance_idx = np.zeros((len(dura_idx),2))
+        slice_counter += 1
 
-            distance_from_start = np.zeros(len(dura_idx))
-            distance_from_end = np.zeros(len(dura_idx))
-            for i in range(len(dura_idx)):
-                distance_from_start[i] = math.sqrt((orig_start[0] - dura_idx[i][0])**2 + (orig_start[1] - dura_idx[i][1])**2)
-                distance_from_end[i] = math.sqrt((orig_end[0] - dura_idx[i][0])**2 + (orig_end[1] - dura_idx[i][1])**2)
+        if slice_counter == num_slices:
+            iter_flag = False
 
-            filled_array, boundary_coords, connect_coords = connect_points(start=orig_start, end=orig_end, boundary=temp_boundary, hematoma_type=hematoma_type)
-
-            hemorrhage_mask[init_slice-int((num_slices-1)/2)+slice_counter] = filled_array
-            slice_counter += 1
-
-            if slice_counter == num_slices:
-                iter_flag = False
     return hemorrhage_mask
 
 
