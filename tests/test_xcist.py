@@ -47,7 +47,8 @@ contrast = 400
 img_w_lesion, lesion_vol, (z, x, y) = add_random_sphere_lesion(phantom,
                                                                phantom == 0,
                                                                radius,
-                                                               contrast)
+                                                               contrast,
+                                                               seed=1)
 ct = CTobj(img_w_lesion, spacings=3*[dx], patientname='test',
            output_dir=result_dir)
 
@@ -110,7 +111,7 @@ def test_transform_image_label_pair():
                                                                  img_w_lesion,
                                                                  lesion_vol,
                                                                  seed=42)
-      
+
     # tests that the augmented results are different from the original
     assert cosine_similarity(img_augmented, img_w_lesion) < cosine_similarity(img_w_lesion, img_w_lesion)
     assert cosine_similarity(lesion_augmented, lesion_vol) < cosine_similarity(lesion_vol, lesion_vol)
