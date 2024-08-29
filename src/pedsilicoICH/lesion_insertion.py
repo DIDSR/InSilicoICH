@@ -10,7 +10,8 @@ from .lesion_definition import spherical_lesion, insert_dural_3D
 
 def add_random_sphere_lesion(vol: np.ndarray, mask: np.ndarray,
                              radius: list[int] = [20],
-                             contrast: list[int] = [-100]) -> tuple:
+                             contrast: list[int] = [-100],
+                             seed: int | None = None) -> tuple:
     '''
     adds lesion to vol in random location within mask of size radius
     and contrast level contrast
@@ -34,9 +35,10 @@ def add_random_sphere_lesion(vol: np.ndarray, mask: np.ndarray,
 
     counts = 0
     sphere = np.zeros_like(vol, dtype=bool)
-    while np.sum(mask & sphere) < volume: #can increase threshold to size of lesion
+    while np.sum(mask & sphere) < volume:  # can increase threshold to size of lesion
         lesion_vol = np.zeros_like(vol)
-        z, x, y = np.argwhere(mask)[np.random.randint(0, mask.sum())]
+        rng = np.random.default_rng(seed)
+        z, x, y = np.argwhere(mask)[rng.integers(0, mask.sum())]
         if mask[z].sum() < np.pi*r**2:
             continue
         counts += 1
