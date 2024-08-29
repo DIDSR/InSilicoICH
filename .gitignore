@@ -2,6 +2,7 @@ notebooks/.ipynb_checkpoints
 .ipynb_checkpoints
 notebooks/__pycache__
 .vscode
+.PedSilicoICH
 .PedsilicoICH
 notebooks/default
 notebooks/test
