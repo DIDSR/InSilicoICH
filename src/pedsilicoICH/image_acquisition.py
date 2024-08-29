@@ -179,7 +179,7 @@ class CTobj():
 
         threshold [HU] determines minimum attenuating regions to keep
         '''
-        scout_profile = self.phantom[::-1].mean(axis=(1, 2))
+        scout_profile = self.phantom.mean(axis=(1, 2))
         suggested_start_idx = np.argmax(np.diff(scout_profile > threshold)) + 1
         suggested_start_mm = self.start_positions[0] + suggested_start_idx * self.spacings[0]
 
@@ -236,16 +236,29 @@ class CTobj():
                 raise ValueError(f'startZ is outside the range of valid start positions: {self.start_positions}')
             start_positions = start_positions[start_positions < endZ]
 
-        plt.imshow(self.phantom.sum(axis=1)[::-1], cmap='gray', origin='upper', extent=[-self.phantom.shape[0]*self.spacings[0]/2, self.phantom.shape[0]*self.spacings[0]/2,
-                                                                                        self.start_positions[0]+self.total_scan_length, self.start_positions[0]])
-        plt.hlines(y=start_positions[0], xmin=-self.phantom.shape[0]*self.spacings[0] / 2, xmax=self.phantom.shape[0]*self.spacings[0]/2, color='red')
-        plt.annotate('Start', (0, start_positions[0]-10), horizontalalignment='center')
+        plt.imshow(self.phantom.sum(axis=1), cmap='gray', origin='lower',
+                   extent=[-self.phantom.shape[0]*self.spacings[0]/2,
+                           self.phantom.shape[0]*self.spacings[0]/2,
+                           self.start_positions[0]+self.total_scan_length,
+                           self.start_positions[0]])
+        plt.hlines(y=start_positions[0],
+                   xmin=-self.phantom.shape[0]*self.spacings[0] / 2,
+                   xmax=self.phantom.shape[0]*self.spacings[0]/2, color='red')
+        plt.annotate('Stop', (0, start_positions[0]-10),
+                     horizontalalignment='center')
 
-        plt.hlines(y=start_positions[-1] + self.scan_width, xmin=-self.phantom.shape[0]*self.spacings[0]/2, xmax=self.phantom.shape[0]*self.spacings[0]/2, color='red')
-        plt.annotate('Stop', (0, start_positions[-1] + self.scan_width + 10), horizontalalignment='center')
+        plt.hlines(y=start_positions[-1] + self.scan_width,
+                   xmin=-self.phantom.shape[0]*self.spacings[0]/2,
+                   xmax=self.phantom.shape[0]*self.spacings[0]/2, color='red')
+        plt.annotate('Start', (0, start_positions[-1] + self.scan_width + 10),
+                     horizontalalignment='center')
 
-        plt.annotate(f'{len(start_positions)} scans required', xy=(0, (start_positions[0]+start_positions[-1])/2), horizontalalignment='center')
-        plt.annotate('', xy=(40, start_positions[0]), xytext=(40, start_positions[-1] + self.scan_width), arrowprops=dict(facecolor='black', shrink=0.05))
+        plt.annotate(f'{len(start_positions)} scans required',
+                     xy=(0, (start_positions[0]+start_positions[-1])/2),
+                     horizontalalignment='center')
+        plt.annotate('', xy=(40, start_positions[-1] + self.scan_width),
+                     xytext=(40, start_positions[0]),
+                     arrowprops=dict(facecolor='black', shrink=0.05))
         plt.title(f'Table Speed: {self.xcist.cfg.protocol.tableSpeed} mm/s')
         plt.ylabel('scan z position [mm]')
         plt.xlabel('scan x position [mm]')

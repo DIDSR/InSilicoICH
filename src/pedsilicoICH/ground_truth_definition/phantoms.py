@@ -8,6 +8,7 @@ from io import StringIO
 import numpy as np
 import nibabel as nib
 import pandas as pd
+import skimage as ski
 from monai.transforms import Resize
 
 from . import dicom_to_voxelized_phantom
@@ -75,6 +76,10 @@ class Phantom:
     def get_material_mask(self, material):
         pass
 
+    def get_dura_map(self):
+        'used for epidural, subdural lesion insertion'
+        pass
+
 
 class MIDA_Head(Phantom):
     def __init__(self, phantom_dir, csf_HU=15, gm_HU=45, wm_HU=20, skull_HU=1000, shape=None):
@@ -88,7 +93,7 @@ class MIDA_Head(Phantom):
         self.material_lut = self._load_material_LUT()
 
         img = nib.load(self.phantom_dir/'MIDA_v1.nii')
-        self._phantom = np.array(img.get_fdata()).transpose(1, 0, 2)
+        self._phantom = np.array(img.get_fdata()).transpose(1, 0, 2)[::-1]
 
         original_shape = self._phantom.shape
         if shape:
@@ -173,6 +178,11 @@ class MIDA_Head(Phantom):
             raise ValueError(f'{material} not in {self.materials.keys()}')
         return self.get_CT_number_phantom() == self.materials[material]
 
+    def get_dura_map(self):
+        dura_map = np.zeros_like(self._phantom)
+        dura_map[np.where(self._phantom == 1.0)] = 1.0
+        return dura_map
+
 
 class NIHPD_Head(Phantom):
     '''
@@ -213,6 +223,12 @@ class NIHPD_Head(Phantom):
         self.mask = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_mask.nii').get_fdata().transpose(2, 1, 0)[:,::-1,:]
         self.pdw = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_pdw.nii').get_fdata().transpose(2, 1, 0)[:,::-1,:]
 
+        self.csf = self.csf[::-1]
+        self.gm = self.gm[::-1]
+        self.wm = self.wm[::-1]
+        self.mask = self.mask[::-1]
+        self.pdw = self.pdw[::-1]
+
         original_shape = self.csf.shape
         if shape:
             self.csf = resize(self.csf, shape)
@@ -235,7 +251,7 @@ class NIHPD_Head(Phantom):
     def get_CT_number_phantom(self):
 
         phantom = self.csf*self.csf_HU + self.gm*self.gm_HU + self.wm*self.wm_HU + self.skull*self.skull_HU
-        phantom[phantom==0] = self.air_HU
+        phantom[phantom == 0] = self.air_HU
         return phantom.numpy()
 
     def get_material_mask(self, material):
@@ -250,3 +266,8 @@ class NIHPD_Head(Phantom):
         if material == 'CSF':
             mask = self.csf > 0.3
         return mask.astype(int)
+
+    def get_dura_map(self):
+        return ski.segmentation.find_boundaries(self.mask.numpy(),
+                                                mode='inner',
+                                                background=0)

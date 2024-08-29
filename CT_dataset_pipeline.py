@@ -27,7 +27,9 @@ from monai.transforms import RandAffine
 
 from pedsilicoICH.ground_truth_definition.phantoms import NIHPD_Head, MIDA_Head
 from pedsilicoICH.image_acquisition import CTobj
-from pedsilicoICH.lesion_insertion import add_random_sphere_lesion
+from pedsilicoICH.lesion_insertion import (add_random_sphere_lesion,
+                                           add_epidural_lesion,
+                                           add_subdural_lesion)
 from pedsilicoICH.artifact_generation import transform_image_label_pair
 
 # %% [markdown]
@@ -42,7 +44,7 @@ possible_ages = nihpd_ages + [mida_age]
 
 # %% [markdown]
 # Define simulation parameters
-output_directory = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/mixed_datasets_sphere_ICH') # output directory to save simulation results
+output_directory = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/mixed_datasets_mixed_lesions') # output directory to save simulation results
 # consider turning this script into a command line function, similar to https://github.com/bnel1201/Virtual-Patient-CT-Simulations/blob/PedSilicoICH-Pilot/run_xcat.py
 # it makes the files more annoying to develop, but avoids having different developers have personal copies just to update output directories
 
@@ -50,10 +52,11 @@ desired_cases = 100
 
 add_positioning_augmentation = True  # whether to apply random rotation, translation, and resizing of the ground truth phantom head, see line 78 for default parameters
 
-# simple sphere lesion settings
-min_radius, max_radius = 2, 20
+# Define lesion settings
+lesion_types = ['sphere', 'epidural', 'subdural']
+min_radius, max_radius = 2, 20  # applied only to spheres, TODO turn to volume then can be more general to allow types
 min_contrast, max_contrast = 20, 200
-material = 'white matter'  # brain region where lesion will be inserted options based on `material_lut` materials
+material = 'white matter'  # brain region where SPHERE lesion will be inserted options based on `material_lut` materials
 
 # scan acquisition settings
 dynamic_scan_range = True  # used to determine z range covering the z extent of the head, can handle different sized heads e.g. peds vs adults
@@ -73,6 +76,7 @@ files = []
 masks = []
 contrast_list = []
 radius_list = []
+lesion_type_list = []
 center_x_list = []
 center_y_list = []
 center_z_list = []
@@ -92,13 +96,27 @@ while case_count < desired_cases:
     ground_truth_image = phantom.get_CT_number_phantom()
 
     radius = np.random.randint(min_radius, max_radius)
+    lesion_type = choice(lesion_types)
     contrast = np.random.randint(min_contrast, max_contrast)
+
     try:
-        brain_mask = phantom.get_material_mask(material)
-        img_w_lesion, lesion_image, lesion_coords = add_random_sphere_lesion(ground_truth_image,
-                                                                             brain_mask,
-                                                                             radius=radius,
-                                                                             contrast=contrast)
+        if lesion_type == 'sphere':
+            lesion_func = add_random_sphere_lesion
+            mask = phantom.get_material_mask(material).astype(int)
+            params = {'radius': radius, 'contrast': contrast}
+        elif lesion_type == 'epidural':
+            lesion_func = add_epidural_lesion
+            mask = phantom.get_dura_map()
+            params = {'spacing': (phantom.dz, phantom.dx, phantom.dy),
+                      'contrast': contrast}
+        else:
+            lesion_func = add_subdural_lesion
+            mask = phantom.get_dura_map()
+            params = {'spacing': (phantom.dz, phantom.dx, phantom.dy),
+                      'contrast': contrast}
+
+        img_w_lesion, lesion_image, lesion_coords = lesion_func(ground_truth_image, mask, **params)
+
     except:
         print('Failed to insert lesion, continuing...')
         continue
@@ -146,6 +164,7 @@ while case_count < desired_cases:
         masks.append(m)
         contrast_list.append(contrast)
         radius_list.append(radius)
+        lesion_type_list.append(lesion_type)
         center_x_list.append(lesion_coords[0])
         center_y_list.append(lesion_coords[1])
         center_z_list.append(lesion_coords[2])
@@ -159,6 +178,7 @@ while case_count < desired_cases:
                              'center x': center_x_list,
                              'center y': center_y_list,
                              'center z': center_z_list,
+                             'lesion type': lesion_type_list,
                              'lesion volume [mL]': lesion_volume_list,
                              'image file': files,
                              'mask file': masks})

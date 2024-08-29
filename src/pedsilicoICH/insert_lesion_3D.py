@@ -2,14 +2,14 @@
 # import nibabel as nib
 import numpy as np
 # import matplotlib.pyplot as plt
-import matplotlib as mpl
+# import matplotlib as mpl
 import random
 # import sys
 import math
 import skimage as ski
 import scipy
 # import cv2
-import time
+# import time
 
 # Jayse Weaver 08/26/24
 # Currently relies on being called by main.py
@@ -18,7 +18,7 @@ import time
 # Only inserts epidural/subdural lesions, will be merged with other lesion types
 
 # the goal is to re-write this script as a function that can work on any atlas/phantom
-def insert_dural_3D(spacing, volume, boundary, init_slice, hematoma_type, verbose=False):
+def insert_dural_3D(spacing, volume, dura_map, init_slice, hematoma_type, verbose=False):
 
     # print('starting code')
 
@@ -28,6 +28,7 @@ def insert_dural_3D(spacing, volume, boundary, init_slice, hematoma_type, verbos
     # plot_intermediate = False # true if plotting intermediate steps is desired
     # plot_final = plot_opt
     # save_output = True
+    boundary = dura_map
     [dx, dy, dz] = spacing # set resolution, mm
     distances = [50/dx, 75/dx] # length range in mm, will divide by voxel size (assuming isotropic) to convert
 
@@ -71,7 +72,7 @@ def insert_dural_3D(spacing, volume, boundary, init_slice, hematoma_type, verbos
         print('iterating')
         if slice_counter == 0: # need to do the slice in the middle of the hemorrhage, same as before
             print('Processing center slice: ' + str(init_slice))
-            temp_boundary = boundary[:, :, init_slice]
+            temp_boundary = boundary[init_slice]
             dura_idx = np.argwhere(temp_boundary == 1.0)
 
             # choose a random start point, and calculate distance bfrom all available boundary voxels to start point
@@ -96,13 +97,13 @@ def insert_dural_3D(spacing, volume, boundary, init_slice, hematoma_type, verbos
             filled_array, boundary_coords, connect_coords = connect_points(start=orig_start, end=orig_end, boundary=temp_boundary, hematoma_type=hematoma_type)
             # eventually will use boundary and connection coordinates to warp hemorrhage volume and original phantom
 
-            hemorrhage_mask[:, :, init_slice] = filled_array
+            hemorrhage_mask[init_slice] = filled_array
 
             slice_counter += 1
 
         if slice_counter <= (num_slices-1)/2:
             # now do other slices
-            temp_boundary = boundary[:, :, init_slice-slice_counter]
+            temp_boundary = boundary[init_slice-slice_counter]
             print(temp_boundary.shape)
             dura_idx = np.argwhere(temp_boundary == 1.0)
             print('Processing slice: ' + str(init_slice - slice_counter))
@@ -120,7 +121,7 @@ def insert_dural_3D(spacing, volume, boundary, init_slice, hematoma_type, verbos
 
             filled_array, boundary_coords, connect_coords = connect_points(start=orig_start, end=orig_end, boundary=temp_boundary, hematoma_type=hematoma_type)
 
-            hemorrhage_mask[:, :, init_slice-slice_counter] = filled_array
+            hemorrhage_mask[init_slice-slice_counter] = filled_array
 
             slice_counter += 1
 
@@ -129,7 +130,7 @@ def insert_dural_3D(spacing, volume, boundary, init_slice, hematoma_type, verbos
 
         elif slice_counter > (num_slices-1)/2:
             # now do slices above origin
-            temp_boundary = boundary[:, :, init_slice-int((num_slices-1)/2)+slice_counter]
+            temp_boundary = boundary[init_slice-int((num_slices-1)/2)+slice_counter]
             dura_idx = np.argwhere(temp_boundary == 1.0)
             print('Processing slice: ' + str(init_slice - slice_counter))
             # find closest boundary point to previous start
@@ -141,12 +142,9 @@ def insert_dural_3D(spacing, volume, boundary, init_slice, hematoma_type, verbos
                 distance_from_start[i] = math.sqrt((orig_start[0] - dura_idx[i][0])**2 + (orig_start[1] - dura_idx[i][1])**2)
                 distance_from_end[i] = math.sqrt((orig_end[0] - dura_idx[i][0])**2 + (orig_end[1] - dura_idx[i][1])**2)
 
-            # new_start = dura_idx[np.argmin(distance_from_start)]
-            # new_end = dura_idx[np.argmin(distance_from_end)]
-
             filled_array, boundary_coords, connect_coords = connect_points(start=orig_start, end=orig_end, boundary=temp_boundary, hematoma_type=hematoma_type)
 
-            hemorrhage_mask[:, :, init_slice-int((num_slices-1)/2)+slice_counter] = filled_array
+            hemorrhage_mask[init_slice-int((num_slices-1)/2)+slice_counter] = filled_array
             slice_counter += 1
 
             if slice_counter == num_slices:
