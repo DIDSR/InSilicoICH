@@ -11,8 +11,6 @@ dependencies = [
   "nibabel",
   "scikit-image",
   "scipy",
-  "matplotlib",
-  "opencv-python",
   "monai",
   "pandas",
   "numpy",

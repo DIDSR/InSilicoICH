@@ -8,8 +8,6 @@ import random
 import math
 import skimage as ski
 import scipy
-# import cv2
-# import time
 
 # Jayse Weaver 08/26/24
 # Currently relies on being called by main.py
