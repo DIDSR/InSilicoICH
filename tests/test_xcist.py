@@ -8,7 +8,7 @@ import numpy as np
 from monai.transforms import RandAffine
 
 from pedsilicoICH.image_acquisition import read_dicom, CTobj
-from pedsilicoICH.lesion_insertion import add_random_sphere_lesion
+from pedsilicoICH.lesion_insertion import add_sphere_lesion
 from pedsilicoICH.artifact_generation import transform_image_label_pair
 
 
@@ -44,11 +44,11 @@ if Path(result_dir).exists():
 
 radius = 6
 contrast = 400
-img_w_lesion, lesion_vol, (z, x, y) = add_random_sphere_lesion(phantom,
-                                                               phantom == 0,
-                                                               radius,
-                                                               contrast,
-                                                               seed=1)
+img_w_lesion, lesion_vol, (z, x, y) = add_sphere_lesion(phantom,
+                                                        phantom == 0,
+                                                        radius,
+                                                        contrast,
+                                                        seed=1)
 ct = CTobj(img_w_lesion, spacings=3*[dx], patientname='test',
            output_dir=result_dir)
 

@@ -8,10 +8,10 @@ from scipy.ndimage import center_of_mass
 from .lesion_definition import spherical_lesion, insert_dural_3D
 
 
-def add_random_sphere_lesion(vol: np.ndarray, mask: np.ndarray,
-                             radius: list[int] = [20],
-                             contrast: list[int] = [-100],
-                             seed: int | None = None) -> tuple:
+def add_sphere_lesion(vol: np.ndarray, mask: np.ndarray,
+                      radius: list[int] = [20],
+                      contrast: list[int] = [-100],
+                      seed: int | None = None) -> tuple:
     '''
     adds lesion to vol in random location within mask of size radius
     and contrast level contrast

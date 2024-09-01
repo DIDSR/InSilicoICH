@@ -27,7 +27,7 @@ from monai.transforms import RandAffine
 
 from pedsilicoICH.ground_truth_definition.phantoms import NIHPD_Head, MIDA_Head
 from pedsilicoICH.image_acquisition import CTobj
-from pedsilicoICH.lesion_insertion import (add_random_sphere_lesion,
+from pedsilicoICH.lesion_insertion import (add_sphere_lesion,
                                            add_epidural_lesion,
                                            add_subdural_lesion)
 from pedsilicoICH.artifact_generation import transform_image_label_pair
@@ -108,7 +108,7 @@ while case_count < desired_cases:
 
     try:
         if lesion_type == 'sphere':
-            lesion_func = add_random_sphere_lesion
+            lesion_func = add_sphere_lesiondom_sphere_lesion
             mask = phantom.get_material_mask(material).astype(int)
             params = {'radius': radius, 'contrast': contrast}
         elif lesion_type == 'epidural':

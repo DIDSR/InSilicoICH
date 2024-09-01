@@ -249,9 +249,8 @@ class NIHPD_Head(Phantom):
         self.skull = skull
 
     def get_CT_number_phantom(self):
-
         phantom = self.csf*self.csf_HU + self.gm*self.gm_HU + self.wm*self.wm_HU + self.skull*self.skull_HU
-        phantom[phantom == 0] = self.air_HU
+        phantom[phantom <= 0] = self.air_HU
         return phantom.numpy()
 
     def get_material_mask(self, material):
