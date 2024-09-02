@@ -1,3 +1,7 @@
+'''
+pipeline: this module organizes the healthy head phantoms, lesion definitions,
+augmentations, and CT simulation together into the final ct_simulation function
+'''
 from pathlib import Path
 
 from monai.transforms import RandAffine
@@ -17,7 +21,7 @@ MIDA_dir = Path('MIDA Head Phantom')
 def ct_simulation(output_directory, patient_name, age, lesion_type, radius,
                   contrast, views=1000, fov=250, mA=200, kVp=120,
                   zspan='dynamic', add_positioning_augmentation=True):
-
+    print(f'{age} years, {lesion_type}, {contrast} HU')
     mida_shape = (480, 480, 350)  # default shape of MIDA
     mida_age = 38
     if age == mida_age:
@@ -42,7 +46,8 @@ def ct_simulation(output_directory, patient_name, age, lesion_type, radius,
                   'contrast': contrast}
     ground_truth_image = phantom.get_CT_number_phantom()
 
-    img_w_lesion, lesion_image, lesion_coords = lesion_func(ground_truth_image, mask, **params)
+    img_w_lesion, lesion_image, _ = lesion_func(ground_truth_image,
+                                                mask, **params)
 
     if add_positioning_augmentation:
         transform = RandAffine(prob=0.5,
@@ -54,9 +59,9 @@ def ct_simulation(output_directory, patient_name, age, lesion_type, radius,
                                                                 img_w_lesion,
                                                                 lesion_image)
 
-    output_dir = output_directory / patient_name
+    output_dir = Path(output_directory) / patient_name
     output_dir.mkdir(exist_ok=True, parents=True)
-    ct = CTobj(img_w_lesion, spacings=(phantom.dz, phantom.dx, phantom.dy),
+    ct = CTobj(img_w_lesion, spacings=phantom.spacings,
                patientname=patient_name,
                age=age,
                studyname='full volume long scan',

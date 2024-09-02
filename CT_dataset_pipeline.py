@@ -32,17 +32,17 @@ from pedsilicoICH.pipeline import ct_simulation
 from pedsilicoICH.image_acquisition import read_dicom
 
 
+output_directory = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/parallel')  # output directory to save simulation results
+desired_cases = 100
+views = 1000
+
+
 def load_vol(file_list):
     return np.stack(list(map(read_dicom, file_list)))
 
 
-output_directory = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/parallel') # output directory to save simulation results
-desired_cases = 100
-views = 1000
-
-def main(patientid, age, kVp, mA, contrast, radius, lesion_type, views=1000, zspan='dynamic'):
-    print(patientid)
-    patient_name = f'case_{patientid:03}'
+def main(output_directory, patient_name, age, kVp, mA, contrast, radius,
+         lesion_type, views=1000, zspan='dynamic'):
     dcm_files, mask_files = ct_simulation(output_directory=output_directory,
                                           patient_name=patient_name,
                                           age=age,
@@ -98,16 +98,25 @@ def main(patientid, age, kVp, mA, contrast, radius, lesion_type, views=1000, zsp
                              'image file': files,
                              'mask file': masks})
     return metadata
-
 # %%
+
+
 if __name__ == "__main__":
     parser = ArgumentParser(description='Runs XCIST CT simulations of ICH models')
-    parser.add_argument('--output_directory', type=str, default="", help='output directory to save simulation results')
-    parser.add_argument('--views', type=int, default=1000, help='number of angular CT views per rotation')
-    parser.add_argument('--desired_cases', type=int, default=1000, help='number of simulations to run')
+    parser.add_argument('--output_directory', type=str, default="",
+                        help='output directory to save simulation results')
+    parser.add_argument('--views', type=int, default=1000,
+                        help='number of angular CT views per rotation')
+    parser.add_argument('--desired_cases', type=int, default=1000,
+                        help='number of simulations to run')    
+    parser.add_argument('--zspan', nargs='+', default='dynamic',
+                        help='z range of scans [mm], defaults to dynamic')
     args = parser.parse_args()
 
+    output_directory = args.output_directory
     desired_cases = args.desired_cases
+    zspan = args.zspan
+    views = args.views
     # </https://www.aapm.org/pubs/CTProtocols/documents/PediatricRoutineHeadCT.pdf>
     # find parameter
 # %%
@@ -121,7 +130,7 @@ if __name__ == "__main__":
     min_contrast, max_contrast = 20, 200
     contrast_list = np.arange(20, 200)
     radii_list = np.arange(min_radius, max_radius)
-    simulations_list = list(range(1)) # This can be increased to enable multiple scans (different noise realizations of the same slice and settings)
+    simulations_list = list(range(1))  # This can be increased to enable multiple scans (different noise realizations of the same slice and settings)
     l_parameter_comb = []
     for age_id in possible_ages:
         for kVp_id in kVp_list:
@@ -141,25 +150,23 @@ if __name__ == "__main__":
     l_parameter_comb = l_parameter_comb[:desired_cases]
 
     try:
-        SGE_TASK_ID = int(os.environ['SGE_TASK_ID'])-1 # since tasks start from 1
-        age, kVp, mA, contrast, radius, lesion_type, sim_id = l_parameter_comb[SGE_TASK_ID]
-        metadata = main(patientid=SGE_TASK_ID, age=age,
+        patientids = [int(os.environ['SGE_TASK_ID']) - 1]  # since tasks start from 1
+    except:
+        print('SGE_TASK_ID not set, running in serial')
+        n_params = len(l_parameter_comb)
+        patientids = list(range(n_params))
+
+    for patientid in patientids:
+        print(f'{patientid}/{n_params}')
+        age, kVp, mA, contrast, radius, lesion_type, sim_id = l_parameter_comb[patientid]
+        patient_name = f'case_{patientid:03}'
+        metadata = main(output_directory,
+                        patient_name, age=age,
                         kVp=kVp, mA=mA, contrast=contrast,
                         radius=radius,
                         lesion_type=lesion_type,
                         views=views, zspan=zspan)
-        metadata.to_csv(output_directory / f'metadata_{SGE_TASK_ID}.csv', index=False)
-    except:
-        print('SGE_TASK_ID not set, running in serial')
-        n_params = len(l_parameter_comb)
-        for SGE_TASK_ID in range(n_params):
-            print(f'{SGE_TASK_ID}/{n_params}')
-            age, kVp, mA, contrast, radius, lesion_type, sim_id = l_parameter_comb[SGE_TASK_ID]
-            metadata = main(patientid=SGE_TASK_ID, age=age,
-                            kVp=kVp, mA=mA, contrast=contrast,
-                            radius=radius,
-                            lesion_type=lesion_type,
-                            views=views, zspan=zspan)
-            metadata.to_csv(output_directory / f'metadata_{SGE_TASK_ID}.csv', index=False)
+        metadata.to_csv(output_directory / f'metadata_{patientid}.csv',
+                        index=False)
 
 # %%

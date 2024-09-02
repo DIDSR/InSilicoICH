@@ -48,8 +48,8 @@ def insert_dural_3D(spacing, volume, dura_map, init_slice, hematoma_type):
     elif hemisphere == 'right':
         boundary[:, :, :(int(cols/2) + 10)] = 0.0
 
-    import matplotlib.pyplot as plt
-    plt.imshow(boundary[150, :, :])
+    # import matplotlib.pyplot as plt
+    # plt.imshow(boundary[150, :, :])
 
     hemorrhage_mask = np.zeros_like(boundary)
     while iter_flag:
@@ -140,7 +140,7 @@ def connect_points(start, end, boundary, hematoma_type):
     elif hematoma_type == 'subdural':
         bezier_weight = 0.5
         bezier_middle = boundary_coords[round(len(boundary_coords)/2)]  # use the middle point of the dura line 
-        print(bezier_middle)
+        # print(bezier_middle)
     else:
         bezier_weight = 0.0
         bezier_middle = (int(rows/2), int(cols/2))
