@@ -36,7 +36,7 @@ def load_vol(file_list):
     return np.stack(list(map(read_dicom, file_list)))
 
 
-output_directory = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/mixed_datasets_mixed_lesions') # output directory to save simulation results
+output_directory = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/parallel') # output directory to save simulation results
 desired_cases = 100
 views = 1000
 
