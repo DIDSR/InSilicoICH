@@ -7,27 +7,22 @@ from pathlib import Path
 from monai.transforms import RandAffine
 import numpy as np
 
-from .ground_truth_definition.phantoms import NIHPD_Head, MIDA_Head
 from .image_acquisition import CTobj
 from .lesion_insertion import (add_sphere_lesion,
                                add_epidural_lesion,
                                add_subdural_lesion)
 from .artifact_generation import transform_image_label_pair
 
-nihpd_dir = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/brain_atlases/obj1_analyze/')
-MIDA_dir = Path('MIDA Head Phantom')
 
-
-def ct_simulation(output_directory, patient_name, age, lesion_type, radius,
-                  contrast, views=1000, fov=250, mA=200, kVp=120,
+def ct_simulation(output_directory, phantom, views=1000, fov=250, mA=200, kVp=120,
                   zspan='dynamic', add_positioning_augmentation=True):
+    patient_name = phantom.patient_name
+    age = phantom.age
+    lesion_type = phantom.lesion_type
+    radius = phantom.lesion_radius
+    contrast = phantom.lesion_contrast
+
     print(f'{age} years, {lesion_type}, {contrast} HU')
-    mida_shape = (480, 480, 350)  # default shape of MIDA
-    mida_age = 38
-    if age == mida_age:
-        phantom = MIDA_Head(MIDA_dir, shape=mida_shape)
-    else:
-        phantom = NIHPD_Head(nihpd_dir, age=age, shape=mida_shape)
 
     if lesion_type == 'sphere':
         lesion_func = add_sphere_lesion

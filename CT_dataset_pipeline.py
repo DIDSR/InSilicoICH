@@ -29,12 +29,18 @@ from scipy.ndimage import center_of_mass
 import pydicom
 
 from pedsilicoICH.pipeline import ct_simulation
+from pedsilicoICH.ground_truth_definition.phantoms import NIHPD_Head, MIDA_Head
+
 from pedsilicoICH.image_acquisition import read_dicom
 
-
+nihpd_dir = Path('NIHPD_Head_Phantom')
+MIDA_dir = Path('MIDA_Head_Phantom')
 output_directory = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/parallel')  # output directory to save simulation results
 desired_cases = 100
 views = 1000
+fov=250
+mA=200
+kVp=120
 
 
 def load_vol(file_list):
@@ -43,14 +49,25 @@ def load_vol(file_list):
 
 def main(output_directory, patient_name, age, kVp, mA, contrast, radius,
          lesion_type, views=1000, zspan='dynamic'):
+    
+    mida_shape = (480, 480, 350)  # default shape of MIDA
+    mida_age = 38
+    if age == mida_age:
+        phantom = MIDA_Head(MIDA_dir, shape=mida_shape)
+    else:
+        phantom = NIHPD_Head(nihpd_dir, age=age, shape=mida_shape)
+    
+    phantom.patient_name = patient_name
+    phantom.age = age
+    phantom.lesion_type = lesion_type
+    phantom.lesion_radius = radius
+    phantom.lesion_contrast = contrast
+
     dcm_files, mask_files = ct_simulation(output_directory=output_directory,
-                                          patient_name=patient_name,
-                                          age=age,
-                                          kVp=kVp,
+                                          phantom=phantom,
+                                          fov=fov,
                                           mA=mA,
-                                          contrast=contrast,
-                                          radius=radius,
-                                          lesion_type=lesion_type,
+                                          kVp=kVp,
                                           views=views,
                                           zspan=zspan)
 
@@ -148,12 +165,12 @@ if __name__ == "__main__":
                                                          simulation_id])
     shuffle(l_parameter_comb)
     l_parameter_comb = l_parameter_comb[:desired_cases]
+    n_params = len(l_parameter_comb)
 
     try:
         patientids = [int(os.environ['SGE_TASK_ID']) - 1]  # since tasks start from 1
     except:
         print('SGE_TASK_ID not set, running in serial')
-        n_params = len(l_parameter_comb)
         patientids = list(range(n_params))
 
     for patientid in patientids:
@@ -166,7 +183,7 @@ if __name__ == "__main__":
                         radius=radius,
                         lesion_type=lesion_type,
                         views=views, zspan=zspan)
-        metadata.to_csv(output_directory / f'metadata_{patientid}.csv',
+        metadata.to_csv(output_directory / patient_name / f'metadata_{patientid}.csv',
                         index=False)
 
 # %%

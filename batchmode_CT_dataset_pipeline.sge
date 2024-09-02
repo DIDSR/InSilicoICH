@@ -12,6 +12,7 @@
 
 export LOG_DIR=$1
 OUTPUT=$2
+CASES=$3
 
 mkdir -p $LOG_DIR
 mkdir -p $OUTPUT
@@ -29,7 +30,7 @@ source /home/brandon.nelson/Dev/REALYSM_peds/.realysm_3.10/bin/activate
 
 START_TIME=`date +%s`
 set -x
-( python CT_dataset_pipeline.py --output_directory $OUTPUT --views 100 --desired_cases=1)
+( python CT_dataset_pipeline.py --output_directory $OUTPUT --desired_cases=$CASES)
 set +x
 EXIT_STATUS=$?
 END_TIME=`date +%s`

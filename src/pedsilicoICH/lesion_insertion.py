@@ -65,6 +65,8 @@ def _add_dural_lesion(spacing, volume, dura_map,
         np.where(dura_map.mean(axis=(1, 2)) > 0.01)[0])
     lesion_vol = insert_dural_3D(spacing, volume, dura_map, init_slice,
                                  lesion_type)
+    if not isinstance(volume, np.ndarray):
+        volume = volume.numpy()
     img_w_lesion = volume.copy()
     img_w_lesion[lesion_vol == 1] = contrast
     z, x, y = center_of_mass(lesion_vol)
