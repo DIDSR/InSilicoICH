@@ -19,150 +19,59 @@
 #    the input radius
 
 from pathlib import Path
-from random import choice
+from argparse import ArgumentParser
+from random import shuffle
+import os
 
 import pandas as pd
 import numpy as np
-from monai.transforms import RandAffine
+from scipy.ndimage import center_of_mass
+import pydicom
 
-from pedsilicoICH.ground_truth_definition.phantoms import NIHPD_Head, MIDA_Head
-from pedsilicoICH.image_acquisition import CTobj
-from pedsilicoICH.lesion_insertion import (add_sphere_lesion,
-                                           add_epidural_lesion,
-                                           add_subdural_lesion)
-from pedsilicoICH.artifact_generation import transform_image_label_pair
+from pedsilicoICH.pipeline import ct_simulation
+from pedsilicoICH.image_acquisition import read_dicom
 
-# %% [markdown]
-# # Start of User Defined Settings
-# ## Define Ground Truth Head
 
-nihpd_dir = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/brain_atlases/obj1_analyze/')
-MIDA_dir = Path('MIDA Head Phantom')
+def load_vol(file_list):
+    return np.stack(list(map(read_dicom, file_list)))
 
-nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
-mida_age = 38  # add 38 as the median US adult age to represent MIDA, consider other identifiers when adding more patients
-possible_ages = nihpd_ages + [mida_age]
 
-# %% [markdown]
-# ## Define simulation parameters
 output_directory = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/mixed_datasets_mixed_lesions') # output directory to save simulation results
-# consider turning this script into a command line function, similar to https://github.com/bnel1201/Virtual-Patient-CT-Simulations/blob/PedSilicoICH-Pilot/run_xcat.py
-# it makes the files more annoying to develop, but avoids having different developers have personal copies just to update output directories
-
 desired_cases = 100
-
-add_positioning_augmentation = True  # whether to apply random rotation, translation, and resizing of the ground truth phantom head, see line 78 for default parameters
-
-# Define lesion settings
-lesion_types = ['sphere', 'epidural', 'subdural']
-min_radius, max_radius = 2, 20  # applied only to spheres, TODO turn to volume then can be more general to allow types
-min_contrast, max_contrast = 20, 200
-material = 'white matter'  # brain region where SPHERE lesion will be inserted options based on `material_lut` materials
-
-# %% [markdown]
-# ## Define scan acquisition settings
-dynamic_scan_range = True  # used to determine z range covering the z extent of the head, can handle different sized heads e.g. peds vs adults
-if not dynamic_scan_range:
-    startZ = None
-    endZ = None  # if none, will default to the full possible scan range units in mm, centered at 0, see ct.scout_view() for examples
 views = 1000
-fov = 250
-mA = 200
-kVp = 120
 
-# %% [markdown]
-# ## End of user defined settings
+def main(patientid, age, kVp, mA, contrast, radius, lesion_type, views=1000, zspan='dynamic'):
+    print(patientid)
+    patient_name = f'case_{patientid:03}'
+    dcm_files, mask_files = ct_simulation(output_directory=output_directory,
+                                          patient_name=patient_name,
+                                          age=age,
+                                          kVp=kVp,
+                                          mA=mA,
+                                          contrast=contrast,
+                                          radius=radius,
+                                          lesion_type=lesion_type,
+                                          views=views,
+                                          zspan=zspan)
 
-# define empty list of metadata columns to store in the resulting dataframe
-ages = []
-names = []
-files = []
-masks = []
-contrast_list = []
-radius_list = []
-lesion_type_list = []
-center_x_list = []
-center_y_list = []
-center_z_list = []
-lesion_volume_list = []
+    mask = load_vol(mask_files)
+    dcm = pydicom.read_file(mask_files[0])
+    spacings = dcm.PixelSpacing
 
-# %% [markdown]
-# ## Start simulation runs
-
-mida_shape = MIDA_Head(MIDA_dir).get_CT_number_phantom().shape  # for consistent phantom sizes
-
-case_count = 0
-while case_count < desired_cases:
-    print(f'Case count number: {case_count}')
-
-    age = choice(possible_ages)
-    if age == mida_age:
-        phantom = MIDA_Head(MIDA_dir)
-    else:
-        phantom = NIHPD_Head(nihpd_dir, age=age, shape=mida_shape)
-    ground_truth_image = phantom.get_CT_number_phantom()
-
-    radius = np.random.randint(min_radius, max_radius)
-    lesion_type = choice(lesion_types)
-    contrast = np.random.randint(min_contrast, max_contrast)
-
-    try:
-        if lesion_type == 'sphere':
-            lesion_func = add_sphere_lesiondom_sphere_lesion
-            mask = phantom.get_material_mask(material).astype(int)
-            params = {'radius': radius, 'contrast': contrast}
-        elif lesion_type == 'epidural':
-            lesion_func = add_epidural_lesion
-            mask = phantom.get_dura_map()
-            params = {'spacing': (phantom.dz, phantom.dx, phantom.dy),
-                      'contrast': contrast}
-        else:
-            lesion_func = add_subdural_lesion
-            mask = phantom.get_dura_map()
-            params = {'spacing': (phantom.dz, phantom.dx, phantom.dy),
-                      'contrast': contrast}
-
-        img_w_lesion, lesion_image, lesion_coords = lesion_func(ground_truth_image, mask, **params)
-
-    except:
-        print('Failed to insert lesion, continuing...')
-        continue
-
-    if add_positioning_augmentation:
-        transform = RandAffine(prob=0.5,
-                               rotate_range=[np.pi/4, np.pi/20, np.pi/20],
-                               translate_range=[10, 10, 10],
-                               scale_range=[0.1, 0.1, 0.1],
-                               padding_mode="border")
-        img_w_lesion, lesion_image = transform_image_label_pair(transform,
-                                                                img_w_lesion,
-                                                                lesion_image)
-
-    patient_name = f'case_{case_count:03d}'
-    output_dir = output_directory / patient_name
-    output_dir.mkdir(exist_ok=True, parents=True)
-    ct = CTobj(img_w_lesion, spacings=(phantom.dz, phantom.dx, phantom.dy),
-               patientname=patient_name,
-               age=age,
-               studyname='full volume long scan',
-               output_dir=output_dir)
-
-    if dynamic_scan_range:
-        startZ, endZ = ct.recommend_scan_range()
-
-    ct.run_scan(startZ=startZ, endZ=endZ, views=views, mA=mA, kVp=kVp)
-    ct.run_recon(fov=fov)
-    dicom_path = output_dir / 'dicoms'
-    dcm_files = ct.write_to_dicom(dicom_path / f'{patient_name}.dcm')
-
-    lesion_only = ct
-    mask = ct.get_lesion_mask(lesion_image,
-                              startZ=startZ, endZ=endZ)
-    vol_ml = np.prod(lesion_only.spacings) * mask.sum() / 1000
-
-    lesion_only.recon = mask
-    dicom_path = output_dir / 'lesion_masks'
-    mask_files = lesion_only.write_to_dicom(dicom_path / f'{patient_name}_mask.dcm')
+    vol_ml = np.prod(spacings) * mask.sum() / 1000
+    z, x, y = center_of_mass(mask)
+    # define empty list of metadata columns to store in the resulting dataframe
+    ages = []
+    names = []
+    files = []
+    masks = []
+    contrast_list = []
+    radius_list = []
+    lesion_type_list = []
+    center_x_list = []
+    center_y_list = []
+    center_z_list = []
+    lesion_volume_list = []
 
     for f, m in zip(dcm_files, mask_files):
         names.append(patient_name)
@@ -172,12 +81,11 @@ while case_count < desired_cases:
         contrast_list.append(contrast)
         radius_list.append(radius)
         lesion_type_list.append(lesion_type)
-        center_x_list.append(lesion_coords[0])
-        center_y_list.append(lesion_coords[1])
-        center_z_list.append(lesion_coords[2])
+        center_x_list.append(x)
+        center_y_list.append(y)
+        center_z_list.append(z)
         lesion_volume_list.append(vol_ml)
 
-    case_count += 1
     metadata = pd.DataFrame({'name': names,
                              'age': ages,
                              'contrast': contrast_list,
@@ -189,6 +97,69 @@ while case_count < desired_cases:
                              'lesion volume [mL]': lesion_volume_list,
                              'image file': files,
                              'mask file': masks})
-    metadata.to_csv(output_directory / 'metadata.csv', index=False)
+    return metadata
+
+# %%
+if __name__ == "__main__":
+    parser = ArgumentParser(description='Runs XCIST CT simulations of ICH models')
+    parser.add_argument('--output_directory', type=str, default="", help='output directory to save simulation results')
+    parser.add_argument('--views', type=int, default=1000, help='number of angular CT views per rotation')
+    parser.add_argument('--desired_cases', type=int, default=1000, help='number of simulations to run')
+    args = parser.parse_args()
+
+    desired_cases = args.desired_cases
+    # </https://www.aapm.org/pubs/CTProtocols/documents/PediatricRoutineHeadCT.pdf>
+    # find parameter
+# %%
+    nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
+    mida_age = 38  # add 38 as the median US adult age to represent MIDA, consider other identifiers when adding more patients
+    possible_ages = nihpd_ages + [mida_age]
+    kVp_list = [110, 120, 130]
+    mA_list = list(range(50, 400, 50))
+    lesion_types = ['sphere', 'epidural', 'subdural']
+    min_radius, max_radius = 2, 20  # applied only to spheres, TODO turn to volume then can be more general to allow types
+    min_contrast, max_contrast = 20, 200
+    contrast_list = np.arange(20, 200)
+    radii_list = np.arange(min_radius, max_radius)
+    simulations_list = list(range(1)) # This can be increased to enable multiple scans (different noise realizations of the same slice and settings)
+    l_parameter_comb = []
+    for age_id in possible_ages:
+        for kVp_id in kVp_list:
+            for mA_id in mA_list:
+                for contrast_id in contrast_list:
+                    for radii_id in radii_list:
+                        for lesion_id in lesion_types:
+                            for simulation_id in simulations_list:
+                                l_parameter_comb.append([age_id,
+                                                         kVp_id,
+                                                         mA_id,
+                                                         contrast_id,
+                                                         radii_id,
+                                                         lesion_id,
+                                                         simulation_id])
+    shuffle(l_parameter_comb)
+    l_parameter_comb = l_parameter_comb[:desired_cases]
+
+    try:
+        SGE_TASK_ID = int(os.environ['SGE_TASK_ID'])-1 # since tasks start from 1
+        age, kVp, mA, contrast, radius, lesion_type, sim_id = l_parameter_comb[SGE_TASK_ID]
+        metadata = main(patientid=SGE_TASK_ID, age=age,
+                        kVp=kVp, mA=mA, contrast=contrast,
+                        radius=radius,
+                        lesion_type=lesion_type,
+                        views=views, zspan=zspan)
+        metadata.to_csv(output_directory / f'metadata_{SGE_TASK_ID}.csv', index=False)
+    except:
+        print('SGE_TASK_ID not set, running in serial')
+        n_params = len(l_parameter_comb)
+        for SGE_TASK_ID in range(n_params):
+            print(f'{SGE_TASK_ID}/{n_params}')
+            age, kVp, mA, contrast, radius, lesion_type, sim_id = l_parameter_comb[SGE_TASK_ID]
+            metadata = main(patientid=SGE_TASK_ID, age=age,
+                            kVp=kVp, mA=mA, contrast=contrast,
+                            radius=radius,
+                            lesion_type=lesion_type,
+                            views=views, zspan=zspan)
+            metadata.to_csv(output_directory / f'metadata_{SGE_TASK_ID}.csv', index=False)
 
 # %%
