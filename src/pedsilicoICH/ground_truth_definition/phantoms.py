@@ -80,6 +80,10 @@ class Phantom:
         'used for epidural, subdural lesion insertion'
         pass
 
+    @property
+    def spacings(self):
+        return self.dz, self.dx, self.dy
+
 
 class MIDA_Head(Phantom):
     def __init__(self, phantom_dir, csf_HU=15, gm_HU=45, wm_HU=20, skull_HU=1000, shape=None):
@@ -231,12 +235,12 @@ class NIHPD_Head(Phantom):
 
         original_shape = self.csf.shape
         if shape:
-            self.csf = resize(self.csf, shape)
+            self.csf = resize(self.csf, shape).numpy()
             new_shape = self.csf.shape
-            self.gm = resize(self.gm, shape)
-            self.wm = resize(self.wm, shape)
-            self.mask = resize(self.mask, shape)
-            self.pdw = resize(self.pdw, shape)
+            self.gm = resize(self.gm, shape).numpy()
+            self.wm = resize(self.wm, shape).numpy()
+            self.mask = resize(self.mask, shape).numpy()
+            self.pdw = resize(self.pdw, shape).numpy()
 
             new_spacings = np.array(original_shape) / np.array(new_shape) * [self.dz, self.dx, self.dy]
             self.dz, self.dx, self.dy = new_spacings
@@ -251,7 +255,7 @@ class NIHPD_Head(Phantom):
     def get_CT_number_phantom(self):
         phantom = self.csf*self.csf_HU + self.gm*self.gm_HU + self.wm*self.wm_HU + self.skull*self.skull_HU
         phantom[phantom <= 0] = self.air_HU
-        return phantom.numpy()
+        return phantom
 
     def get_material_mask(self, material):
         if material not in self.materials:
@@ -267,6 +271,6 @@ class NIHPD_Head(Phantom):
         return mask.astype(int)
 
     def get_dura_map(self):
-        return ski.segmentation.find_boundaries(self.mask.numpy(),
+        return ski.segmentation.find_boundaries(self.mask,
                                                 mode='inner',
                                                 background=0)
