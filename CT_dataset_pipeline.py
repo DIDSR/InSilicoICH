@@ -108,7 +108,7 @@ while case_count < desired_cases:
 
     try:
         if lesion_type == 'sphere':
-            lesion_func = add_sphere_lesiondom_sphere_lesion
+            lesion_func = add_sphere_lesion
             mask = phantom.get_material_mask(material).astype(int)
             params = {'radius': radius, 'contrast': contrast}
         elif lesion_type == 'epidural':
