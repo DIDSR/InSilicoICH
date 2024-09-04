@@ -38,9 +38,9 @@ MIDA_dir = Path('MIDA_Head_Phantom')
 output_directory = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/parallel')  # output directory to save simulation results
 desired_cases = 100
 views = 1000
-fov=250
-mA=200
-kVp=120
+fov = 250
+mA = 200
+kVp = 120
 
 
 def load_vol(file_list):
@@ -49,14 +49,14 @@ def load_vol(file_list):
 
 def main(output_directory, patient_name, age, kVp, mA, contrast, radius,
          lesion_type, views=1000, zspan='dynamic'):
-    
+
     mida_shape = (480, 480, 350)  # default shape of MIDA
     mida_age = 38
     if age == mida_age:
         phantom = MIDA_Head(MIDA_dir, shape=mida_shape)
     else:
         phantom = NIHPD_Head(nihpd_dir, age=age, shape=mida_shape)
-    
+
     phantom.patient_name = patient_name
     phantom.age = age
     phantom.lesion_type = lesion_type
@@ -130,7 +130,7 @@ if __name__ == "__main__":
                         help='z range of scans [mm], defaults to dynamic')
     args = parser.parse_args()
 
-    output_directory = args.output_directory
+    output_directory = Path(args.output_directory)
     desired_cases = args.desired_cases
     zspan = args.zspan
     views = args.views
@@ -177,13 +177,16 @@ if __name__ == "__main__":
         print(f'{patientid}/{n_params}')
         age, kVp, mA, contrast, radius, lesion_type, sim_id = l_parameter_comb[patientid]
         patient_name = f'case_{patientid:03}'
-        metadata = main(output_directory,
-                        patient_name, age=age,
-                        kVp=kVp, mA=mA, contrast=contrast,
-                        radius=radius,
-                        lesion_type=lesion_type,
-                        views=views, zspan=zspan)
-        metadata.to_csv(output_directory / patient_name / f'metadata_{patientid}.csv',
-                        index=False)
-
-# %%
+        try:
+            metadata = main(output_directory,
+                            patient_name, age=age,
+                            kVp=kVp, mA=mA, contrast=contrast,
+                            radius=radius,
+                            lesion_type=lesion_type,
+                            views=views, zspan=zspan)
+            metadata.to_csv(output_directory / patient_name /
+                            f'metadata_{patientid}.csv',
+                            index=False)
+        except:
+            print('Simulation failed, continuing..')
+            continue

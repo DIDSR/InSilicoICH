@@ -6,7 +6,7 @@ notebooks/__pycache__
 .PedsilicoICH
 notebooks/default
 notebooks/test
-logs
+build
 
 octave-workspace
 MIDA Head Phantom
@@ -26,5 +26,4 @@ default
 __pycache__
 *.nrrd
 *.nii
-core.*
 src/PedSilicoICH.egg-info

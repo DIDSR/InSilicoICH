@@ -18,8 +18,8 @@ nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
 test_dir = Path(__file__).parent.absolute()
 print(test_dir)
 
-nihpd_dir = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/brain_atlases/obj1_analyze/')
-MIDA_dir = test_dir.parent / 'MIDA Head Phantom'
+nihpd_dir = test_dir.parent / 'NIHPD_Head_Phantom'
+MIDA_dir = test_dir.parent / 'MIDA_Head_Phantom'
 # %%
 
 
