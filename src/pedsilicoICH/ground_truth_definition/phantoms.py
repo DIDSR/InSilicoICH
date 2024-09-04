@@ -9,10 +9,10 @@ import numpy as np
 import nibabel as nib
 import pandas as pd
 import skimage as ski
-from monai.transforms import Resize
+from monai.transforms import Resize, RandAffine, Affine
 
 from . import dicom_to_voxelized_phantom
-
+from ..artifact_generation import transform_image_label_pair
 from ..lesion_insertion import (add_sphere_lesion,
                                 add_epidural_lesion,
                                 add_subdural_lesion)
@@ -98,7 +98,7 @@ class Phantom:
         'return img_w_lesion, lesion_image, lesion_coords'
         if lesion_type == 'sphere':
             lesion_func = add_sphere_lesion
-            mask = self.get_material_mask('gray matter').astype(int)
+            mask = self.get_material_mask('white matter').astype(int)
             params = {'radius': radius, 'contrast': contrast}
         elif lesion_type == 'epidural':
             if isinstance(contrast, list):
@@ -121,6 +121,12 @@ class Phantom:
         self._lesion.append(lesion_image)
         self._lesion_coords.append(lesion_coords)
         return self
+
+    def apply_transform(self, transform: RandAffine | Affine, seed=None):
+        self._phantom, self._lesion[0] = transform_image_label_pair(transform,
+                                                                    self.get_CT_number_phantom(),
+                                                                    self._lesion[0],
+                                                                    seed=seed)
 
 
 class MIDA_Head(Phantom):

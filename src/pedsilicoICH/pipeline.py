@@ -8,7 +8,6 @@ from monai.transforms import RandAffine
 import numpy as np
 
 from .image_acquisition import CTobj
-from .artifact_generation import transform_image_label_pair
 
 
 def ct_simulation(output_directory, phantom, views=1000, fov=250, mA=200,
@@ -31,9 +30,9 @@ def ct_simulation(output_directory, phantom, views=1000, fov=250, mA=200,
                                translate_range=[10, 10, 10],
                                scale_range=[0.1, 0.1, 0.1],
                                padding_mode="border")
-        img_w_lesion, lesion_image = transform_image_label_pair(transform,
-                                                                img_w_lesion,
-                                                                lesion_image)
+        phantom.apply_transform(transform)
+        img_w_lesion = phantom.get_CT_number_phantom()
+        lesion_image = phantom._lesion[0]
 
     output_dir = Path(output_directory) / patient_name
     output_dir.mkdir(exist_ok=True, parents=True)
