@@ -48,8 +48,8 @@ def insert_dural_3D(spacing, volume, dura_map, init_slice, hematoma_type):
     elif hemisphere == 'right':
         boundary[:, :, :(int(cols/2) + 10)] = 0.0
 
-    import matplotlib.pyplot as plt
-    plt.imshow(boundary[150, :, :])
+    # import matplotlib.pyplot as plt
+    # plt.imshow(boundary[150, :, :])
 
     hemorrhage_mask = np.zeros_like(boundary)
     while iter_flag:

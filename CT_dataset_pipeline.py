@@ -27,9 +27,6 @@ from monai.transforms import RandAffine
 
 from pedsilicoICH.ground_truth_definition.phantoms import NIHPD_Head, MIDA_Head
 from pedsilicoICH.image_acquisition import CTobj
-from pedsilicoICH.lesion_insertion import (add_sphere_lesion,
-                                           add_epidural_lesion,
-                                           add_subdural_lesion)
 from pedsilicoICH.artifact_generation import transform_image_label_pair
 
 # %% [markdown]
@@ -100,29 +97,15 @@ while case_count < desired_cases:
         phantom = MIDA_Head(MIDA_dir)
     else:
         phantom = NIHPD_Head(nihpd_dir, age=age, shape=mida_shape)
-    ground_truth_image = phantom.get_CT_number_phantom()
 
     radius = np.random.randint(min_radius, max_radius)
     lesion_type = choice(lesion_types)
     contrast = np.random.randint(min_contrast, max_contrast)
 
     try:
-        if lesion_type == 'sphere':
-            lesion_func = add_sphere_lesion
-            mask = phantom.get_material_mask(material).astype(int)
-            params = {'radius': radius, 'contrast': contrast}
-        elif lesion_type == 'epidural':
-            lesion_func = add_epidural_lesion
-            mask = phantom.get_dura_map()
-            params = {'spacing': (phantom.dz, phantom.dx, phantom.dy),
-                      'contrast': contrast}
-        else:
-            lesion_func = add_subdural_lesion
-            mask = phantom.get_dura_map()
-            params = {'spacing': (phantom.dz, phantom.dx, phantom.dy),
-                      'contrast': contrast}
-
-        img_w_lesion, lesion_image, lesion_coords = lesion_func(ground_truth_image, mask, **params)
+        phantom.add_lesion(lesion_type, radius=radius, contrast=contrast)
+        img_w_lesion = phantom.get_CT_number_phantom()
+        lesion_image = phantom._lesion[0]
 
     except:
         print('Failed to insert lesion, continuing...')

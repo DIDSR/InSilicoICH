@@ -6,6 +6,7 @@ notebooks/__pycache__
 .PedsilicoICH
 notebooks/default
 notebooks/test
+build
 
 octave-workspace
 MIDA Head Phantom
