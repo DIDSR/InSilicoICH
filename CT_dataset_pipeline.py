@@ -168,9 +168,9 @@ if __name__ == "__main__":
     n_params = len(l_parameter_comb)
 
     try:
-        patientids = [int(os.environ['SGE_TASK_ID']) - 1]  # since tasks start from 1
+        patientids = [int(os.environ['SLURM_ARRAY_TASK_ID']) - 1]  # since tasks start from 1
     except:
-        print('SGE_TASK_ID not set, running in serial')
+        print('SLURM_ARRAY_TASK_ID not set, running in serial')
         patientids = list(range(n_params))
 
     for patientid in patientids:
