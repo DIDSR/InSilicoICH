@@ -80,6 +80,10 @@ class Phantom:
         'used for epidural, subdural lesion insertion'
         pass
 
+    def get_skull_map(self):
+        'used for lesion insertion mass effect warping'
+        pass
+
 
 class MIDA_Head(Phantom):
     def __init__(self, phantom_dir, csf_HU=15, gm_HU=45, wm_HU=20, skull_HU=1000, shape=None):
@@ -182,6 +186,13 @@ class MIDA_Head(Phantom):
         dura_map = np.zeros_like(self._phantom)
         dura_map[np.where(self._phantom == 1.0)] = 1.0
         return dura_map
+    
+    def get_skull_map(self):
+        'obtain spartial skull map using mida atlas, ignoring facial bones (for now)'
+        skull_map = np.zeros_like(self._phantom)
+        skull_map[np.where(self._phantom == 53)] = 1.0 
+        skull_map[np.where(self._phantom == 1000)] = 1.0 # skull inner table
+        return skull_map
 
 
 class NIHPD_Head(Phantom):
@@ -271,3 +282,10 @@ class NIHPD_Head(Phantom):
         return ski.segmentation.find_boundaries(self.mask.numpy(),
                                                 mode='inner',
                                                 background=0)
+    
+    def get_skull_map(self):
+        'get rudimentary mask of skull voxels'
+        skull_map = (self.mask == 0)*self.pdw / self.pdw.max()
+        skull_map[skull_map < 0.1] = 0
+        skull_map[skull_map > 0] = 1
+        return skull_map
