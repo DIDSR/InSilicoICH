@@ -140,7 +140,7 @@ def connect_points(start, end, boundary, hematoma_type):
     elif hematoma_type == 'subdural':
         bezier_weight = 0.5
         bezier_middle = boundary_coords[round(len(boundary_coords)/2)]  # use the middle point of the dura line 
-        print(bezier_middle)
+        # print(bezier_middle)
     else:
         bezier_weight = 0.0
         bezier_middle = (int(rows/2), int(cols/2))
