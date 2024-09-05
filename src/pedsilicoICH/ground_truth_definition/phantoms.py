@@ -17,10 +17,6 @@ from ..lesion_insertion import (add_sphere_lesion,
                                 add_epidural_lesion,
                                 add_subdural_lesion)
 
-from ..lesion_insertion import (add_sphere_lesion,
-                                add_epidural_lesion,
-                                add_subdural_lesion)
-
 
 def get_mean_age(age_range: str):
     return (float(age_range.split('-')[1])+float(age_range.split('-')[0]))/2
