@@ -9,9 +9,13 @@ import numpy as np
 import nibabel as nib
 import pandas as pd
 import skimage as ski
-from monai.transforms import Resize
+from monai.transforms import Resize, RandAffine, Affine
 
 from . import dicom_to_voxelized_phantom
+from ..artifact_generation import transform_image_label_pair
+from ..lesion_insertion import (add_sphere_lesion,
+                                add_epidural_lesion,
+                                add_subdural_lesion)
 
 
 def get_mean_age(age_range: str):
@@ -38,8 +42,12 @@ def voxelize_ground_truth(dicom_path, phantom_path, material_threshold_dict=None
     slice_range = list(range(nfiles))
     if not material_threshold_dict:
         material_threshold_dict = dict(zip(
-        ['ICRU_lung_adult_healthy', 'ICRU_adipose_adult2', 'ICRU_liver_adult', 'water', 'ICRU_skeleton_cortical_bone_adult'],
-        [-1000, -200, 0, 100, 300]))
+                                        ['ICRU_lung_adult_healthy',
+                                         'ICRU_adipose_adult2',
+                                         'ICRU_liver_adult',
+                                         'water',
+                                         'ICRU_skeleton_cortical_bone_adult'],
+                                        [-1000, -200, 0, 100, 300]))
 
     cfg_file_str = f"""
 # Path where the DICOM images are located:
@@ -69,6 +77,8 @@ class Phantom:
                           'white matter': 20,
                           'CSF': 15,
                           'skull': 1000}
+        self._lesion = []
+        self._lesion_coords = []
 
     def get_CT_number_phantom(self):
         pass
@@ -79,6 +89,47 @@ class Phantom:
     def get_dura_map(self):
         'used for epidural, subdural lesion insertion'
         pass
+
+    def get_lesion_mask(self):
+        return self._lesion[0]
+
+    @property
+    def spacings(self):
+        return self.dz, self.dx, self.dy
+
+    def insert_lesion(self, lesion_type, radius=5, contrast=100):
+        'return img_w_lesion, lesion_image, lesion_coords'
+        if lesion_type == 'sphere':
+            lesion_func = add_sphere_lesion
+            mask = self.get_material_mask('white matter').astype(int)
+            params = {'radius': radius, 'contrast': contrast}
+        elif lesion_type == 'epidural':
+            if isinstance(contrast, list):
+                contrast = max(contrast)
+            lesion_func = add_epidural_lesion
+            mask = self.get_dura_map()
+            params = {'spacing': self.spacings,
+                      'contrast': contrast}
+        else:
+            if isinstance(contrast, list):
+                contrast = max(contrast)
+            lesion_func = add_subdural_lesion
+            mask = self.get_dura_map()
+            params = {'spacing': self.spacings,
+                      'contrast': contrast}
+
+        img_w_lesion, lesion_image, lesion_coords = lesion_func(self.get_CT_number_phantom(), mask, **params) 
+
+        self._phantom = img_w_lesion
+        self._lesion.append(lesion_image)
+        self._lesion_coords.append(lesion_coords)
+        return self
+
+    def apply_transform(self, transform: RandAffine | Affine, seed=None):
+        self._phantom, self._lesion[0] = transform_image_label_pair(transform,
+                                                                    self.get_CT_number_phantom(),
+                                                                    self.get_lesion_mask(),
+                                                                    seed=seed)
 
     def get_skull_map(self):
         'used for lesion insertion mass effect warping'
@@ -170,6 +221,8 @@ class MIDA_Head(Phantom):
         return material_lut[~material_lut['CT Number [HU]'].isna()]
 
     def get_CT_number_phantom(self):
+        if len(self._lesion_coords) > 0:
+            return self._phantom
         phantom = self._phantom
         material_lut = self.material_lut
         phantom[phantom == 50] = -1000  # air
@@ -242,12 +295,12 @@ class NIHPD_Head(Phantom):
 
         original_shape = self.csf.shape
         if shape:
-            self.csf = resize(self.csf, shape)
+            self.csf = resize(self.csf, shape).numpy()
             new_shape = self.csf.shape
-            self.gm = resize(self.gm, shape)
-            self.wm = resize(self.wm, shape)
-            self.mask = resize(self.mask, shape)
-            self.pdw = resize(self.pdw, shape)
+            self.gm = resize(self.gm, shape).numpy()
+            self.wm = resize(self.wm, shape).numpy()
+            self.mask = resize(self.mask, shape).numpy()
+            self.pdw = resize(self.pdw, shape).numpy()
 
             new_spacings = np.array(original_shape) / np.array(new_shape) * [self.dz, self.dx, self.dy]
             self.dz, self.dx, self.dy = new_spacings
@@ -260,10 +313,11 @@ class NIHPD_Head(Phantom):
         self.skull = skull
 
     def get_CT_number_phantom(self):
-
+        if len(self._lesion_coords) > 0:
+            return self._phantom
         phantom = self.csf*self.csf_HU + self.gm*self.gm_HU + self.wm*self.wm_HU + self.skull*self.skull_HU
-        phantom[phantom == 0] = self.air_HU
-        return phantom.numpy()
+        phantom[phantom <= 0] = self.air_HU
+        return phantom
 
     def get_material_mask(self, material):
         if material not in self.materials:
@@ -279,7 +333,7 @@ class NIHPD_Head(Phantom):
         return mask.astype(int)
 
     def get_dura_map(self):
-        return ski.segmentation.find_boundaries(self.mask.numpy(),
+        return ski.segmentation.find_boundaries(self.mask,
                                                 mode='inner',
                                                 background=0)
     
