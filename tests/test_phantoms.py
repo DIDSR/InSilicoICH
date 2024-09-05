@@ -43,9 +43,9 @@ def transforms_performed_correctly(phantom, transform, lesion_type, tol=0.2,
     print(phantom, transform, lesion_type)
     phantom = deepcopy(phantom)
     phantom.insert_lesion(lesion_type, radius=5, contrast=200)
-    lesion = phantom._lesion[0]
+    lesion = phantom.get_lesion_mask()
     phantom.apply_transform(transform, seed=seed)
-    transformed_lesion = phantom._lesion[0]
+    transformed_lesion = phantom.get_lesion_mask()
     err = np.abs(lesion.sum() - transformed_lesion.sum())/lesion.sum()
     print(f'transforms_performed_correctly error: {err:2.3f} [tol: {tol}]')
     assert err < tol

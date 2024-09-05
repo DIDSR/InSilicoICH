@@ -48,7 +48,7 @@ def load_vol(file_list):
 
 
 def main(output_directory, patient_name, age, kVp, mA, contrast, radius,
-         lesion_type, views=1000, zspan='dynamic'):
+         lesion_type, views=1000, zspan='dynamic') -> pd.DataFrame:
 
     mida_shape = (480, 480, 350)  # default shape of MIDA
     mida_age = 38
@@ -73,7 +73,7 @@ def main(output_directory, patient_name, age, kVp, mA, contrast, radius,
 
     mask = load_vol(mask_files)
     dcm = pydicom.read_file(mask_files[0])
-    spacings = dcm.PixelSpacing
+    spacings = list(map(float, [dcm.SliceThickness] + list(dcm.PixelSpacing)))
 
     vol_ml = np.prod(spacings) * mask.sum() / 1000
     z, x, y = center_of_mass(mask)
@@ -176,6 +176,7 @@ if __name__ == "__main__":
     for patientid in patientids:
         print(f'{patientid}/{n_params}')
         age, kVp, mA, contrast, radius, lesion_type, sim_id = l_parameter_comb[patientid]
+        print(f'{age} years, {lesion_type}, {contrast} HU')
         patient_name = f'case_{patientid:03}'
         try:
             metadata = main(output_directory,

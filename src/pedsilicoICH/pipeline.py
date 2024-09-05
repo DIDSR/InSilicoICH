@@ -18,11 +18,8 @@ def ct_simulation(output_directory, phantom, views=1000, fov=250, mA=200,
     radius = phantom.lesion_radius
     contrast = phantom.lesion_contrast
 
-    print(f'{age} years, {lesion_type}, {contrast} HU')
-
-    phantom.insert_lesion(lesion_type, radius=radius, contrast=contrast)
-    img_w_lesion = phantom.get_CT_number_phantom()
-    lesion_image = phantom._lesion[0]
+    if lesion_type:
+        phantom.insert_lesion(lesion_type, radius=radius, contrast=contrast)
 
     if add_positioning_augmentation:
         transform = RandAffine(prob=0.5,
@@ -31,8 +28,8 @@ def ct_simulation(output_directory, phantom, views=1000, fov=250, mA=200,
                                scale_range=[0.1, 0.1, 0.1],
                                padding_mode="border")
         phantom.apply_transform(transform)
-        img_w_lesion = phantom.get_CT_number_phantom()
-        lesion_image = phantom._lesion[0]
+    img_w_lesion = phantom.get_CT_number_phantom()
+    lesion_image = phantom.get_lesion_mask()
 
     output_dir = Path(output_directory) / patient_name
     output_dir.mkdir(exist_ok=True, parents=True)
@@ -58,5 +55,6 @@ def ct_simulation(output_directory, phantom, views=1000, fov=250, mA=200,
 
     lesion_only.recon = mask
     dicom_path = output_dir / 'lesion_masks'
-    mask_files = lesion_only.write_to_dicom(dicom_path / f'{patient_name}_mask.dcm')
+    mask_files = lesion_only.write_to_dicom(dicom_path /
+                                            f'{patient_name}_mask.dcm')
     return dcm_files, mask_files

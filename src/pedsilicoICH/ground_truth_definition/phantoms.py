@@ -90,6 +90,9 @@ class Phantom:
         'used for epidural, subdural lesion insertion'
         pass
 
+    def get_lesion_mask(self):
+        return self._lesion[0]
+
     @property
     def spacings(self):
         return self.dz, self.dx, self.dy
