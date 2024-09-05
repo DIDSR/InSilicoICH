@@ -7,7 +7,6 @@ notebooks/__pycache__
 notebooks/default
 notebooks/test
 build
-tests/test_phantom.py # need to ignore for now since we cant include MIDA as open source, but could download NIHPD as a part of testing
 
 octave-workspace
 MIDA Head Phantom
@@ -28,3 +27,5 @@ __pycache__
 *.nrrd
 *.nii
 src/PedSilicoICH.egg-info
+tests/test_phantoms.py
+# need to ignore for now since we cant include MIDA as open source, but could download NIHPD as a part of testing
