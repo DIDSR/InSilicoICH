@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time=3:00:00        # time limit
+#SBATCH --time=30:00:00        # time limit
 #SBATCH --mem=20G             # memory limit
 export LOG_DIR=$1
 OUTPUT=$2
