@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time=3:00:00        # time limit
+#SBATCH --time=30:00:00        # time limit
 #SBATCH --mem=20G             # memory limit
 export LOG_DIR=$1
 OUTPUT=$2
@@ -15,9 +15,7 @@ exec 2>> $LOG_DIR/$LOGNAME
 
 echo "==== begin job $JOB_NAME ($SLURM_ARRAY_TASK_ID) at:" `date` "on host $HOSTNAME"
 
-source /projects/mikem/applications/centos7/python3.10/set_run_env.sh
-source /home/brandon.nelson/Dev/REALYSM_peds/.realysm_3.10/bin/activate
-
+source /home/brandon.nelson/anaconda3/envs/pedsilicoich/bin/activate
 
 START_TIME=`date +%s`
 set -x
