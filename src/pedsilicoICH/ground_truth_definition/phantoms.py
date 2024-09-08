@@ -97,7 +97,7 @@ class Phantom:
     def spacings(self):
         return self.dz, self.dx, self.dy
 
-    def insert_lesion(self, lesion_type, radius=5, contrast=100):
+    def insert_lesion(self, lesion_type, radius=5, contrast=100, seed=None):
         'return img_w_lesion, lesion_image, lesion_coords'
         if lesion_type == 'sphere':
             lesion_func = add_sphere_lesion
@@ -118,7 +118,8 @@ class Phantom:
             params = {'spacing': self.spacings,
                       'contrast': contrast}
 
-        img_w_lesion, lesion_image, lesion_coords = lesion_func(self.get_CT_number_phantom(), mask, **params) 
+        img_w_lesion, lesion_image, lesion_coords = lesion_func(self.get_CT_number_phantom(), mask,
+                                                                 seed=seed, **params) 
 
         self._phantom = img_w_lesion
         self._lesion.append(lesion_image)
