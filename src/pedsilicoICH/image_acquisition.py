@@ -27,7 +27,8 @@ def read_dicom(dcm_fname: str) -> np.ndarray:
     return dcm.pixel_array + int(dcm.RescaleIntercept)
 
 
-def convert_to_dicom(img_slice: np.ndarray, phantom_path: str, spacings: tuple):
+def convert_to_dicom(img_slice: np.ndarray, phantom_path: str,
+                     spacings: tuple):
     '''
     :param img_slice: input 2D ndarray to be saved
     :param phantom_path: filename to save dicom file to
@@ -46,16 +47,19 @@ def convert_to_dicom(img_slice: np.ndarray, phantom_path: str, spacings: tuple):
 
 def get_projection_data(ct):
     '''takes as input xcist cfg struct and returns ndarray'''
-    return xc.rawread(ct.resultsName+'.prep', [ct.protocol.viewCount,
-                                               ct.scanner.detectorRowCount,
-                                               ct.scanner.detectorColCount],
-                                               'float')
+    return xc.rawread(ct.resultsName+'.prep', 
+                      [ct.protocol.viewCount,
+                       ct.scanner.detectorRowCount,
+                       ct.scanner.detectorColCount],
+                      'float')
 
 
 def get_reconstructed_data(ct) -> np.ndarray:
     '''takes as input xcist cfg struct and returns ndarray'''
     imsize = ct.recon.imageSize
-    return xc.rawread(ct.resultsName+f'_{imsize}x{imsize}x{ct.recon.sliceCount}.raw', [ct.recon.sliceCount, imsize, imsize], 'single')
+    return xc.rawread(
+        ct.resultsName+f'_{imsize}x{imsize}x{ct.recon.sliceCount}.raw',
+        [ct.recon.sliceCount, imsize, imsize], 'single')
 
 
 def initialize_xcist(ground_truth_image, spacings=(1, 1, 1),
@@ -94,7 +98,8 @@ def initialize_xcist(ground_truth_image, spacings=(1, 1, 1),
         dicom_filename = dicom_path / f'1-{slice_id:03d}.dcm'    
         convert_to_dicom(img, dicom_filename, spacings=spacings)
 
-    voxelize_ground_truth(dicom_path, phantom_path, material_threshold_dict=materials)
+    voxelize_ground_truth(dicom_path, phantom_path,
+                          material_threshold_dict=materials)
     print('Scanner Ready')
     return ct
 
@@ -108,10 +113,13 @@ class CTobj():
         A class to hold CT simulation data and run simulations
 
         :param phantom: 3D phantom volume to be scanned, voxels in units of
-            approximate CT Numbers [HU], typically in python coordinates (z, x, y)
+            approximate CT Numbers [HU], typically in python
+            coordinates (z, x, y)
             where z is perpendicular to the axial plane made by x and y.
-            See <https://en.wikipedia.org/wiki/Hounsfield_scale#Values_for_different_body_tissues_and_material> for some suggested values for common materials
-        :param spacings: tuple of voxel sizes of phantom volume in mm (dz, dx, dy)
+            See <https://en.wikipedia.org/wiki/Hounsfield_scale#Values_for_different_body_tissues_and_material>
+            for some suggested values for common materials
+        :param spacings: tuple of voxel sizes of phantom volume
+            in mm (dz, dx, dy)
         :param patientname: patient identifier to be saved in DICOM header
         :param patientid: int, patient identifier to be saved in DICOM header
         :param age: float, in years to be saved in DICOM header
@@ -121,16 +129,20 @@ class CTobj():
         :param seriesid: int, series identifier to be saved in DICOM header
         :param output_dir: optional directory to save the intermediate and
             final simulation results, defaults to current working directory
-        :param framework: Optional, CT simulation framework options include `['CATSIM']`
-        :param materials: Optional dictionary of {material name: HU value}, used for construction volume fraction maps in XCIST,
-            see materials and thresholds from this XCIST example: https://github.com/xcist/phantoms-voxelized/blob/main/DICOM_to_voxelized/DICOM_to_voxelized_example_head.cfg
+        :param framework: Optional, CT simulation framework options
+            include `['CATSIM']`
+        :param materials: Optional dictionary of {material name: HU value},
+            used for construction volume fraction maps in XCIST,
+            see materials and thresholds from this XCIST example:
+            https://github.com/xcist/phantoms-voxelized/blob/main/DICOM_to_voxelized/DICOM_to_voxelized_example_head.cfg
 
         :returns: None
 
         See also <https://github.com/DIDSR/pediatricIQphantoms/blob/main/src/pediatricIQphantoms/make_phantoms.py#L19>
     """
-    def __init__(self, phantom: np.ndarray, spacings: tuple, patientname="default", patientid=0,
-                 age=0, studyname="default", studyid=0, seriesname="default",
+    def __init__(self, phantom: np.ndarray, spacings: tuple,
+                 patientname="default", patientid=0, age=0,
+                 studyname="default", studyid=0, seriesname="default",
                  seriesid=0, framework='CATSIM', output_dir=None,
                  materials: dict | None = None) -> None:
         """Constructor method
@@ -157,8 +169,10 @@ class CTobj():
         self.groundtruth = None
         self.patient_diameter = 18
 
-        self.xcist = initialize_xcist(self.phantom, self.spacings, output_dir=self.output_dir,
-                                      phantom_id=patientid, materials=materials)
+        self.xcist = initialize_xcist(self.phantom, self.spacings,
+                                      output_dir=self.output_dir,
+                                      phantom_id=patientid,
+                                      materials=materials)
         self.start_positions = self.calculate_start_positions()
 
     def calculate_start_positions(self):
@@ -170,7 +184,9 @@ class CTobj():
         safe_width_at_isocenter = detector_width_at_isocenter - 2*self.xcist.scanner.detectorRowSize
         self.scan_width = self.xcist.cfg.protocol.rotationTime * self.xcist.cfg.protocol.tableSpeed + safe_width_at_isocenter
         self.total_scan_length = self.spacings[0]*self.phantom.shape[0]
-        return np.arange(-self.total_scan_length/2, self.total_scan_length/2, self.scan_width)
+        return np.arange(-self.total_scan_length/2,
+                         self.total_scan_length/2,
+                         self.scan_width)
 
     def recommend_scan_range(self, threshold=-950) -> tuple:
         '''
@@ -216,8 +232,10 @@ class CTobj():
     def scout_view(self, startZ=None, endZ=None, table_speed=0):
         '''
         Preview radiograph useful for determining scan range startZ and endZ
-        :param startZ: optional starting table position in mm of the scan, see self.start_positions
-        :param endZ: optional last position of scan in mm, see self.start_positions
+        :param startZ: optional starting table position in mm of the scan,
+            see self.start_positions
+        :param endZ: optional last position of scan in mm,
+            see self.start_positions
         '''
 
         if isinstance(table_speed, str):
@@ -229,11 +247,13 @@ class CTobj():
         start_positions = self.start_positions.copy()
         if startZ is not None:
             if startZ < start_positions.min():
-                raise ValueError(f'startZ is outside the range of valid start positions: {self.start_positions}')
+                raise ValueError(f'startZ is outside the range of valid\
+                                  start positions: {self.start_positions}')
             start_positions = start_positions[start_positions > startZ]
         if endZ is not None:
             if endZ > self.start_positions.max():
-                raise ValueError(f'startZ is outside the range of valid start positions: {self.start_positions}')
+                raise ValueError(f'startZ is outside the range of valid\
+                                  start positions: {self.start_positions}')
             start_positions = start_positions[start_positions < endZ]
 
         plt.imshow(self.phantom.sum(axis=1), cmap='gray', origin='lower',
@@ -274,22 +294,30 @@ class CTobj():
         return repr
 
     def run_scan(self, mA=200, kVp=120, startZ=None, endZ=None, views=None,
-                 verbose=False, table_speed=0):
+                 table_speed=0):
         """
             Runs the CT simulation using the stored parameters.
 
-            :param mA: x-ray source milliamps, increases x-ray flux linearly, $noise \propto 1/sqrt(mA)$
-            :param kVp: x-ray source potential, increases x-ray flux nonlinearly and reduces contrast as increased
-            :param startZ: optional starting table position in mm of the scan, see self.start_positions
-            :param endZ: optional last position of scan in mm, see self.start_positions
-            :param views: number of angular views, for testing this can be reduced but will produced aliasing streaks
-            :param verbose: optional boolean, if True prints out status updates, if False they are suppressed.
-            :param table_speed: optional [float, str] str options include 'Low': 26.67, 'Intermediate': 48, 'High': 64, units in mm/s
+            :param mA: x-ray source milliamps, increases x-ray flux linearly,
+                $noise \propto 1/sqrt(mA)$
+            :param kVp: x-ray source potential, increases x-ray flux
+                nonlinearly and reduces contrast as increased
+            :param startZ: optional starting table position in mm of the scan,
+                see self.start_positions
+            :param endZ: optional last position of scan in mm,
+                see self.start_positions
+            :param views: number of angular views, for testing this can be
+                reduced but will produced aliasing streaks
+            :param verbose: optional boolean, if True prints out status
+                updates, if False they are suppressed.
+            :param table_speed: optional [float, str] str options include
+                'Low': 26.67, 'Intermediate': 48, 'High': 64, units in mm/s
         """
         self.xcist.cfg.protocol.mA = mA
         kVp_options = [70, 80, 90, 100, 110, 120, 130, 140]
         if kVp not in kVp_options:
-            raise ValueError(f'Selected kVP [{kVp}] not available, please choose from {kVp_options}')
+            raise ValueError(f'Selected kVP [{kVp}] not available,\
+                              please choose from {kVp_options}')
         self.xcist.cfg.protocol.spectrumFilename = f'tungsten_tar7.0_{kVp}_filt.dat'
         self.kVp = kVp
         if isinstance(table_speed, str):
@@ -302,11 +330,13 @@ class CTobj():
 
         if startZ:
             if startZ < start_positions.min():
-                raise ValueError(f'startZ is outside the range of valid start positions: {self.start_positions}')
+                raise ValueError(f'startZ is outside the range of valid\
+                                  start positions: {self.start_positions}')
             start_positions = start_positions[start_positions > startZ]
         if endZ:
             if endZ > start_positions.max():
-                raise ValueError(f'startZ is outside the range of valid start positions: {self.start_positions}')
+                raise ValueError(f'startZ is outside the range of valid\
+                                  start positions: {self.start_positions}')
             start_positions = start_positions[start_positions < endZ]
 
         if views:
@@ -316,13 +346,13 @@ class CTobj():
 
         self.results_dir = self.output_dir / 'simulations' / f'{self.patientid}'
         self.results_dir.mkdir(exist_ok=True, parents=True)    
-        self.xcist.protocol.spectrumFilename = f"tungsten_tar7.0_{int(kVp)}_filt.dat" # name of the spectrum file
+        self.xcist.protocol.spectrumFilename = f"tungsten_tar7.0_{int(kVp)}_filt.dat"  # name of the spectrum file
         self.xcist.cfg.experimentDirectory = str(self.results_dir)
 
         projections = []
         for idx, table_position in enumerate(start_positions):
             print(f'scan: {idx+1}/{len(start_positions)}')
-            self.xcist.cfg.resultsName = str((self.results_dir / f'{idx:03d}_{mA}mA_{kVp}kV').absolute()) #keep projection data from each scan
+            self.xcist.cfg.resultsName = str((self.results_dir / f'{idx:03d}_{mA}mA_{kVp}kV').absolute())  # keep projection data from each scan
             self.xcist.resultsName = self.xcist.cfg.resultsName
             self.xcist.protocol.startZ = table_position
             self.xcist.run_all()
@@ -330,7 +360,8 @@ class CTobj():
         self._projections = projections
         return self
 
-    def run_recon(self, fov=None, sliceThickness=None, sliceCount=None, mu_water=None, preview=False):
+    def run_recon(self, fov=None, sliceThickness=None, sliceCount=None,
+                  mu_water=None, preview=False):
         'perform reconstruction and save to .recon attribute'
         if sliceThickness:
             self.xcist.recon.sliceThickness = sliceThickness
@@ -364,13 +395,17 @@ class CTobj():
         self.nsims = 1
         return self
 
-    def write_to_dicom(self, fname: str | Path, groundtruth=False) -> list[Path]:
+    def write_to_dicom(self, fname: str | Path,
+                       groundtruth=False) -> list[Path]:
         """
         write ct data to DICOM file, returns list of written dicom file names
 
-        :param fname: filename to save image to (preferably with '.dcm` or related extension)
-        :param groundtruth: Optional, whether to save the ground truth phantom image (no noise, blurring, or other artifacts).
-            If True, 'self.groundtruth` is saved, if False (default) `self.recon` which contains blurring (and noise if 'add_noise`True)
+        :param fname: filename to save image to (preferably with '.dcm`
+            or related extension)
+        :param groundtruth: Optional, whether to save the ground truth
+            phantom image (no noise, blurring, or other artifacts).
+            If True, 'self.groundtruth` is saved, if False (default)
+            `self.recon` which contains blurring (and noise if 'add_noise`True)
         :returns: list[Path]
 
         Adapted from <https://github.com/DIDSR/pediatricIQphantoms/blob/main/src/pediatricIQphantoms/make_phantoms.py#L144>
@@ -409,7 +444,8 @@ class CTobj():
         ds.DistanceSourceToDetector = self.xcist.cfg.scanner.sdd
         ds.DistanceSourceToPatient = self.xcist.cfg.scanner.sid
 
-        ds.PixelSpacing = [self.xcist.cfg.recon.fov/self.xcist.cfg.recon.imageSize, self.xcist.cfg.recon.fov/self.xcist.cfg.recon.imageSize]
+        ds.PixelSpacing = [self.xcist.cfg.recon.fov/self.xcist.cfg.recon.imageSize,
+                           self.xcist.cfg.recon.fov/self.xcist.cfg.recon.imageSize]
         ds.SliceThickness = ds.PixelSpacing[0]
 
         ds.KVP = self.kVp

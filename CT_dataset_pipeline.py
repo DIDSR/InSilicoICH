@@ -35,7 +35,7 @@ from pedsilicoICH.image_acquisition import read_dicom
 
 nihpd_dir = Path('NIHPD_Head_Phantom')
 MIDA_dir = Path('MIDA_Head_Phantom')
-output_directory = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/parallel')  # output directory to save simulation results
+output_directory = Path('/gpfs_projects/brandon.nelson/pedsilicoICH/parallel')
 desired_cases = 100
 views = 1000
 fov = 250
@@ -138,7 +138,7 @@ if __name__ == "__main__":
     # find parameter
 # %%
     nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
-    mida_age = 38  # add 38 as the median US adult age to represent MIDA, consider other identifiers when adding more patients
+    mida_age = 38  # median US adult age to represent MIDA
     possible_ages = nihpd_ages + [mida_age]
     kVp_list = [110, 120, 130]
     mA_list = list(range(50, 400, 50))
@@ -147,7 +147,7 @@ if __name__ == "__main__":
     min_contrast, max_contrast = 20, 200
     contrast_list = np.arange(20, 200)
     radii_list = np.arange(min_radius, max_radius)
-    simulations_list = list(range(1))  # This can be increased to enable multiple scans (different noise realizations of the same slice and settings)
+    simulations_list = list(range(1))  # increased for multiple scans
     l_parameter_comb = []
     for age_id in possible_ages:
         for kVp_id in kVp_list:
@@ -168,7 +168,7 @@ if __name__ == "__main__":
     n_params = len(l_parameter_comb)
 
     try:
-        patientids = [int(os.environ['SLURM_ARRAY_TASK_ID']) - 1]  # since tasks start from 1
+        patientids = [int(os.environ['SLURM_ARRAY_TASK_ID']) - 1]
     except:
         print('SLURM_ARRAY_TASK_ID not set, running in serial')
         patientids = list(range(n_params))
