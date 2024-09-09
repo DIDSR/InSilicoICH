@@ -50,7 +50,7 @@ def transforms_performed_correctly(phantom, transform, lesion_type, tol=0.2,
                                    seed=None):
     print(phantom, transform, lesion_type)
     phantom = deepcopy(phantom)
-    phantom.insert_lesion(lesion_type, radius=5, contrast=200)
+    phantom.insert_lesion(lesion_type, radius=5, contrast=200, seed=seed)
     lesion = phantom.get_lesion_mask()
     phantom.apply_transform(transform, seed=seed)
     transformed_lesion = phantom.get_lesion_mask()
@@ -59,10 +59,9 @@ def transforms_performed_correctly(phantom, transform, lesion_type, tol=0.2,
     assert err < tol
 
 
-def test_transforms_on_phantoms(seed=880):
+def test_transforms_on_phantoms(seed=900):
     'tests each combination of phantom and transform'
-    seed = 880
-    mida_shape = (480, 480, 350)
+    mida_shape = (240, 240, 175)
     phantoms = [NIHPD_Head(nihpd_dir, age, shape=mida_shape) for
                 age in nihpd_ages]
     ages = nihpd_ages
@@ -84,7 +83,7 @@ def test_transforms_on_phantoms(seed=880):
     lesions = ['sphere', 'epidural', 'subdural']
 
     for age, phantom in zip(ages, phantoms):
-        print(f'phantom of age: {age}')
+        print(f'phantom of age: {age}, seed: {seed}')
         for lesion in lesions:
             for transform in transforms:
                 transforms_performed_correctly(phantom, transform, lesion,

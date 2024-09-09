@@ -14,7 +14,7 @@ dependencies = [
   "monai",
   "pandas",
   "numpy",
-  "pydicom",
+  "pydicom==2.4.4",
   "pytest",
   "torchvision",
   "gecatsim @ git+https://github.com/xcist/main.git"
