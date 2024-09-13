@@ -30,7 +30,11 @@ def spherical_lesion(phantom: np.ndarray,
     return np.where(distance_matrix > radius**2, False, True)
 
 
-def insert_dural_3D(spacing, volume, dura_map, skull_map, init_slice, hematoma_type, mass_effect):
+def insert_dural_3D(spacing, phantom, init_slice, hematoma_type, mass_effect):
+
+    volume = phantom.get_CT_number_phantom()
+    dura_map = phantom.get_dura_map()
+    skull_map = phantom.get_skull_map()
 
     new_volume = np.copy(volume)
 
@@ -131,7 +135,7 @@ def insert_dural_3D(spacing, volume, dura_map, skull_map, init_slice, hematoma_t
 
 
 def connect_points(start, end, boundary, hematoma_type):
-    'draw a line connecting start and end points but following existing dura'
+    '''draw a line connecting start and end points but following existing dura'''
     rows, cols = boundary.shape
     costs = np.where(boundary, 0, 10000)
     path, _ = ski.graph.route_through_array(costs, start=(start[0], start[1]), end=(end[0], end[1]), fully_connected=False)
@@ -177,9 +181,7 @@ def connect_points(start, end, boundary, hematoma_type):
     return filled_array, boundary_coords, connect_coords
 
 def warp_slice(axial_slice, skull_slice, src, dst):
-    'perform warp of 2D slice according to hematoma boundary coordinates'
-
-    print('warping...')
+    '''perform warp of 2D slice according to hematoma boundary coordinates'''
     # to simulate mass effect, transform will need some skull coordinates to NOT move
     skull_idx = np.argwhere(skull_slice == 1.0)
     skull_sample = np.round(np.linspace(0, len(skull_idx)-1, 1000)).astype(int) # increase from 1000 as memory allows

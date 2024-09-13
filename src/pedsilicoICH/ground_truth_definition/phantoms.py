@@ -90,6 +90,10 @@ class Phantom:
         'used for epidural, subdural lesion insertion'
         pass
 
+    def get_skull_map(self):
+        'used for lesion insertion mass effect warping'
+        pass
+
     def get_lesion_mask(self):
         return self._lesion[0]
 
@@ -97,28 +101,28 @@ class Phantom:
     def spacings(self):
         return self.dz, self.dx, self.dy
 
-    def insert_lesion(self, lesion_type, radius=5, contrast=100):
+    def insert_lesion(self, lesion_type, radius=5, contrast=100, init_slice=None):
         'return img_w_lesion, lesion_image, lesion_coords'
         if lesion_type == 'sphere':
             lesion_func = add_sphere_lesion
             mask = self.get_material_mask('white matter').astype(int)
-            params = {'radius': radius, 'contrast': contrast}
+            params = {'radius': radius, 'contrast': contrast, 'mask': mask}
         elif lesion_type == 'epidural':
             if isinstance(contrast, list):
                 contrast = max(contrast)
             lesion_func = add_epidural_lesion
-            mask = self.get_dura_map()
             params = {'spacing': self.spacings,
-                      'contrast': contrast}
+                      'contrast': contrast,
+                      'init_slice': init_slice}
         else:
             if isinstance(contrast, list):
                 contrast = max(contrast)
             lesion_func = add_subdural_lesion
-            mask = self.get_dura_map()
             params = {'spacing': self.spacings,
-                      'contrast': contrast}
+                      'contrast': contrast,
+                      'init_slice': init_slice}
 
-        img_w_lesion, lesion_image, lesion_coords = lesion_func(self.get_CT_number_phantom(), mask, **params) 
+        img_w_lesion, lesion_image, lesion_coords = lesion_func(self, **params) 
 
         self._phantom = img_w_lesion
         self._lesion.append(lesion_image)
@@ -130,10 +134,6 @@ class Phantom:
                                                                     self.get_CT_number_phantom(),
                                                                     self.get_lesion_mask(),
                                                                     seed=seed)
-
-    def get_skull_map(self):
-        'used for lesion insertion mass effect warping'
-        pass
 
 
 class MIDA_Head(Phantom):
@@ -236,12 +236,13 @@ class MIDA_Head(Phantom):
         return self.get_CT_number_phantom() == self.materials[material]
 
     def get_dura_map(self):
+        '''obtains dura map using mida atlas index of 1.0'''
         dura_map = np.zeros_like(self._phantom)
         dura_map[np.where(self._phantom == 1.0)] = 1.0
         return dura_map
     
     def get_skull_map(self):
-        'obtain spartial skull map using mida atlas, ignoring facial bones (for now)'
+        '''obtains partial skull map using mida atlas, ignoring facial bones (for now)'''
         skull_map = np.zeros_like(self._phantom)
         skull_map[np.where(self._phantom == 53)] = 1.0 
         skull_map[np.where(self._phantom == 1000)] = 1.0 # skull inner table
@@ -333,12 +334,13 @@ class NIHPD_Head(Phantom):
         return mask.astype(int)
 
     def get_dura_map(self):
+        '''obtains approximate dura map using inside boundary of brain mask'''
         return ski.segmentation.find_boundaries(self.mask,
                                                 mode='inner',
                                                 background=0)
     
     def get_skull_map(self):
-        'get rudimentary mask of skull voxels'
+        '''obtains rudimentary mask of skull voxels using threshold of proton-density weighted image and full mask'''
         skull_map = (self.mask == 0)*self.pdw / self.pdw.max()
         skull_map[skull_map < 0.1] = 0
         skull_map[skull_map > 0] = 1
