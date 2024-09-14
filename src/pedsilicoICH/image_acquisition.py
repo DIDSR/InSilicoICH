@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pydicom
 import gecatsim as xc
+import monai
 
 from gecatsim.reconstruction.pyfiles import recon
 from .ground_truth_definition.phantoms import voxelize_ground_truth
@@ -147,10 +148,15 @@ class CTobj():
                  materials: dict | None = None) -> None:
         """Constructor method
         """
-        output_dir = output_dir or f'{patientname}'
-        self.output_dir = Path(output_dir)
-        if self.output_dir.exists():
-            rmtree(self.output_dir)
+        output_dir = output_dir or '.'
+        output_dir = Path(output_dir) / f'{patientname}'
+        if output_dir.exists():
+            rmtree(output_dir)
+        output_dir.mkdir(exist_ok=True, parents=True)
+        self.output_dir = output_dir
+
+        if isinstance(phantom, monai.data.meta_tensor.MetaTensor):
+            phantom = phantom.numpy()
         self.phantom = phantom
         self.spacings = spacings
         self.age = age

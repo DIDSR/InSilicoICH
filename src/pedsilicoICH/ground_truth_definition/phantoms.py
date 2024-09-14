@@ -10,6 +10,7 @@ import nibabel as nib
 import pandas as pd
 import skimage as ski
 from monai.transforms import Resize, RandAffine, Affine
+from torchvision.datasets.utils import download_and_extract_archive
 
 from . import dicom_to_voxelized_phantom
 from ..artifact_generation import transform_image_label_pair
@@ -70,6 +71,44 @@ phantom.overwrite = True                   # Flag to overwrite existing files wi
     dicom_to_voxelized_phantom.run_from_config(dicom_to_voxel_cfg)
 
 
+def load_phantom(age, shape=(480, 480, 350), name='default', lesion_type=None,
+                 radius=4, contrast=200, add_positioning_augmentation=True):
+    '''
+    Loads appropriate phantom based on age as a keyword
+
+    :param age: patient age in years, MIDA currently hard coded at 38 yrs
+    :param shape: shape of that the ground truth phantom will be interpolated
+    :param name: patient name to be saved in DICOM header
+    :param lesion_type: options include: ['sphere', 'epidural', 'subdural']
+    :param radius: lesion radius if sphere is selected
+    :param contrast: uniform contrast of the lesion
+    :param add_positioning_augmentation: bool, apply random affine to phantom
+    '''
+    root_dir = Path(__file__).parents[2]
+    nihpd_dir = root_dir.parent / 'NIHPD_Head_Phantom'
+    mida_dir = root_dir.parent / 'MIDA_Head_Phantom'
+
+    if not nihpd_dir.exists():
+        url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
+        download_and_extract_archive(url, nihpd_dir)
+    mida_age = 38
+    if age == mida_age:
+        if not mida_dir.exists():
+            Warning(f'MIDA head phantom not found in {mida_dir}, skipping...')
+            return None
+        phantom = MIDA_Head(mida_dir, shape=shape)
+    else:
+        phantom = NIHPD_Head(nihpd_dir, age=age, shape=shape)
+
+    phantom.patient_name = name
+    phantom.age = age
+    phantom.lesion_type = lesion_type
+    phantom.lesion_radius = radius
+    phantom.lesion_contrast = contrast
+
+    return phantom
+
+
 class Phantom:
     def __init__(self, phantom_dir):
         self.phantom_dir = phantom_dir
@@ -119,7 +158,7 @@ class Phantom:
                       'contrast': contrast}
 
         img_w_lesion, lesion_image, lesion_coords = lesion_func(self.get_CT_number_phantom(), mask,
-                                                                 seed=seed, **params) 
+                                                                seed=seed, **params) 
 
         self._phantom = img_w_lesion
         self._lesion.append(lesion_image)
