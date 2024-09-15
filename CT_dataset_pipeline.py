@@ -53,24 +53,24 @@ if __name__ == "__main__":
     kVp_list = [110, 120, 130]
     mA_list = list(range(50, 400, 50))
     lesion_types = ['sphere', 'epidural', 'subdural']
-    min_radius, max_radius = 2, 20  # applied only to spheres, TODO turn to volume then can be more general to allow types
+    min_vol, max_vol = 34, 34000  # applied only to spheres [units of voxels, TODO convert to mL or mm^3]
     min_contrast, max_contrast = 20, 200
     contrast_list = np.arange(20, 200)
-    radii_list = np.arange(min_radius, max_radius)
+    volume_list = np.linspace(min_vol, max_vol, 20)
     simulations_list = list(range(1))  # increased for multiple scans
     l_parameter_comb = []
     for age_id in possible_ages:
         for kVp_id in kVp_list:
             for mA_id in mA_list:
                 for contrast_id in contrast_list:
-                    for radii_id in radii_list:
+                    for vol_id in volume_list:
                         for lesion_id in lesion_types:
                             for simulation_id in simulations_list:
                                 l_parameter_comb.append([age_id,
                                                          kVp_id,
                                                          mA_id,
                                                          contrast_id,
-                                                         radii_id,
+                                                         vol_id,
                                                          lesion_id,
                                                          simulation_id])
     shuffle(l_parameter_comb)
@@ -85,14 +85,15 @@ if __name__ == "__main__":
 
     for patientid in patientids:
         print(f'{patientid}/{n_params}')
-        age, kVp, mA, contrast, radius, lesion_type, sim_id = l_parameter_comb[patientid]
+        age, kVp, mA, contrast, volume, lesion_type, sim_id =\
+            l_parameter_comb[patientid]
         print(f'{age} years, {lesion_type}, {contrast} HU')
         patient_name = f'case_{patientid:03}'
         try:
             study = run_study(output_directory,
                               patient_name, age=age,
                               kVp=kVp, mA=mA, contrast=contrast,
-                              radius=radius,
+                              volume=volume,
                               lesion_type=lesion_type,
                               views=views, zspan=zspan)
             study.metadata.to_csv(output_directory / patient_name /
