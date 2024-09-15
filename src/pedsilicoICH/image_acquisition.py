@@ -5,6 +5,7 @@ Module responsible for CT image acquisition simulation
 from pathlib import Path
 from shutil import rmtree
 from datetime import datetime
+from copy import deepcopy
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,7 +14,8 @@ import gecatsim as xc
 import monai
 
 from gecatsim.reconstruction.pyfiles import recon
-from .ground_truth_definition.phantoms import voxelize_ground_truth
+from .ground_truth_definition.phantoms import (voxelize_ground_truth,
+                                               Phantom)
 
 install_path = Path(__file__).parent
 
@@ -141,27 +143,24 @@ class CTobj():
 
         See also <https://github.com/DIDSR/pediatricIQphantoms/blob/main/src/pediatricIQphantoms/make_phantoms.py#L19>
     """
-    def __init__(self, phantom: np.ndarray, spacings: tuple,
-                 patientname="default", patientid=0, age=0,
-                 studyname="default", studyid=0, seriesname="default",
+    def __init__(self, phantom: Phantom, studyname="default",
+                 studyid=0, seriesname="default",
                  seriesid=0, framework='CATSIM', output_dir=None,
                  materials: dict | None = None) -> None:
         """Constructor method
         """
         output_dir = output_dir or '.'
-        output_dir = Path(output_dir) / f'{patientname}'
+        output_dir = Path(output_dir) / f'{phantom.patient_name}'
         if output_dir.exists():
             rmtree(output_dir)
         output_dir.mkdir(exist_ok=True, parents=True)
         self.output_dir = output_dir
 
-        if isinstance(phantom, monai.data.meta_tensor.MetaTensor):
-            phantom = phantom.numpy()
+        img = phantom.get_CT_number_phantom()
+        if isinstance(img, monai.data.meta_tensor.MetaTensor):
+            img = img.numpy()
         self.phantom = phantom
-        self.spacings = spacings
-        self.age = age
-        self.patientname = patientname
-        self.patientid = patientid
+        self.spacings = phantom.spacings
         self.studyname = studyname or self.patientname
         self.studyid = studyid
         self.seriesname = seriesname
@@ -174,10 +173,11 @@ class CTobj():
         self.projections = None
         self.groundtruth = None
         self.patient_diameter = 18
+        self.zspan = 'dynamic'
 
-        self.xcist = initialize_xcist(self.phantom, self.spacings,
+        self.xcist = initialize_xcist(img, self.spacings,
                                       output_dir=self.output_dir,
-                                      phantom_id=patientid,
+                                      phantom_id=phantom.patientid,
                                       materials=materials)
         self.start_positions = self.calculate_start_positions()
 
@@ -189,7 +189,8 @@ class CTobj():
 
         safe_width_at_isocenter = detector_width_at_isocenter - 2*self.xcist.scanner.detectorRowSize
         self.scan_width = self.xcist.cfg.protocol.rotationTime * self.xcist.cfg.protocol.tableSpeed + safe_width_at_isocenter
-        self.total_scan_length = self.spacings[0]*self.phantom.shape[0]
+        img = self.phantom.get_CT_number_phantom()
+        self.total_scan_length = self.spacings[0]*img.shape[0]
         return np.arange(-self.total_scan_length/2,
                          self.total_scan_length/2,
                          self.scan_width)
@@ -201,7 +202,8 @@ class CTobj():
 
         threshold [HU] determines minimum attenuating regions to keep
         '''
-        scout_profile = self.phantom.mean(axis=(1, 2))
+        img = self.phantom.get_CT_number_phantom()
+        scout_profile = img.mean(axis=(1, 2))
         suggested_start_idx = np.argmax(np.diff(scout_profile > threshold)) + 1
         suggested_start_mm = self.start_positions[0] + suggested_start_idx * self.spacings[0]
 
@@ -217,12 +219,14 @@ class CTobj():
         gt_dicoms = list(Path(self.xcist.cfg.phantom.filename).parent.rglob('*.dcm'))
         return np.stack([read_dicom(o) for o in gt_dicoms])
 
-    def get_lesion_mask(self, ground_truth_lesion, startZ=None, endZ=None):
+    def get_lesion_mask(self, startZ=None, endZ=None):
         '''takes lesion in object space and returns a mask in CT image space
         for the given imaging system'''
-        lesion_only = CTobj(np.where(ground_truth_lesion > 0, 0, - 1000),
-                            spacings=self.spacings,
-                            patientname='lesion only',
+        ground_truth_lesion = self.phantom._lesion[0]
+        lesion_phantom = deepcopy(self.phantom)
+        lesion_phantom._phantom = np.where(ground_truth_lesion > 0, 0, - 1000)
+        lesion_phantom.patient_name = 'lesion only'
+        lesion_only = CTobj(lesion_phantom,
                             materials={
                                 'ICRU_lung_adult_healthy': -1000,
                                 'water': 0})
@@ -261,21 +265,21 @@ class CTobj():
                 raise ValueError(f'startZ is outside the range of valid\
                                   start positions: {self.start_positions}')
             start_positions = start_positions[start_positions < endZ]
-
-        plt.imshow(self.phantom.sum(axis=1), cmap='gray', origin='lower',
-                   extent=[-self.phantom.shape[0]*self.spacings[0]/2,
-                           self.phantom.shape[0]*self.spacings[0]/2,
+        img = self.phantom.get_CT_number_phantom()
+        plt.imshow(img.sum(axis=1), cmap='gray', origin='lower',
+                   extent=[-img.shape[0]*self.spacings[0]/2,
+                           img.shape[0]*self.spacings[0]/2,
                            self.start_positions[0]+self.total_scan_length,
                            self.start_positions[0]])
         plt.hlines(y=start_positions[0],
-                   xmin=-self.phantom.shape[0]*self.spacings[0] / 2,
-                   xmax=self.phantom.shape[0]*self.spacings[0]/2, color='red')
+                   xmin=-img.shape[0]*self.spacings[0] / 2,
+                   xmax=img.shape[0]*self.spacings[0]/2, color='red')
         plt.annotate('Stop', (0, start_positions[0]-10),
                      horizontalalignment='center')
 
         plt.hlines(y=start_positions[-1] + self.scan_width,
-                   xmin=-self.phantom.shape[0]*self.spacings[0]/2,
-                   xmax=self.phantom.shape[0]*self.spacings[0]/2, color='red')
+                   xmin=-img.shape[0]*self.spacings[0]/2,
+                   xmax=img.shape[0]*self.spacings[0]/2, color='red')
         plt.annotate('Start', (0, start_positions[-1] + self.scan_width + 10),
                      horizontalalignment='center')
 
@@ -350,7 +354,8 @@ class CTobj():
             self.xcist.protocol.stopViewId = self.xcist.cfg.protocol.startViewId+self.xcist.cfg.protocol.viewCount-1
             self.xcist.cfg.protocol.viewsPerRotation = views
 
-        self.results_dir = self.output_dir / 'simulations' / f'{self.patientid}'
+        self.results_dir = self.output_dir / 'simulations' / \
+            f'{self.phantom.patientid}'
         self.results_dir.mkdir(exist_ok=True, parents=True)    
         self.xcist.protocol.spectrumFilename = f"tungsten_tar7.0_{int(kVp)}_filt.dat"  # name of the spectrum file
         self.xcist.cfg.experimentDirectory = str(self.results_dir)
@@ -427,10 +432,10 @@ class CTobj():
         ds.InstitutionName = 'FDA/CDRH/OSEL/DIDSR'
         ds.StudyDate = ds.InstanceCreationDate
         ds.StudyTime = ds.InstanceCreationTime
-        ds.PatientName = self.patientname
+        ds.PatientName = self.phantom.patient_name
         ds.SeriesNumber = self.seriesid
-        ds.PatientAge = f'{int(self.age):03d}Y'
-        ds.PatientID = f'{int(self.patientid):03d}'
+        ds.PatientAge = f'{int(self.phantom.age):03d}Y'
+        ds.PatientID = f'{int(self.phantom.patientid):03d}'
         del ds.PatientWeight
         del ds.ContrastBolusRoute
         del ds.ContrastBolusAgent

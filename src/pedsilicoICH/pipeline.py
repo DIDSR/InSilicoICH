@@ -2,6 +2,7 @@
 pipeline: this module organizes the healthy head phantoms, lesion definitions,
 augmentations, and CT simulation together into the final ct_simulation function
 '''
+from pathlib import Path
 
 import numpy as np
 import pydicom
@@ -10,7 +11,7 @@ from scipy.ndimage import center_of_mass
 from monai.transforms import RandAffine
 
 from .image_acquisition import CTobj, read_dicom
-from .ground_truth_definition.phantoms import Phantom, load_phantom
+from .ground_truth_definition.phantoms import load_phantom
 
 
 def load_vol(file_list):
@@ -18,26 +19,24 @@ def load_vol(file_list):
 
 
 class Study:
-    def __init__(self, phantom: Phantom, study_name='default'):
-        self.phantom = phantom
+    def __init__(self, scanner: CTobj, study_name='default'):
+        self.scanner = scanner
+        self.phantom = scanner.phantom
         self.study_name = study_name
-        self.scanner = None
+        self.metadata = None
 
     def __repr__(self) -> str:
         repr = f'''
         study name: {self.study_name}
         Phantom details:
         ----------------
-        phantom class: {self.phantom.__class__.__name__}
+        phantom class: {self.scanner.phantom.__class__.__name__}
         age [yrs]: {self.phantom.age}
         shape [voxels]: {self.shape}
         size [mm]: {self.size}
         Number of lesions: {len(self.phantom._lesion_coords)}
         Lesion locations [voxel index (z, x, y)]: {self.phantom._lesion_coords}
-        '''
-        if self.scanner is None:
-            return repr
-        repr + f'''
+
         Scanner details:
         ----------------
         Scanner: {self.scanner.framework}
@@ -58,17 +57,9 @@ class Study:
         patient_name = self.phantom.patient_name
         age = self.phantom.age
         lesion_type = self.phantom.lesion_type
-        radius = self.phantom.lesion_radius
         contrast = self.phantom.lesion_contrast
 
-        img_w_lesion = self.phantom.get_CT_number_phantom()
-        lesion_image = self.phantom.get_lesion_mask()
-
-        ct = CTobj(img_w_lesion, spacings=self.phantom.spacings,
-                   patientname=self.phantom.patient_name,
-                   age=self.phantom.age,
-                   studyname=self.study_name,
-                   output_dir=output_directory)
+        ct = self.scanner
         if zspan == 'dynamic':
             startZ, endZ = ct.recommend_scan_range()
         elif isinstance(zspan, tuple):
@@ -78,26 +69,34 @@ class Study:
                     mA=mA, kVp=kVp)
         ct.run_recon(fov=fov)
         self.scanner = ct
+        self.images = ct.recon
 
+        output_directory = Path(output_directory)
         dicom_path = output_directory / 'dicoms'
         dcm_files = ct.write_to_dicom(dicom_path / f'{patient_name}.dcm')
 
-        lesion_only = ct
-        mask = ct.get_lesion_mask(lesion_image,
-                                  startZ=startZ, endZ=endZ)
+        mask_files = [None]*len(dcm_files)
+        z, x, y = 3*[None]
+        vol_ml = None
+        if lesion_type:
+            lesion_only = ct
+            mask = ct.get_lesion_mask(startZ=startZ, endZ=endZ)
 
-        lesion_only.recon = mask
-        dicom_path = output_directory / 'lesion_masks'
-        mask_files = lesion_only.write_to_dicom(dicom_path /
-                                                f'{patient_name}_mask.dcm')
-        mask = load_vol(mask_files)
+            lesion_only.recon = mask
+            dicom_path = output_directory / 'lesion_masks'
+            mask_files = lesion_only.write_to_dicom(dicom_path /
+                                                    f'{patient_name}_mask.dcm')
+            mask = load_vol(mask_files)
+            self.lesion = mask & (self.images > self.images.mean())
+            self.scanner.recon = self.images
 
-        dcm = pydicom.read_file(mask_files[0])
-        spacings = list(map(float, [dcm.SliceThickness] + list(dcm.PixelSpacing)))
+            dcm = pydicom.read_file(mask_files[0])
+            spacings = list(map(float, [dcm.SliceThickness] +
+                            list(dcm.PixelSpacing)))
 
-        vol_ml = np.prod(spacings) * mask.sum() / 1000
-        z, x, y = center_of_mass(mask)
-        # define empty list of metadata columns to store in the resulting dataframe
+            vol_ml = np.prod(spacings) * mask.sum() / 1000
+            z, x, y = center_of_mass(mask)
+            self.lesion_coords = (z, x, y)
         ages = []
         names = []
         files = []
@@ -107,7 +106,6 @@ class Study:
         views_list = []
         masks = []
         contrast_list = []
-        radius_list = []
         lesion_type_list = []
         center_x_list = []
         center_y_list = []
@@ -124,7 +122,6 @@ class Study:
             views_list.append(views)
             masks.append(m)
             contrast_list.append(contrast)
-            radius_list.append(radius)
             lesion_type_list.append(lesion_type)
             center_x_list.append(x)
             center_y_list.append(y)
@@ -134,7 +131,6 @@ class Study:
         metadata = pd.DataFrame({'name': names,
                                  'age': ages,
                                  'contrast': contrast_list,
-                                 'radius': radius_list,
                                  'center x': center_x_list,
                                  'center y': center_y_list,
                                  'center z': center_z_list,
@@ -151,16 +147,16 @@ class Study:
 
 
 def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
-              mA=200, contrast=200, radius=5, lesion_type=None, views=1000,
+              mA=200, contrast=200, volume=500, lesion_type=None, views=1000,
               zspan='dynamic',
-              add_positioning_augmentation=True) -> pd.DataFrame:
+              add_positioning_augmentation=True) -> Study:
 
     mida_shape = (480, 480, 350)  # default shape of MIDA
     phantom = load_phantom(age=age, shape=mida_shape, name=patient_name)
 
     if lesion_type:
         phantom.insert_lesion(lesion_type,
-                              radius=radius,
+                              volume=volume,
                               contrast=contrast)
 
     if add_positioning_augmentation:
@@ -171,6 +167,7 @@ def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
                                padding_mode="border")
         phantom.apply_transform(transform)
 
-    study = Study(phantom, 'pilot', kVp=kVp, mA=mA, views=views, zspan=zspan)
-    study.run_study(output_directory)
+    scanner = CTobj(phantom, output_dir=output_directory)
+    study = Study(scanner, 'pilot')
+    study.run_study(output_directory, kVp=kVp, mA=mA, views=views, zspan=zspan)
     return study

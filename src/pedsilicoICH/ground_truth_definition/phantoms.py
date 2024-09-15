@@ -71,8 +71,7 @@ phantom.overwrite = True                   # Flag to overwrite existing files wi
     dicom_to_voxelized_phantom.run_from_config(dicom_to_voxel_cfg)
 
 
-def load_phantom(age, shape=(480, 480, 350), name='default', lesion_type=None,
-                 radius=4, contrast=200, add_positioning_augmentation=True):
+def load_phantom(age=38, shape=(480, 480, 350), name='default'):
     '''
     Loads appropriate phantom based on age as a keyword
 
@@ -102,10 +101,6 @@ def load_phantom(age, shape=(480, 480, 350), name='default', lesion_type=None,
 
     phantom.patient_name = name
     phantom.age = age
-    phantom.lesion_type = lesion_type
-    phantom.lesion_radius = radius
-    phantom.lesion_contrast = contrast
-
     return phantom
 
 
@@ -116,8 +111,11 @@ class Phantom:
                           'white matter': 20,
                           'CSF': 15,
                           'skull': 1000}
+        self.patientid = 0
         self._lesion = []
         self._lesion_coords = []
+        self.lesion_type = []
+        self.lesion_contrast = []
 
     def get_CT_number_phantom(self):
         pass
@@ -136,12 +134,13 @@ class Phantom:
     def spacings(self):
         return self.dz, self.dx, self.dy
 
-    def insert_lesion(self, lesion_type, radius=5, contrast=100, seed=None):
+    def insert_lesion(self, lesion_type, volume=500, contrast=100, seed=None):
         'return img_w_lesion, lesion_image, lesion_coords'
+        self.lesion_type.append(lesion_type)
         if lesion_type == 'sphere':
             lesion_func = add_sphere_lesion
             mask = self.get_material_mask('white matter').astype(int)
-            params = {'radius': radius, 'contrast': contrast}
+            params = {'contrast': contrast}
         elif lesion_type == 'epidural':
             if isinstance(contrast, list):
                 contrast = max(contrast)
@@ -158,14 +157,20 @@ class Phantom:
                       'contrast': contrast}
 
         img_w_lesion, lesion_image, lesion_coords = lesion_func(self.get_CT_number_phantom(), mask,
-                                                                seed=seed, **params) 
+                                                                volume=volume,
+                                                                seed=seed,
+                                                                **params) 
 
         self._phantom = img_w_lesion
         self._lesion.append(lesion_image)
         self._lesion_coords.append(lesion_coords)
+        self.lesion_contrast.append(contrast)
         return self
 
     def apply_transform(self, transform: RandAffine | Affine, seed=None):
+        if not self._lesion:
+            self._phantom = transform(self.get_CT_number_phantom())
+            return
         self._phantom, self._lesion[0] = transform_image_label_pair(transform,
                                                                     self.get_CT_number_phantom(),
                                                                     self.get_lesion_mask(),
@@ -279,14 +284,23 @@ class MIDA_Head(Phantom):
 
 class NIHPD_Head(Phantom):
     '''
-    loads MR brain atlas of mean `age`, downloaded from <https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1> and saved in `base_dir`
+    loads MR brain atlas of mean `age`, downloaded from
+    <https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1> and saved in `base_dir`
 
-    :param base_dir: str, directory holding .nii files from https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1
-    :param age: float, mean age of the atlas phantom to load. Note the brain atlases are stored as age ranges, thus the mean age is the mid point of the range (upper+lower)/2
-    :param symmetry: optional, the atlases are provided in their natural asymmetric or artificially generated symmetric state, default is asymmetric, see article for more details: 
-    1. Fonov V, Evans AC, Botteron K, Almli CR, McKinstry RC, Collins DL. Unbiased average age-appropriate atlases for pediatric studies. NeuroImage. 2011;54(1):313-327. doi:10.1016/j.neuroimage.2010.07.033
+    :param base_dir: str, directory holding .nii files from
+        https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1
+    :param age: float, mean age of the atlas phantom to load. Note the brain
+        atlases are stored as age ranges, thus the mean age is the mid point
+        of the range (upper+lower)/2
+    :param symmetry: optional, the atlases are provided in their natural
+        asymmetric or artificially generated symmetric state, default is
+        asymmetric, see article for more details: 
+    1. Fonov V, Evans AC, Botteron K, Almli CR, McKinstry RC, Collins DL.
+        Unbiased average age-appropriate atlases for pediatric studies.
+        NeuroImage. 2011;54(1):313-327. doi:10.1016/j.neuroimage.2010.07.033
     '''
-    def __init__(self, phantom_dir, age: float, symmetric=False, csf_HU=15, gm_HU=45, wm_HU=20, skull_HU=1000, shape=None):
+    def __init__(self, phantom_dir, age: float, symmetric=False, csf_HU=15,
+                 gm_HU=45, wm_HU=20, skull_HU=1000, shape=None):
         super().__init__(phantom_dir)
         self.age = age
         self.csf_HU = csf_HU
@@ -310,11 +324,11 @@ class NIHPD_Head(Phantom):
         header = nib_img.header
         self.dx, self.dy, self.dz = header['pixdim'][1:4]
 
-        self.csf = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_csf.nii').get_fdata().transpose(2, 1, 0)[:,::-1,:]
-        self.gm = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_gm.nii').get_fdata().transpose(2, 1, 0)[:,::-1,:]
-        self.wm = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_wm.nii').get_fdata().transpose(2, 1, 0)[:,::-1,:]
-        self.mask = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_mask.nii').get_fdata().transpose(2, 1, 0)[:,::-1,:]
-        self.pdw = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_pdw.nii').get_fdata().transpose(2, 1, 0)[:,::-1,:]
+        self.csf = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_csf.nii').get_fdata().transpose(2, 1, 0)[:, ::-1, :]
+        self.gm = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_gm.nii').get_fdata().transpose(2, 1, 0)[:, ::-1, :]
+        self.wm = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_wm.nii').get_fdata().transpose(2, 1, 0)[:, ::-1, :]
+        self.mask = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_mask.nii').get_fdata().transpose(2, 1, 0)[:, ::-1, :]
+        self.pdw = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_pdw.nii').get_fdata().transpose(2, 1, 0)[:, ::-1, :]
 
         self.csf = self.csf[::-1]
         self.gm = self.gm[::-1]
