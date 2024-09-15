@@ -105,6 +105,38 @@ def load_phantom(age=38, shape=(480, 480, 350), name='default'):
 
 
 class Phantom:
+    '''
+    Base phantom that can accept any img array and spacings which
+        specify the size
+
+    :param img: 2D or 3D numpy array defining the phantom
+    :param spacings: tuple, voxel spacings [mm] (z, x, y), defining voxel
+        sizes, defaults to 1 mm in each direction
+    :param patient_name: patient identifier to be saved in DICOM header
+    :param patientid: int, patient identifier to be saved in DICOM header
+    :param age: float, in years to be saved in DICOM header
+    '''
+    def __init__(self, img: np.ndarray, spacings: tuple = (1, 1, 1),
+                 patient_name='default', patientid=0, age=0) -> None:
+        self._phantom = img
+        self.dz, self.dx, self.dy = spacings
+        self.patient_name = patient_name
+        self.patientid = patientid
+        self.age = age
+        self._lesion = []
+        self._lesion_coords = []
+        self.lesion_type = []
+        self.lesion_contrast = []
+
+    def get_CT_number_phantom(self) -> np.ndarray:
+        return self._phantom
+
+    @property
+    def spacings(self):
+        return self.dz, self.dx, self.dy
+
+
+class HeadPhantom(Phantom):
     def __init__(self, phantom_dir):
         self.phantom_dir = phantom_dir
         self.materials = {'gray matter': 45,
@@ -117,9 +149,6 @@ class Phantom:
         self.lesion_type = []
         self.lesion_contrast = []
 
-    def get_CT_number_phantom(self):
-        pass
-
     def get_material_mask(self, material):
         pass
 
@@ -129,10 +158,6 @@ class Phantom:
 
     def get_lesion_mask(self):
         return self._lesion[0]
-
-    @property
-    def spacings(self):
-        return self.dz, self.dx, self.dy
 
     def insert_lesion(self, lesion_type, volume=500, contrast=100, seed=None):
         'return img_w_lesion, lesion_image, lesion_coords'
@@ -177,7 +202,7 @@ class Phantom:
                                                                     seed=seed)
 
 
-class MIDA_Head(Phantom):
+class MIDA_Head(HeadPhantom):
     def __init__(self, phantom_dir, csf_HU=15, gm_HU=45, wm_HU=20, skull_HU=1000, shape=None):
         super().__init__(phantom_dir)
         self.age = 39  # median american age
@@ -282,7 +307,7 @@ class MIDA_Head(Phantom):
         return dura_map
 
 
-class NIHPD_Head(Phantom):
+class NIHPD_Head(HeadPhantom):
     '''
     loads MR brain atlas of mean `age`, downloaded from
     <https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1> and saved in `base_dir`

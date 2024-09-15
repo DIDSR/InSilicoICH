@@ -113,41 +113,38 @@ _table_speed = {'Low': 26.67, 'Intermediate': 48, 'High': 64}
 
 class CTobj():
     """
-        A class to hold CT simulation data and run simulations
+    A class to hold CT simulation data and run simulations
 
-        :param phantom: 3D phantom volume to be scanned, voxels in units of
-            approximate CT Numbers [HU], typically in python
-            coordinates (z, x, y)
-            where z is perpendicular to the axial plane made by x and y.
-            See <https://en.wikipedia.org/wiki/Hounsfield_scale#Values_for_different_body_tissues_and_material>
-            for some suggested values for common materials
-        :param spacings: tuple of voxel sizes of phantom volume
-            in mm (dz, dx, dy)
-        :param patientname: patient identifier to be saved in DICOM header
-        :param patientid: int, patient identifier to be saved in DICOM header
-        :param age: float, in years to be saved in DICOM header
-        :param studyname: str, study identifier to be saved in DICOM header
-        :param studyid: int, study identifier to be saved in DICOM header
-        :param seriesname: str, series identifier to be saved in DICOM header
-        :param seriesid: int, series identifier to be saved in DICOM header
-        :param output_dir: optional directory to save the intermediate and
-            final simulation results, defaults to current working directory
-        :param framework: Optional, CT simulation framework options
-            include `['CATSIM']`
-        :param materials: Optional dictionary of {material name: HU value},
-            used for construction volume fraction maps in XCIST,
-            see materials and thresholds from this XCIST example:
-            https://github.com/xcist/phantoms-voxelized/blob/main/DICOM_to_voxelized/DICOM_to_voxelized_example_head.cfg
+    :param phantom: Phantom class instance to be scanned, voxels in units of
+        approximate CT Numbers [HU], typically in python
+        coordinates (z, x, y)
+        where z is perpendicular to the axial plane made by x and y.
+        See <https://en.wikipedia.org/wiki/Hounsfield_scale>
+        for some suggested values for common materials
 
-        :returns: None
+    :param studyname: str, study identifier to be saved in DICOM header
+    :param studyid: int, study identifier to be saved in DICOM header
+    :param seriesname: str, series identifier to be saved in DICOM header
+    :param seriesid: int, series identifier to be saved in DICOM header
+    :param output_dir: optional directory to save the intermediate and
+        final simulation results, defaults to current working directory
+    :param framework: Optional, CT simulation framework options
+        include `['CATSIM']`
+    :param materials: Optional dictionary of {material name: HU value},
+        used for construction volume fraction maps in XCIST,
+        see materials and thresholds from this XCIST example:
+        https://github.com/xcist/phantoms-voxelized/blob/main/DICOM_to_voxelized/DICOM_to_voxelized_example_head.cfg
 
-        See also <https://github.com/DIDSR/pediatricIQphantoms/blob/main/src/pediatricIQphantoms/make_phantoms.py#L19>
+    :returns: None
+
+    See also <https://github.com/DIDSR/pediatricIQphantoms/blob/main/src/pediatricIQphantoms/make_phantoms.py#L19>
     """
-    def __init__(self, phantom: Phantom, studyname="default",
-                 studyid=0, seriesname="default",
-                 seriesid=0, framework='CATSIM', output_dir=None,
+    def __init__(self, phantom: Phantom, studyname: str = "default",
+                 studyid: int = 0, seriesname: str = "default", seriesid=0,
+                 framework: str = 'CATSIM', output_dir: str | Path = None,
                  materials: dict | None = None) -> None:
-        """Constructor method
+        """
+        Constructor method
         """
         output_dir = output_dir or '.'
         output_dir = Path(output_dir) / f'{phantom.patient_name}'
@@ -160,7 +157,6 @@ class CTobj():
         if isinstance(img, monai.data.meta_tensor.MetaTensor):
             img = img.numpy()
         self.phantom = phantom
-        self.spacings = phantom.spacings
         self.studyname = studyname or self.patientname
         self.studyid = studyid
         self.seriesname = seriesname
@@ -175,7 +171,7 @@ class CTobj():
         self.patient_diameter = 18
         self.zspan = 'dynamic'
 
-        self.xcist = initialize_xcist(img, self.spacings,
+        self.xcist = initialize_xcist(img, self.phantom.spacings,
                                       output_dir=self.output_dir,
                                       phantom_id=phantom.patientid,
                                       materials=materials)
@@ -190,7 +186,7 @@ class CTobj():
         safe_width_at_isocenter = detector_width_at_isocenter - 2*self.xcist.scanner.detectorRowSize
         self.scan_width = self.xcist.cfg.protocol.rotationTime * self.xcist.cfg.protocol.tableSpeed + safe_width_at_isocenter
         img = self.phantom.get_CT_number_phantom()
-        self.total_scan_length = self.spacings[0]*img.shape[0]
+        self.total_scan_length = self.phantom.spacings[0]*img.shape[0]
         return np.arange(-self.total_scan_length/2,
                          self.total_scan_length/2,
                          self.scan_width)
@@ -205,23 +201,24 @@ class CTobj():
         img = self.phantom.get_CT_number_phantom()
         scout_profile = img.mean(axis=(1, 2))
         suggested_start_idx = np.argmax(np.diff(scout_profile > threshold)) + 1
-        suggested_start_mm = self.start_positions[0] + suggested_start_idx * self.spacings[0]
+        suggested_start_mm = self.start_positions[0] + suggested_start_idx *\
+            self.phantom.spacings[0]
 
         if np.all(scout_profile[suggested_start_idx:] > threshold):
             suggested_end_mm = self.start_positions[-1]
         else:
-            suggested_end_idx = np.argmax(np.diff(scout_profile[suggested_start_idx:] > threshold)) + 1
-            suggested_end_mm = self.start_positions[0] + suggested_end_idx * self.spacings[0]
+            suggested_end_idx = \
+                np.argmax(np.diff(scout_profile[suggested_start_idx:] >
+                                  threshold)) + 1
+            suggested_end_mm = self.start_positions[0] + suggested_end_idx *\
+                self.phantom.spacings[0]
         return (suggested_start_mm, suggested_end_mm)
-
-    def get_phantom(self) -> np.ndarray:
-        'returns ground truth phantom as ndarray'
-        gt_dicoms = list(Path(self.xcist.cfg.phantom.filename).parent.rglob('*.dcm'))
-        return np.stack([read_dicom(o) for o in gt_dicoms])
 
     def get_lesion_mask(self, startZ=None, endZ=None):
         '''takes lesion in object space and returns a mask in CT image space
         for the given imaging system'''
+        if not self.phantom._lesion:
+            return
         ground_truth_lesion = self.phantom._lesion[0]
         lesion_phantom = deepcopy(self.phantom)
         lesion_phantom._phantom = np.where(ground_truth_lesion > 0, 0, - 1000)
@@ -267,19 +264,19 @@ class CTobj():
             start_positions = start_positions[start_positions < endZ]
         img = self.phantom.get_CT_number_phantom()
         plt.imshow(img.sum(axis=1), cmap='gray', origin='lower',
-                   extent=[-img.shape[0]*self.spacings[0]/2,
-                           img.shape[0]*self.spacings[0]/2,
+                   extent=[-img.shape[0]*self.phantom.spacings[0]/2,
+                           img.shape[0]*self.phantom.spacings[0]/2,
                            self.start_positions[0]+self.total_scan_length,
                            self.start_positions[0]])
         plt.hlines(y=start_positions[0],
-                   xmin=-img.shape[0]*self.spacings[0] / 2,
-                   xmax=img.shape[0]*self.spacings[0]/2, color='red')
+                   xmin=-img.shape[0]*self.phantoms.spacings[0] / 2,
+                   xmax=img.shape[0]*self.phantoms.spacings[0]/2, color='red')
         plt.annotate('Stop', (0, start_positions[0]-10),
                      horizontalalignment='center')
 
         plt.hlines(y=start_positions[-1] + self.scan_width,
-                   xmin=-img.shape[0]*self.spacings[0]/2,
-                   xmax=img.shape[0]*self.spacings[0]/2, color='red')
+                   xmin=-img.shape[0]*self.phantom.spacings[0]/2,
+                   xmax=img.shape[0]*self.phantom.spacings[0]/2, color='red')
         plt.annotate('Start', (0, start_positions[-1] + self.scan_width + 10),
                      horizontalalignment='center')
 
@@ -306,22 +303,22 @@ class CTobj():
     def run_scan(self, mA=200, kVp=120, startZ=None, endZ=None, views=None,
                  table_speed=0):
         """
-            Runs the CT simulation using the stored parameters.
+        Runs the CT simulation using the stored parameters.
 
-            :param mA: x-ray source milliamps, increases x-ray flux linearly,
-                $noise \propto 1/sqrt(mA)$
-            :param kVp: x-ray source potential, increases x-ray flux
-                nonlinearly and reduces contrast as increased
-            :param startZ: optional starting table position in mm of the scan,
-                see self.start_positions
-            :param endZ: optional last position of scan in mm,
-                see self.start_positions
-            :param views: number of angular views, for testing this can be
-                reduced but will produced aliasing streaks
-            :param verbose: optional boolean, if True prints out status
-                updates, if False they are suppressed.
-            :param table_speed: optional [float, str] str options include
-                'Low': 26.67, 'Intermediate': 48, 'High': 64, units in mm/s
+        :param mA: x-ray source milliamps, increases x-ray flux linearly,
+            $noise \propto 1/sqrt(mA)$
+        :param kVp: x-ray source potential, increases x-ray flux
+            nonlinearly and reduces contrast as increased
+        :param startZ: optional starting table position in mm of the scan,
+            see self.start_positions
+        :param endZ: optional last position of scan in mm,
+            see self.start_positions
+        :param views: number of angular views, for testing this can be
+            reduced but will produced aliasing streaks
+        :param verbose: optional boolean, if True prints out status
+            updates, if False they are suppressed.
+        :param table_speed: optional [float, str] str options include
+            'Low': 26.67, 'Intermediate': 48, 'High': 64, units in mm/s
         """
         self.xcist.cfg.protocol.mA = mA
         kVp_options = [70, 80, 90, 100, 110, 120, 130, 140]

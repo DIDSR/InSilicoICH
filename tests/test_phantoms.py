@@ -1,6 +1,6 @@
 # %%
 '''
-test pedsilicoich phantom generation functionality
+test low level pedsilicoich phantom generation functionality
 '''
 from pathlib import Path
 
@@ -132,3 +132,5 @@ def test_transforms_on_phantoms(seed=885):
 #         print(f'Attempt: {count}, {seed} failed...')
 # print(seeds)
 # # %%
+
+# %%

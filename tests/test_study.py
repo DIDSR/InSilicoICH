@@ -1,3 +1,6 @@
+'''
+tests high level Study functionality
+'''
 import numpy as np
 from monai.transforms import RandAffine
 
