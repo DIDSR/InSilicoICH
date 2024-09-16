@@ -7,7 +7,7 @@ from shutil import rmtree
 import numpy as np
 
 from pedsilicoICH.ground_truth_definition.phantoms import Phantom
-from pedsilicoICH.image_acquisition import read_dicom, CTobj
+from pedsilicoICH.image_acquisition import read_dicom, Scanner
 
 
 def get_effective_diameter(ground_truth_mu, pixel_width_mm):
@@ -35,7 +35,7 @@ result_dir = test_dir / 'test_result'
 if Path(result_dir).exists():
     rmtree(result_dir)
 
-ct = CTobj(phantom, output_dir=result_dir)
+ct = Scanner(phantom, output_dir=result_dir)
 
 views = 100
 ct.run_scan(views=views)

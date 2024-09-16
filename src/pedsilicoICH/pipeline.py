@@ -1,6 +1,7 @@
 '''
-pipeline: this module organizes the healthy head phantoms, lesion definitions,
-augmentations, and CT simulation together into the final ct_simulation function
+pipeline: this high level module organizes the healthy head phantoms,
+lesion definitions, augmentations, and CT simulation together into the final
+ct_simulation function.
 '''
 from pathlib import Path
 
@@ -10,7 +11,7 @@ import pandas as pd
 from scipy.ndimage import center_of_mass
 from monai.transforms import RandAffine
 
-from .image_acquisition import CTobj, read_dicom
+from .image_acquisition import Scanner, read_dicom
 from .ground_truth_definition.phantoms import load_phantom
 
 
@@ -19,7 +20,7 @@ def load_vol(file_list):
 
 
 class Study:
-    def __init__(self, scanner: CTobj, study_name='default'):
+    def __init__(self, scanner: Scanner, study_name='default'):
         self.scanner = scanner
         self.phantom = scanner.phantom
         self.study_name = study_name
@@ -167,7 +168,7 @@ def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
                                padding_mode="border")
         phantom.apply_transform(transform)
 
-    scanner = CTobj(phantom, output_dir=output_directory)
+    scanner = Scanner(phantom, output_dir=output_directory)
     study = Study(scanner, 'pilot')
     study.run_study(output_directory, kVp=kVp, mA=mA, views=views, zspan=zspan)
     return study

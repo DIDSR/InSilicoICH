@@ -111,7 +111,7 @@ _table_speed = {'Low': 26.67, 'Intermediate': 48, 'High': 64}
 # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5711061/
 
 
-class CTobj():
+class Scanner():
     """
     A class to hold CT simulation data and run simulations
 
@@ -223,7 +223,7 @@ class CTobj():
         lesion_phantom = deepcopy(self.phantom)
         lesion_phantom._phantom = np.where(ground_truth_lesion > 0, 0, - 1000)
         lesion_phantom.patient_name = 'lesion only'
-        lesion_only = CTobj(lesion_phantom,
+        lesion_only = Scanner(lesion_phantom,
                             materials={
                                 'ICRU_lung_adult_healthy': -1000,
                                 'water': 0})

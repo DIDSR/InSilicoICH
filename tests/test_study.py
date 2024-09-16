@@ -6,7 +6,7 @@ from monai.transforms import RandAffine
 
 from pedsilicoICH.pipeline import Study, run_study
 from pedsilicoICH.ground_truth_definition.phantoms import load_phantom
-from pedsilicoICH.image_acquisition import CTobj
+from pedsilicoICH.image_acquisition import Scanner
 
 age = 6.5
 transform = RandAffine(prob=0.5,
@@ -21,7 +21,7 @@ def test_run_study():
     assert study.images.mean() > -1000
 
 
-sphere_tol = 33
+sphere_lesion_tol = 33
 
 
 def test_sphere_lesion_study():
@@ -32,12 +32,12 @@ def test_sphere_lesion_study():
     center = lesion_level_mm
     width = 8
 
-    scanner = CTobj(phantom)
+    scanner = Scanner(phantom)
     study = Study(scanner, 'test')
     study.run_study('test', zspan=(center-width//2, center+width//2), views=50)
     measured_lesion_signal = study.images[study.lesion.astype(bool)].mean()
     print(measured_lesion_signal)
-    assert measured_lesion_signal > sphere_tol
+    assert measured_lesion_signal > sphere_lesion_tol
 
 
 def test_sphere_augmented_position_study():
@@ -49,13 +49,13 @@ def test_sphere_augmented_position_study():
     center = lesion_level_mm
     width = 8
 
-    scanner = CTobj(phantom)
+    scanner = Scanner(phantom)
     study = Study(scanner, 'test')
     study.run_study('test', zspan=(center-width//2, center+width//2),
                     views=100)
     measured_lesion_signal = study.images[study.lesion.astype(bool)].mean()
     print(measured_lesion_signal)
-    assert measured_lesion_signal > sphere_tol
+    assert measured_lesion_signal > sphere_lesion_tol
 
 
 def test_epidural_lesion_study():
@@ -66,7 +66,7 @@ def test_epidural_lesion_study():
     center = lesion_level_mm
     width = 8
 
-    scanner = CTobj(phantom)
+    scanner = Scanner(phantom)
     study = Study(scanner, 'test')
     study.run_study('test', zspan=(center-width//2, center+width//2),
                     views=100)
@@ -84,7 +84,7 @@ def test_epidural_augmented_position_study():
     center = lesion_level_mm
     width = 8
 
-    scanner = CTobj(phantom)
+    scanner = Scanner(phantom)
     study = Study(scanner, 'test')
     study.run_study('test', zspan=(center-width//2, center+width//2),
                     views=100)
@@ -101,7 +101,7 @@ def test_subdural_lesion_study():
     center = lesion_level_mm
     width = 8
 
-    scanner = CTobj(phantom)
+    scanner = Scanner(phantom)
     study = Study(scanner, 'test')
     study.run_study('test', zspan=(center-width//2, center+width//2),
                     views=100)
@@ -119,7 +119,7 @@ def test_subdural_augmented_position_study():
     center = lesion_level_mm
     width = 8
 
-    scanner = CTobj(phantom)
+    scanner = Scanner(phantom)
     study = Study(scanner, 'test')
     study.run_study('test', zspan=(center-width//2, center+width//2),
                     views=100)
