@@ -45,7 +45,7 @@ Tested on python 3.11.3
 Module Layout
 -------------
 
-.. image:: module_layout.png
+.. image:: pedsilico_class_diagram.png
         :width: 800
         :align: center
 
