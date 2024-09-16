@@ -8,7 +8,7 @@ from scipy.ndimage import center_of_mass
 from .lesion_definition import spherical_lesion, insert_dural_3D
 
 
-def add_sphere_lesion(self, mask: np.ndarray,
+def add_sphere_lesion(vol, mask: np.ndarray,
                       radius: list[int] = [20],
                       contrast: list[int] = [-100],
                       seed: int | None = None,
@@ -36,8 +36,6 @@ def add_sphere_lesion(self, mask: np.ndarray,
     r = max(radius)
     volume = (4/3*np.pi*r**3)*0.95
 
-    vol = self.get_CT_number_phantom()
-
     counts = 0
     sphere = np.zeros_like(vol, dtype=bool)
     while np.sum(mask & sphere) < volume:  # can increase threshold to size of lesion
@@ -60,7 +58,7 @@ def add_sphere_lesion(self, mask: np.ndarray,
     return img_w_lesion, lesion_vol, (z, x, y)
 
 
-def _add_dural_lesion(spacing, self,
+def _add_dural_lesion(self, spacing,
                       lesion_type, contrast, init_slice=None, seed=None):
     rng = np.random.default_rng(seed)
     dura_map = self.get_dura_map()
