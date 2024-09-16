@@ -1,8 +1,6 @@
 """
 Module responsible for lesion definition
 """
-
-import random
 import math
 
 import numpy as np
@@ -30,7 +28,7 @@ def spherical_lesion(phantom: np.ndarray,
     return np.where(distance_matrix > radius**2, False, True)
 
 
-def insert_dural_3D(spacing, phantom, init_slice, hematoma_type, mass_effect):
+def insert_dural_3D(spacing, phantom, init_slice, hematoma_type, mass_effect, seed=None):
 
     volume = phantom.get_CT_number_phantom()
     dura_map = phantom.get_dura_map()
@@ -48,6 +46,8 @@ def insert_dural_3D(spacing, phantom, init_slice, hematoma_type, mass_effect):
     slices, rows, cols = volume.shape
 
     # desired_thickness = 0.5 # slice thickness in mm
+    print(f'insert_dural_3d seed {seed}')
+    random = np.random.default_rng(seed)
     hemisphere = random.choice(['left', 'right'])  # can either be random or pre-defined
 
     if hemisphere == 'left':

@@ -69,8 +69,8 @@ def _add_dural_lesion(spacing, self,
     init_slice = init_slice or rng.choice(
         np.where(dura_map.mean(axis=(1, 2)) > 0.015)[0])
     
-    lesion_vol, volume = insert_dural_3D(spacing, self, init_slice,
-                                 lesion_type, mass_effect=True)
+    lesion_vol, volume = insert_dural_3D(self, spacing, init_slice,
+                                 lesion_type, seed=seed, mass_effect=True)
     
     if not isinstance(volume, np.ndarray):
         volume = volume.numpy()
