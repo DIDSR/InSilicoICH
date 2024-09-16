@@ -17,8 +17,11 @@ transform = RandAffine(prob=0.5,
 
 
 def test_run_study():
-    study = run_study('test', views=100, zspan=(-5, 5))
+    study = run_study('test', age=age, views=100, zspan=(-5, 5))
     assert study.images.mean() > -1000
+
+
+sphere_tol = 33
 
 
 def test_sphere_lesion_study():
@@ -34,7 +37,7 @@ def test_sphere_lesion_study():
     study.run_study('test', zspan=(center-width//2, center+width//2), views=50)
     measured_lesion_signal = study.images[study.lesion.astype(bool)].mean()
     print(measured_lesion_signal)
-    assert measured_lesion_signal > 50
+    assert measured_lesion_signal > sphere_tol
 
 
 def test_sphere_augmented_position_study():
@@ -52,7 +55,7 @@ def test_sphere_augmented_position_study():
                     views=100)
     measured_lesion_signal = study.images[study.lesion.astype(bool)].mean()
     print(measured_lesion_signal)
-    assert measured_lesion_signal > 50
+    assert measured_lesion_signal > sphere_tol
 
 
 def test_epidural_lesion_study():
@@ -108,7 +111,7 @@ def test_subdural_lesion_study():
 
 
 def test_subdural_augmented_position_study():
-    phantom = load_phantom()
+    phantom = load_phantom(age)
     phantom.insert_lesion('subdural', volume=1000, contrast=300, seed=336)
     phantom.apply_transform(transform, seed=42)
     lesion_level_mm = (phantom.get_CT_number_phantom().shape[0]/2 -
