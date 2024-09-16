@@ -94,10 +94,6 @@ class Phantom:
         'used for lesion insertion mass effect warping'
         pass
 
-    def get_skull_map(self):
-        'used for lesion insertion mass effect warping'
-        pass
-
     def get_lesion_mask(self):
         return self._lesion[0]
 
@@ -105,7 +101,7 @@ class Phantom:
     def spacings(self):
         return self.dz, self.dx, self.dy
 
-    def insert_lesion(self, lesion_type, radius=5, contrast=100, init_slice=None, seed=None):
+    def insert_lesion(self, lesion_type, radius=5, contrast=100, seed=None, init_slice=None):
         'return img_w_lesion, lesion_image, lesion_coords'
         if lesion_type == 'sphere':
             lesion_func = add_sphere_lesion
@@ -127,6 +123,8 @@ class Phantom:
                       'init_slice': init_slice}
 
         img_w_lesion, lesion_image, lesion_coords = lesion_func(self, mask, seed=seed, **params) 
+        img_w_lesion, lesion_image, lesion_coords = lesion_func(self,
+                                                                 seed=seed, **params) 
 
         self._phantom = img_w_lesion
         self._lesion.append(lesion_image)
