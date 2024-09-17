@@ -65,17 +65,17 @@ def add_sphere_lesion(img: np.ndarray, mask: np.ndarray,
     return img_w_lesion, lesion_vol, (z, x, y)
 
 
-def _add_dural_lesion(self, spacing,
-                      lesion_type, contrast, init_slice=None, seed=None):
+def _add_dural_lesion(phantom, spacing,
+                      lesion_type, contrast, mass_effect=False, init_slice=None, seed=None):
     rng = np.random.default_rng(seed)
-    dura_map = self.get_dura_map()
-    volume = self.get_CT_number_phantom()
+    dura_map = phantom.get_dura_map()
+    volume = phantom.get_CT_number_phantom()
 
     init_slice = init_slice or rng.choice(
         np.where(dura_map.mean(axis=(1, 2)) > 0.015)[0])
     
-    lesion_vol, volume = insert_dural_3D(self, spacing, init_slice,
-                                 lesion_type, seed=seed, mass_effect=True)
+    lesion_vol, volume = insert_dural_3D(phantom, spacing, lesion_type,
+                                 mass_effect, seed=seed, init_slice=init_slice)
     
     if not isinstance(volume, np.ndarray):
         volume = volume.numpy()
@@ -86,37 +86,45 @@ def _add_dural_lesion(self, spacing,
     return img_w_lesion, lesion_vol, (int(z), int(x), int(y))
 
 
-def add_subdural_lesion(self, mask: np.ndarray, spacing: tuple,
-                        volume: float = None, contrast: float = 70,
-                        init_slice: int | None = None, seed=None):
+def add_subdural_lesion(phantom, spacing: tuple,
+                        contrast: float = 70,
+                        mass_effect: bool = False,
+                        seed=None,
+                        init_slice: int | None = None):
     '''
     adds subdural lesion to img within dura mask of given contrast level
 
-    :param img: array to insert lesion into
-    :param mask: mask that specifies limits inside the `img` of
-        potential insertion locations, here a dura mask
+    :param phantom: a phantom class (pedsilicoICH.ground_truth_definition.phantoms)
     :param spacing: voxel spacings in mm
     :param contrast: int or list of ints, contrast of the sphere lesion,
         if provided a list it will make concentric lesions of contrasts
+    :param mass_effect: bool specifying whether inserted lesion will cause warping
+    :param seed:
+    :param init_slice: optional int specifying central slice of lesion
 
     :returns: img_w_lesion, lesion_vol, (z, x, y)
     '''
-    return _add_dural_lesion(self, mask, spacing, 'subdural', contrast, init_slice, seed=seed)
+    return _add_dural_lesion(phantom, spacing, 'subdural', contrast, 
+                             mass_effect, init_slice, seed=seed)
 
 
-def add_epidural_lesion(self, mask: np.ndarray, spacing: tuple,
-                        contrast: float = 70, init_slice: int | None = None,
-                        seed=None):
+def add_epidural_lesion(phantom, spacing: tuple,
+                        contrast: float = 70, 
+                        mass_effect: bool = False,
+                        seed=None,
+                        init_slice: int | None = None):
     '''
     adds epidural lesion to img within dura mask of given contrast level
 
-    :param img: array to insert lesion into
-    :param mask: mask that specifies limits inside the `img` of
-        potential insertion locations, here a dura mask
+    :param phantom: a phantom class (pedsilicoICH.ground_truth_definition.phantoms)
     :param spacing: voxel spacings in mm
     :param contrast: int or list of ints, contrast of the sphere lesion,
         if provided a list it will make concentric lesions of contrasts
+    :param mass_effect: bool specifying whether inserted lesion will cause warping
+    :param seed:
+    :param init_slice: optional int specifying central slice of lesion
 
-    :returns: img_w_lesion, lesion_vol, (z, x, y
+    :returns: img_w_lesion, lesion_vol, (z, x, y)
     '''
-    return _add_dural_lesion(self, mask, spacing, 'epidural', contrast, init_slice, seed=seed)
+    return _add_dural_lesion(phantom, spacing, 'epidural', contrast, 
+                             mass_effect, init_slice, seed=seed)

@@ -167,30 +167,33 @@ class HeadPhantom(Phantom):
     def spacings(self):
         return self.dz, self.dx, self.dy
 
-    def insert_lesion(self, lesion_type, volume=500, contrast=100, seed=None, init_slice=None):
+    def insert_lesion(self, lesion_type, volume=500, contrast=100, 
+                      mass_effect=False, seed=None, init_slice=None):
         'return img_w_lesion, lesion_image, lesion_coords'
         self.lesion_type.append(lesion_type)
         if lesion_type == 'sphere':
             lesion_func = add_sphere_lesion
             mask = self.get_material_mask('white matter').astype(int)
-            params = {'contrast': contrast}
+            params = {'contrast': contrast,
+                      'mask': mask}
         elif lesion_type == 'epidural':
             if isinstance(contrast, list):
                 contrast = max(contrast)
             lesion_func = add_epidural_lesion
             params = {'spacing': self.spacings,
                       'contrast': contrast,
-                      'init_slice': init_slice}
+                      'init_slice': init_slice,
+                      'mass_effect': mass_effect}
         else:
             if isinstance(contrast, list):
                 contrast = max(contrast)
             lesion_func = add_subdural_lesion
             params = {'spacing': self.spacings,
                       'contrast': contrast,
-                      'init_slice': init_slice}
+                      'init_slice': init_slice,
+                      'mass_effect': mass_effect}
 
-        img_w_lesion, lesion_image, lesion_coords = lesion_func(self, volume=volume, mask=mask,
-                                                                 seed=seed, **params) 
+        img_w_lesion, lesion_image, lesion_coords = lesion_func(self, seed=seed, **params) 
 
         self._phantom = img_w_lesion
         self._lesion.append(lesion_image)
@@ -306,23 +309,22 @@ class MIDA_Head(HeadPhantom):
         if material not in self.materials:
             raise ValueError(f'{material} not in {self.materials.keys()}')
         return self.get_CT_number_phantom() == self.materials[material]
-
+    
     def get_dura_map(self):
         '''obtains dura map using mida atlas index of 1.0'''
         dura_map = np.zeros_like(self._phantom)
         dura_map[np.where(self._phantom == 1.0)] = 1.0
         return dura_map
-    
+
     def get_skull_map(self):
         '''obtains partial skull map using mida atlas, ignoring facial bones (for now)'''
         skull_map = np.zeros_like(self._phantom)
-        skull_map[np.where(self._phantom == 53)] = 1.0 
-        skull_map[np.where(self._phantom == 1000)] = 1.0 # skull inner table
+        skull_map[np.where(self._phantom == 53)] = 1.0 # skull outer table
+        skull_map[np.where(self._phantom == 40)] = 1.0 # skull
+        skull_map[np.where(self._phantom == 1000)] = 1.0 # other bone voxels
         return skull_map
-
     
-
-
+    
 class NIHPD_Head(HeadPhantom):
     '''
     loads MR brain atlas of mean `age`, downloaded from
@@ -337,7 +339,7 @@ class NIHPD_Head(HeadPhantom):
         asymmetric or artificially generated symmetric state, default is
         asymmetric, see article for more details: 
     1. Fonov V, Evans AC, Botteron K, Almli CR, McKinstry RC, Collins DL.
-        Unbiased average age-appropriate atlases for pediatric studies.
+        Unbiased average age-appro`pri`ate atlases for pediatric studies.
         NeuroImage. 2011;54(1):313-327. doi:10.1016/j.neuroimage.2010.07.033
     '''
     def __init__(self, phantom_dir, age: float, symmetric=False, csf_HU=15,
