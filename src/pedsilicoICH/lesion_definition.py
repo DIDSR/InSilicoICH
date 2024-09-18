@@ -6,8 +6,7 @@ import math
 import numpy as np
 import skimage as ski
 import scipy
-import time
-import matplotlib.pyplot as plt
+
 
 def spherical_lesion(phantom: np.ndarray,
                      center: tuple | None = None, radius: tuple | None = None):
@@ -28,7 +27,8 @@ def spherical_lesion(phantom: np.ndarray,
     return np.where(distance_matrix > radius**2, False, True)
 
 
-def insert_dural_3D(spacing, phantom, init_slice, hematoma_type, mass_effect):
+def insert_dural_3D(phantom, init_slice, hematoma_type, mass_effect,
+                    seed=None):
 
     volume = phantom.get_CT_number_phantom()
     dura_map = phantom.get_dura_map()
@@ -37,13 +37,13 @@ def insert_dural_3D(spacing, phantom, init_slice, hematoma_type, mass_effect):
     new_volume = np.copy(volume)
 
     boundary = dura_map
-    [dz, dy, dx] = spacing  # set resolution, mm
+    [_, _, dx] = phantom.spacings  # set resolution, mm
     distances = [50/dx, 75/dx]  # length range in mm, will divide by voxel size (assuming isotropic) to convert
 
     num_slices = 11  # number of slices to have hemorrhage, try to make this odd
     slice_counter = slice_idx = 0  # will iterate on this
     iter_flag = True
-    slices, rows, cols = volume.shape
+    _, _, cols = volume.shape
 
     # desired_thickness = 0.5 # slice thickness in mm
     print(f'insert_dural_3d seed {seed}')
@@ -118,8 +118,7 @@ def insert_dural_3D(spacing, phantom, init_slice, hematoma_type, mass_effect):
         filled_array, boundary_coords, connect_coords = connect_points(start=new_start, 
                                                                        end=new_end, 
                                                                        boundary=temp_boundary, 
-                                                                       hematoma_type=hematoma_type)
-        
+                                                                       hematoma_type=hematoma_type)   
         if mass_effect:
             warped_slice = warp_slice(volume[init_slice-slice_idx, :], skull_map[init_slice, :], boundary_coords, connect_coords)
             new_volume[init_slice-slice_idx, :] = warped_slice
@@ -179,6 +178,7 @@ def connect_points(start, end, boundary, hematoma_type):
     filled_array = scipy.ndimage.binary_fill_holes(np.where(np.add(connecting_route, boundary_route) > 0, 1.0, 0)).astype(int)
 
     return filled_array, boundary_coords, connect_coords
+
 
 def warp_slice(axial_slice, skull_slice, src, dst):
     '''perform warp of 2D slice according to hematoma boundary coordinates'''

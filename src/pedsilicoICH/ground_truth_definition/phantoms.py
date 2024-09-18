@@ -14,9 +14,13 @@ from torchvision.datasets.utils import download_and_extract_archive
 
 from . import dicom_to_voxelized_phantom
 from ..artifact_generation import transform_image_label_pair
-from ..lesion_insertion import (add_sphere_lesion,
-                                add_epidural_lesion,
-                                add_subdural_lesion)
+
+from ..lesion_definition import spherical_lesion, insert_dural_3D
+from scipy.ndimage import center_of_mass
+
+
+def sphere_radius_from_volume(volume):
+    return np.power(3/4/np.pi*volume, 1/3)
 
 
 def get_mean_age(age_range: str):
@@ -167,29 +171,29 @@ class HeadPhantom(Phantom):
     def spacings(self):
         return self.dz, self.dx, self.dy
 
-    def insert_lesion(self, lesion_type, radius=5, contrast=100, init_slice=None):
+    def insert_lesion(self, lesion_type, volume=500, contrast=100,
+                      init_slice=None, mass_effect=False, seed=None):
         'return img_w_lesion, lesion_image, lesion_coords'
         self.lesion_type.append(lesion_type)
         if lesion_type == 'sphere':
-            lesion_func = add_sphere_lesion
-            mask = self.get_material_mask('white matter').astype(int)
-            params = {'radius': radius, 'contrast': contrast, 'mask': mask}
+            img_w_lesion, lesion_image, lesion_coords =\
+                self.add_sphere_lesion(volume=volume, contrast=contrast,
+                                       mass_effect=mass_effect,
+                                       seed=seed)
         elif lesion_type == 'epidural':
             if isinstance(contrast, list):
                 contrast = max(contrast)
-            lesion_func = add_epidural_lesion
-            params = {'spacing': self.spacings,
-                      'contrast': contrast,
-                      'init_slice': init_slice}
+            img_w_lesion, lesion_image, lesion_coords =\
+                self._add_dural_lesion('epidural', contrast,
+                                       init_slice, mass_effect=mass_effect,
+                                       seed=seed)
         else:
             if isinstance(contrast, list):
                 contrast = max(contrast)
-            lesion_func = add_subdural_lesion
-            params = {'spacing': self.spacings,
-                      'contrast': contrast,
-                      'init_slice': init_slice}
-
-        img_w_lesion, lesion_image, lesion_coords = lesion_func(self, **params) 
+            img_w_lesion, lesion_image, lesion_coords =\
+                self._add_dural_lesion('subdural', contrast,
+                                       init_slice, mass_effect=mass_effect,
+                                       seed=seed)
 
         self._phantom = img_w_lesion
         self._lesion.append(lesion_image)
@@ -206,9 +210,85 @@ class HeadPhantom(Phantom):
                                                                     self.get_lesion_mask(),
                                                                     seed=seed)
 
+    def add_sphere_lesion(self, mask: np.ndarray,
+                          volume: list[int] = [200],
+                          contrast: list[int] = [-100],
+                          material: str = 'white matter',
+                          mass_effect: bool = False,
+                          seed: int | None = None,
+                          tol: int = 20) -> tuple:
+        '''
+        adds lesion to img in random location within mask of size radius
+        and contrast level contrast
+
+        :param volume: int or list of ints, volume of the sphere lesion,
+            if provided a list it will make concentric lesions
+        :param contrast: int or list of ints, contrast of the sphere lesion,
+            if provided a list it will make concentric lesions of contrasts
+
+        :returns: img_w_lesion, lesion_vol, (z, x, y)
+        '''
+        if seed:
+            tol = 1
+        if not isinstance(volume, list):
+            volume = [volume]
+        if not isinstance(contrast, list):
+            contrast = [contrast]
+        radii = [sphere_radius_from_volume(v) for v in volume]
+        r = max(radii)
+
+        img = self.get_CT_number_phantom()
+        mask = self.get_material_mask(material).astype(int)
+
+        overlap = 0
+        counts = 0
+        sphere = np.zeros_like(img, dtype=bool)
+        while overlap < 0.8:  # can increase threshold to size of lesion
+            lesion_vol = np.zeros_like(img)
+            rng = np.random.default_rng(seed)
+            z, x, y = np.argwhere(mask)[rng.integers(0, mask.sum())]
+            if mask[z].sum() < np.pi*r**2:
+                continue
+            counts += 1
+            sphere = spherical_lesion(img, center=(z, x, y),
+                                      radius=r).transpose(1, 0, 2)
+            overlap = np.sum(mask & sphere)/(np.sum(sphere))
+            if counts > tol:
+                raise ValueError("Failed to insert lesion into mask")
+
+        lesion_vol = np.zeros_like(img)
+        for ri in radii:
+            for ci in contrast:
+                sphere = spherical_lesion(img, center=(z, x, y),
+                                          radius=ri).transpose(1, 0, 2)
+                lesion_vol[sphere] += ci
+        img_w_lesion = img + lesion_vol
+        return img_w_lesion, lesion_vol, (z, x, y)
+
+    def _add_dural_lesion(self, lesion_type, contrast, init_slice=None,
+                          seed=None, mass_effect=True):
+        rng = np.random.default_rng(seed)
+        dura_map = self.get_dura_map()
+        volume = self.get_CT_number_phantom()
+
+        init_slice = init_slice or rng.choice(
+            np.where(dura_map.mean(axis=(1, 2)) > 0.015)[0])
+        lesion_vol, volume = insert_dural_3D(self, init_slice,
+                                             lesion_type,
+                                             mass_effect=mass_effect,
+                                             seed=seed)
+        if not isinstance(volume, np.ndarray):
+            volume = volume.numpy()
+
+        img_w_lesion = volume.copy()
+        img_w_lesion[lesion_vol == 1] = contrast
+        z, x, y = center_of_mass(lesion_vol)
+        return img_w_lesion, lesion_vol, (int(z), int(x), int(y))
+
 
 class MIDA_Head(HeadPhantom):
-    def __init__(self, phantom_dir, csf_HU=15, gm_HU=45, wm_HU=20, skull_HU=1000, shape=None):
+    def __init__(self, phantom_dir, csf_HU=15, gm_HU=45, wm_HU=20,
+                 skull_HU=1000, shape=None):
         super().__init__(phantom_dir)
         self.age = 39  # median american age
         self.csf_HU = csf_HU
