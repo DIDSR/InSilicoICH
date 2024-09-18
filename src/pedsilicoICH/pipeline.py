@@ -72,7 +72,7 @@ class Study:
         self.scanner = ct
         self.images = ct.recon
 
-        output_directory = Path(output_directory)
+        output_directory = Path(output_directory) / patient_name
         dicom_path = output_directory / 'dicoms'
         dcm_files = ct.write_to_dicom(dicom_path / f'{patient_name}.dcm')
 
