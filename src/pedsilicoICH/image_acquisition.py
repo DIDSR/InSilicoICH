@@ -269,8 +269,8 @@ class Scanner():
                            self.start_positions[0]+self.total_scan_length,
                            self.start_positions[0]])
         plt.hlines(y=start_positions[0],
-                   xmin=-img.shape[0]*self.phantoms.spacings[0] / 2,
-                   xmax=img.shape[0]*self.phantoms.spacings[0]/2, color='red')
+                   xmin=-img.shape[0]*self.phantom.spacings[0] / 2,
+                   xmax=img.shape[0]*self.phantom.spacings[0]/2, color='red')
         plt.annotate('Stop', (0, start_positions[0]-10),
                      horizontalalignment='center')
 
