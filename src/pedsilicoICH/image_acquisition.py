@@ -291,7 +291,10 @@ class Scanner():
         plt.xlabel('scan x position [mm]')
 
     def __repr__(self) -> str:
-        repr = f'{self.__class__} {self.seriesname}'
+        repr = f'''
+        {self.__class__} {self.seriesname}
+        Scanner: {self.framework}
+        '''
         if self.recon is None:
             return repr
         repr += f'\nRecon: {self.recon.shape} {self.xcist.cfg.recon.fov/10} cm fov'

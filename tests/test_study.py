@@ -1,3 +1,4 @@
+# %%
 '''
 tests high level Study functionality
 '''
@@ -126,3 +127,18 @@ def test_subdural_augmented_position_study():
     measured_lesion_signal = study.images[study.lesion.astype(bool)].mean()
     print(measured_lesion_signal)
     assert measured_lesion_signal > 21
+
+# %%
+
+
+phantom = load_phantom(age)
+phantom.insert_lesion('epidural', volume=1000, contrast=300, seed=336)
+lesion_level_mm = (phantom.get_CT_number_phantom().shape[0]/2 -
+                   phantom._lesion_coords[0][0])*phantom.dz
+center = lesion_level_mm
+width = 8
+
+scanner = Scanner(phantom)
+# %%
+scanner.run_scan(startZ=center-width//2, endZ=center+width//2, views=100)
+scanner.run_recon()

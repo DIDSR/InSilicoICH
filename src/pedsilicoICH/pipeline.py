@@ -31,16 +31,14 @@ class Study:
         study name: {self.study_name}
         Phantom details:
         ----------------
-        phantom class: {self.scanner.phantom.__class__.__name__}
-        age [yrs]: {self.phantom.age}
-        shape [voxels]: {self.shape}
-        size [mm]: {self.size}
-        Number of lesions: {len(self.phantom._lesion_coords)}
-        Lesion locations [voxel index (z, x, y)]: {self.phantom._lesion_coords}
+        {self.scanner.phantom.__repr__()}
 
         Scanner details:
         ----------------
-        Scanner: {self.scanner.framework}
+        Scanner: {self.scanner.__repr__()}
+
+        Study details:
+        --------------
         {self.metadata}
         '''
         return repr

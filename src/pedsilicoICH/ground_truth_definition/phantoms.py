@@ -132,12 +132,31 @@ class Phantom:
         self.lesion_type = []
         self.lesion_contrast = []
 
+    def __repr__(self) -> str:
+        repr = f'''
+        phantom class: {self.__class__.__name__}
+        age [yrs]: {self.age}
+        shape [voxels]: {self.shape}
+        size [mm]: {self.size}
+        Number of lesions: {len(self._lesion_coords)}
+        Lesion locations [voxel index (z, x, y)]: {self._lesion_coords}
+        '''
+        return repr
+
     def get_CT_number_phantom(self) -> np.ndarray:
         return self._phantom
 
     @property
     def spacings(self):
         return self.dz, self.dx, self.dy
+
+    @property
+    def shape(self):
+        return list(self._phantom.shape)
+
+    @property
+    def size(self):
+        return np.array(self.spacings)*self.shape
 
 
 class HeadPhantom(Phantom):
@@ -476,6 +495,7 @@ class NIHPD_Head(HeadPhantom):
         skull = (self.mask == 0)*self.pdw / self.pdw.max()
         skull[skull < 0.1] = 0
         self.skull = skull
+        self._phantom = self.get_CT_number_phantom()
 
     def get_CT_number_phantom(self):
         if len(self._lesion_coords) > 0:
@@ -502,7 +522,7 @@ class NIHPD_Head(HeadPhantom):
         return ski.segmentation.find_boundaries(self.mask,
                                                 mode='inner',
                                                 background=0)
-    
+
     def get_skull_map(self):
         '''obtains rudimentary mask of skull voxels using threshold of proton-density weighted image and full mask'''
         skull_map = (self.mask == 0)*self.pdw / self.pdw.max()
