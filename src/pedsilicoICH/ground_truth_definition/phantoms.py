@@ -210,11 +210,11 @@ class HeadPhantom(Phantom):
                                                                     self.get_lesion_mask(),
                                                                     seed=seed)
 
-    def add_sphere_lesion(self, mask: np.ndarray,
+    def add_sphere_lesion(self,
                           volume: list[int] = [200],
                           contrast: list[int] = [-100],
                           material: str = 'white matter',
-                          mass_effect: bool = False,
+                          mass_effect: bool = False,  # add mass effect for spherical lesions? These are typically associated with metastases
                           seed: int | None = None,
                           tol: int = 20) -> tuple:
         '''
@@ -225,6 +225,9 @@ class HeadPhantom(Phantom):
             if provided a list it will make concentric lesions
         :param contrast: int or list of ints, contrast of the sphere lesion,
             if provided a list it will make concentric lesions of contrasts
+        :param material: which material region to insert lesion into,
+            self.materials for options
+        :param seed: optional, defaults to None, set seed for reproducible lesion insertion
 
         :returns: img_w_lesion, lesion_vol, (z, x, y)
         '''
