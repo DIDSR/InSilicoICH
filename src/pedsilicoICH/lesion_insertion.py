@@ -14,13 +14,13 @@ def add_sphere_lesion(self, mask: np.ndarray,
                       seed: int | None = None,
                       tol: int = 20) -> tuple:
     '''
-    adds lesion to vol in random location within mask of size radius
+    adds lesion to img in random location within mask of size radius
     and contrast level contrast
 
-    :param vol: array to insert lesion into
-    :param mask: mask that specifies limits inside the `vol` of
+    :param img: array to insert lesion into
+    :param mask: mask that specifies limits inside the `img` of
         potential insertion locations
-    :param radius: int or list of ints, radius of the sphere lesion,
+    :param volume: int or list of ints, volume of the sphere lesion,
         if provided a list it will make concentric lesions
     :param contrast: int or list of ints, contrast of the sphere lesion,
         if provided a list it will make concentric lesions of contrasts
@@ -29,34 +29,36 @@ def add_sphere_lesion(self, mask: np.ndarray,
     '''
     if seed:
         tol = 1  # no need to keep trying if the seed is going to place in the same position each time
-    if not isinstance(radius, list):
-        radius = [radius]
+    if not isinstance(volume, list):
+        volume = [volume]
     if not isinstance(contrast, list):
         contrast = [contrast]
-    r = max(radius)
-    volume = (4/3*np.pi*r**3)*0.95
+    radii = [sphere_radius_from_volume(v) for v in volume]
+    r = max(radii)
 
     vol = self.get_CT_number_phantom()
 
     counts = 0
-    sphere = np.zeros_like(vol, dtype=bool)
-    while np.sum(mask & sphere) < volume:  # can increase threshold to size of lesion
-        lesion_vol = np.zeros_like(vol)
+    sphere = np.zeros_like(img, dtype=bool)
+    while overlap < 0.8:  # can increase threshold to size of lesion
+        lesion_vol = np.zeros_like(img)
         rng = np.random.default_rng(seed)
         z, x, y = np.argwhere(mask)[rng.integers(0, mask.sum())]
         if mask[z].sum() < np.pi*r**2:
             continue
         counts += 1
-        sphere = spherical_lesion(vol, center=(z, x, y), radius=r).transpose(1, 0, 2)
+        sphere = spherical_lesion(img, center=(z, x, y), radius=r).transpose(1, 0, 2)
+        overlap = np.sum(mask & sphere)/(np.sum(sphere))
         if counts > tol:
             raise ValueError("Failed to insert lesion into mask")
 
-    lesion_vol = np.zeros_like(vol)
-    for ri in radius:
+    lesion_vol = np.zeros_like(img)
+    for ri in radii:
         for ci in contrast:
-            sphere = spherical_lesion(vol, center=(z, x, y), radius=ri).transpose(1, 0, 2)
+            sphere = spherical_lesion(img, center=(z, x, y),
+                                      radius=ri).transpose(1, 0, 2)
             lesion_vol[sphere] += ci
-    img_w_lesion = vol + lesion_vol
+    img_w_lesion = img + lesion_vol
     return img_w_lesion, lesion_vol, (z, x, y)
 
 
@@ -83,10 +85,10 @@ def _add_dural_lesion(spacing, self,
 
 def add_subdural_lesion(self, spacing: tuple, contrast: float = 70, init_slice: int | None = None, seed=None):
     '''
-    adds subdural lesion to vol within dura mask of given contrast level
+    adds subdural lesion to img within dura mask of given contrast level
 
-    :param vol: array to insert lesion into
-    :param mask: mask that specifies limits inside the `vol` of
+    :param img: array to insert lesion into
+    :param mask: mask that specifies limits inside the `img` of
         potential insertion locations, here a dura mask
     :param spacing: voxel spacings in mm
     :param contrast: int or list of ints, contrast of the sphere lesion,
@@ -99,10 +101,10 @@ def add_subdural_lesion(self, spacing: tuple, contrast: float = 70, init_slice: 
 
 def add_epidural_lesion(self, spacing: tuple, contrast: float = 70, init_slice: int | None = None, seed=None):
     '''
-    adds epidural lesion to vol within dura mask of given contrast level
+    adds epidural lesion to img within dura mask of given contrast level
 
-    :param vol: array to insert lesion into
-    :param mask: mask that specifies limits inside the `vol` of
+    :param img: array to insert lesion into
+    :param mask: mask that specifies limits inside the `img` of
         potential insertion locations, here a dura mask
     :param spacing: voxel spacings in mm
     :param contrast: int or list of ints, contrast of the sphere lesion,

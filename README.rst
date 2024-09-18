@@ -45,7 +45,7 @@ Tested on python 3.11.3
 Module Layout
 -------------
 
-.. image:: module_layout.png
+.. image:: pedsilico_class_diagram.png
         :width: 800
         :align: center
 
@@ -55,8 +55,8 @@ Repository Contents
 **notebooks**: for introducing concepts, developing methods, scratch work, and running experiments
 
 - `notebooks/00_basic_eda.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/00_basic_eda.ipynb>`_: exploratory data analysis of the Hssayeni et 2020 dataset [Aim 1.1]
-- `notebooks/01_ct_head_simulations.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/01_ct_head_simulations.ipynb>`_: introduce CT simulation pipeline concepts with MIDA head phantom [Aim 1.2]
-- `notebooks/02_MRI_brain_atlas_groundtruth.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/02_MRI_brain_atlas_groundtruth.ipynb>`_: expand simultions to include NIH MRI brain atlases as ground truth [Aim 1.2]
+- `notebooks/01_ct_head_simulations.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/01_ct_head_simulations.ipynb>`_: introduce CT simulation pipeline concepts with MIDA head phantom and NIHPD brain atlases [Aim 1.2]
+- `notebooks/03_epidural_subdural_demo.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/03_epidural_subdural_demo.ipynb>`_: expand simulated lesions to subdural and epidural ICH [Aim 1.2]
 - `notebooks/viewing_simulation_results.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/viewing_simulation_results.ipynb>`_: for viewing the simulation results from CT_dataset_pipeline.py
 - `notebooks/IQ_evaluations.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/IQ_evaluations.ipynb>`_: basic evaluations for quality assurance of XCIST simulations and phantoms
 
