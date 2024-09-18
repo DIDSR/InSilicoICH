@@ -175,7 +175,8 @@ class HeadPhantom(Phantom):
             lesion_func = add_sphere_lesion
             mask = self.get_material_mask('white matter').astype(int)
             params = {'contrast': contrast,
-                      'mask': mask}
+                      'mask': mask,
+                      'volume': volume}
         elif lesion_type == 'epidural':
             if isinstance(contrast, list):
                 contrast = max(contrast)
@@ -339,7 +340,7 @@ class NIHPD_Head(HeadPhantom):
         asymmetric or artificially generated symmetric state, default is
         asymmetric, see article for more details: 
     1. Fonov V, Evans AC, Botteron K, Almli CR, McKinstry RC, Collins DL.
-        Unbiased average age-appro`pri`ate atlases for pediatric studies.
+        Unbiased average age-appropriate atlases for pediatric studies.
         NeuroImage. 2011;54(1):313-327. doi:10.1016/j.neuroimage.2010.07.033
     '''
     def __init__(self, phantom_dir, age: float, symmetric=False, csf_HU=15,

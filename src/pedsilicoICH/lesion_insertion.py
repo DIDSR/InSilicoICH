@@ -12,7 +12,7 @@ def sphere_radius_from_volume(volume):
     return np.power(3/4/np.pi*volume, 1/3)
 
 
-def add_sphere_lesion(img: np.ndarray, mask: np.ndarray,
+def add_sphere_lesion(phantom, mask: np.ndarray,
                       volume: list[int] = [20],
                       contrast: list[int] = [-100],
                       seed: int | None = None,
@@ -21,7 +21,7 @@ def add_sphere_lesion(img: np.ndarray, mask: np.ndarray,
     adds lesion to img in random location within mask of size radius
     and contrast level contrast
 
-    :param img: array to insert lesion into
+    :param phantom: a phantom class (pedsilicoICH.ground_truth_definition.phantoms)
     :param mask: mask that specifies limits inside the `img` of
         potential insertion locations
     :param volume: int or list of ints, volume of the sphere lesion,
@@ -31,6 +31,8 @@ def add_sphere_lesion(img: np.ndarray, mask: np.ndarray,
 
     :returns: img_w_lesion, lesion_vol, (z, x, y)
     '''
+    img = phantom.get_CT_number_phantom()
+
     if seed:
         tol = 1  # no need to keep trying if the seed is going to place in the same position each time
     if not isinstance(volume, list):
@@ -66,7 +68,8 @@ def add_sphere_lesion(img: np.ndarray, mask: np.ndarray,
 
 
 def _add_dural_lesion(phantom, spacing,
-                      lesion_type, contrast, mass_effect=False, init_slice=None, seed=None):
+                      lesion_type, contrast, 
+                      mass_effect=False, init_slice=None, seed=None):
     rng = np.random.default_rng(seed)
     dura_map = phantom.get_dura_map()
     volume = phantom.get_CT_number_phantom()
