@@ -24,8 +24,9 @@ if not nihpd_dir.exists():
 
 
 def lesion_added_correctly(phantom):
-    _, lesion_vol, (z, x, y) = phantom.insert_lesion('epidural', seed=880,
-                                                     mass_effect=False)
+    phantom.insert_lesion('epidural', seed=880, mass_effect=False)
+    lesion_vol = phantom.get_lesion_mask()
+    z, x, y = phantom._lesion_coords[0]
     return (lesion_vol.sum() > 0) & (lesion_vol[z, x, y] == 1)
 
 

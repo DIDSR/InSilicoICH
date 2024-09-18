@@ -30,20 +30,18 @@ def spherical_lesion(phantom: np.ndarray,
 def insert_dural_3D(phantom, init_slice, hematoma_type, mass_effect,
                     seed=None):
 
-    volume = phantom.get_CT_number_phantom()
+    HU_array = phantom.get_CT_number_phantom()
     dura_map = phantom.get_dura_map()
     skull_map = phantom.get_skull_map()
 
-    new_volume = np.copy(volume)
+    new_volume = np.copy(HU_array)
 
     boundary = dura_map
-    [_, _, dx] = phantom.spacings  # set resolution, mm
-    distances = [50/dx, 75/dx]  # length range in mm, will divide by voxel size (assuming isotropic) to convert
+    distances = [50/phantom.spacings[2], 75/phantom.spacings[2]]  # length range in mm, will divide by voxel size (assuming isotropic) to convert
 
     num_slices = 11  # number of slices to have hemorrhage, try to make this odd
     slice_counter = slice_idx = 0  # will iterate on this
     iter_flag = True
-    _, _, cols = volume.shape
 
     # desired_thickness = 0.5 # slice thickness in mm
     print(f'insert_dural_3d seed {seed}')
@@ -51,9 +49,9 @@ def insert_dural_3D(phantom, init_slice, hematoma_type, mass_effect,
     hemisphere = random.choice(['left', 'right'])  # can either be random or pre-defined
 
     if hemisphere == 'left':
-        boundary[:, :, (int(cols/2) - 10):None] = 0.0
+        boundary[:, :, (int(HU_array.shape[2]/2) - 10):None] = 0.0
     elif hemisphere == 'right':
-        boundary[:, :, :(int(cols/2) + 10)] = 0.0
+        boundary[:, :, :(int(HU_array.shape[2]/2) + 10)] = 0.0
 
     hemorrhage_mask = np.zeros_like(boundary)
     while iter_flag:
@@ -86,7 +84,7 @@ def insert_dural_3D(phantom, init_slice, hematoma_type, mass_effect,
                                                                            hematoma_type=hematoma_type)
             
             if mass_effect:
-                warped_slice = warp_slice(volume[init_slice, :], skull_map[init_slice, :], boundary_coords, connect_coords)
+                warped_slice = warp_slice(HU_array[init_slice, :], skull_map[init_slice, :], boundary_coords, connect_coords)
                 new_volume[init_slice, :] = warped_slice
 
             hemorrhage_mask[init_slice] = filled_array
@@ -120,7 +118,7 @@ def insert_dural_3D(phantom, init_slice, hematoma_type, mass_effect,
                                                                        boundary=temp_boundary, 
                                                                        hematoma_type=hematoma_type)   
         if mass_effect:
-            warped_slice = warp_slice(volume[init_slice-slice_idx, :], skull_map[init_slice, :], boundary_coords, connect_coords)
+            warped_slice = warp_slice(HU_array[init_slice-slice_idx, :], skull_map[init_slice, :], boundary_coords, connect_coords)
             new_volume[init_slice-slice_idx, :] = warped_slice
 
         hemorrhage_mask[init_slice-slice_idx] = filled_array
