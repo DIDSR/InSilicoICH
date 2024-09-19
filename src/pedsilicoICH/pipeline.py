@@ -76,8 +76,8 @@ class Study:
 
         mask_files = [None]*len(dcm_files)
         z, x, y = 3*[None]
-        vol_by_slice_mL = [None]*len(dcm_files)
-        vol_ml = None
+        vol_by_slice_mL = [0]*len(dcm_files)
+        vol_ml = 0
         if lesion_type:
             lesion_only = ct
             mask = ct.get_lesion_mask(startZ=startZ, endZ=endZ)
