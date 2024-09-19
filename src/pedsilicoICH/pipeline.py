@@ -77,7 +77,7 @@ class Study:
         mask_files = [None]*len(dcm_files)
         z, x, y = 3*[None]
         vol_by_slice_mL = [None]*len(dcm_files)
-        vol_ml = None
+        vol_ml = 0
         if lesion_type:
             lesion_only = ct
             mask = ct.get_lesion_mask(startZ=startZ, endZ=endZ)
@@ -109,6 +109,7 @@ class Study:
         masks = []
         contrast_list = []
         lesion_type_list = []
+        mass_effect = []
         center_x_list = []
         center_y_list = []
         center_z_list = []
@@ -126,12 +127,14 @@ class Study:
             masks.append(m)
 
             if vol_ml > 0:
+                slice_mass_effect = self.phantom.mass_effect
                 slice_contrast = contrast
                 slice_x = int(x)
                 slice_y = int(y)
                 slice_z = int(z)
                 slice_type = lesion_type
             else:
+                slice_mass_effect = None
                 slice_contrast = None
                 slice_x = None
                 slice_y = None
@@ -140,6 +143,7 @@ class Study:
 
             contrast_list.append(slice_contrast)
             lesion_type_list.append(slice_type)
+            mass_effect.append(slice_mass_effect)
             center_x_list.append(slice_x)
             center_y_list.append(slice_y)
             center_z_list.append(slice_z)
@@ -152,6 +156,7 @@ class Study:
                                  'center y': center_y_list,
                                  'center z': center_z_list,
                                  'lesion type': lesion_type_list,
+                                 'mass effect': mass_effect,
                                  'lesion volume [mL]': lesion_volume_list,
                                  'mA': mA_list,
                                  'kVp': kVps,
@@ -164,9 +169,9 @@ class Study:
 
 
 def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
-              mA=200, contrast=200, volume=500, lesion_type=None, views=1000,
-              zspan='dynamic',
-              add_positioning_augmentation=True) -> Study:
+              mA=200, contrast=200, volume=500, lesion_type=None,
+              mass_effect=True, add_positioning_augmentation=True,
+              views=1000, zspan='dynamic') -> Study:
 
     mida_shape = (480, 480, 350)  # default shape of MIDA
     phantom = load_phantom(age=age, shape=mida_shape, name=patient_name)
@@ -174,7 +179,8 @@ def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
     if lesion_type:
         phantom.insert_lesion(lesion_type,
                               volume=volume,
-                              contrast=contrast)
+                              contrast=contrast,
+                              mass_effect=mass_effect)
 
     if add_positioning_augmentation:
         transform = RandAffine(prob=0.5,

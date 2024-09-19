@@ -127,10 +127,6 @@ class Phantom:
         self.patient_name = patient_name
         self.patientid = patientid
         self.age = age
-        self._lesion = []
-        self._lesion_coords = []
-        self.lesion_type = []
-        self.lesion_contrast = []
 
     def __repr__(self) -> str:
         repr = f'''
@@ -138,8 +134,6 @@ class Phantom:
         age [yrs]: {self.age}
         shape [voxels]: {self.shape}
         size [mm]: {self.size}
-        Number of lesions: {len(self._lesion_coords)}
-        Lesion locations [voxel index (z, x, y)]: {self._lesion_coords}
         '''
         return repr
 
@@ -171,6 +165,7 @@ class HeadPhantom(Phantom):
         self._lesion_coords = []
         self.lesion_type = []
         self.lesion_contrast = []
+        self.mass_effect = False
 
     def get_material_mask(self, material):
         pass
@@ -186,6 +181,14 @@ class HeadPhantom(Phantom):
     def get_lesion_mask(self):
         return self._lesion[0]
 
+    def __repr__(self) -> str:
+        repr = super().__repr__() + f'''
+        Number of lesions: {len(self._lesion_coords)}
+        Lesion locations [voxel index (z, x, y)]: {self._lesion_coords}
+        Mass effect: {self.mass_effect}
+        '''
+        return repr
+
     @property
     def spacings(self):
         return self.dz, self.dx, self.dy
@@ -194,6 +197,7 @@ class HeadPhantom(Phantom):
                       init_slice=None, mass_effect=False, seed=None):
         'return img_w_lesion, lesion_image, lesion_coords'
         self.lesion_type.append(lesion_type)
+        self.mass_effect = mass_effect
         if lesion_type == 'sphere':
             img_w_lesion, lesion_image, lesion_coords =\
                 self.add_sphere_lesion(volume=volume, contrast=contrast,

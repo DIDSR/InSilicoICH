@@ -57,6 +57,7 @@ if __name__ == "__main__":
     min_contrast, max_contrast = 20, 200
     contrast_list = np.arange(20, 200)
     volume_list = np.linspace(min_vol, max_vol, 20)
+    mass_effect = [True, False]
     simulations_list = list(range(1))  # increased for multiple scans
     l_parameter_comb = []
     for age_id in possible_ages:
@@ -65,14 +66,16 @@ if __name__ == "__main__":
                 for contrast_id in contrast_list:
                     for vol_id in volume_list:
                         for lesion_id in lesion_types:
-                            for simulation_id in simulations_list:
-                                l_parameter_comb.append([age_id,
-                                                         kVp_id,
-                                                         mA_id,
-                                                         contrast_id,
-                                                         vol_id,
-                                                         lesion_id,
-                                                         simulation_id])
+                            for mass_effect_id in mass_effect:
+                                for simulation_id in simulations_list:
+                                    l_parameter_comb.append([age_id,
+                                                            kVp_id,
+                                                            mA_id,
+                                                            contrast_id,
+                                                            vol_id,
+                                                            lesion_id,
+                                                            mass_effect_id,
+                                                            simulation_id])
     shuffle(l_parameter_comb)
     l_parameter_comb = l_parameter_comb[:desired_cases]
     n_params = len(l_parameter_comb)
@@ -85,20 +88,17 @@ if __name__ == "__main__":
 
     for patientid in patientids:
         print(f'{patientid}/{n_params}')
-        age, kVp, mA, contrast, volume, lesion_type, sim_id =\
+        age, kVp, mA, contrast, volume, lesion_type, mass_effect, sim_id =\
             l_parameter_comb[patientid]
         print(f'{age} years, {lesion_type}, {contrast} HU')
         patient_name = f'case_{patientid:03}'
-        try:
-            study = run_study(output_directory,
-                              patient_name, age=age,
-                              kVp=kVp, mA=mA, contrast=contrast,
-                              volume=volume,
-                              lesion_type=lesion_type,
-                              views=views, zspan=zspan)
-            study.metadata.to_csv(output_directory / patient_name /
-                                  f'metadata_{patientid}.csv',
-                                  index=False)
-        except:
-            print('Simulation failed, continuing..')
-            continue
+        study = run_study(output_directory,
+                          patient_name, age=age,
+                          kVp=kVp, mA=mA, contrast=contrast,
+                          volume=volume,
+                          lesion_type=lesion_type,
+                          mass_effect=mass_effect,
+                          views=views, zspan=zspan)
+        study.metadata.to_csv(output_directory / patient_name /
+                              f'metadata_{patientid}.csv',
+                              index=False)
