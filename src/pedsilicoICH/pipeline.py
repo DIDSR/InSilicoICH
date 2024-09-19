@@ -52,7 +52,7 @@ class Study:
         return np.array(self.phantom.spacings)*self.phantom._phantom.shape
 
     def run_study(self, output_directory, kVp=120, mA=200, views=1000,
-                  fov=250, zspan='dynamic'):
+                  fov=250, zspan='dynamic', kernel='standard'):
         patient_name = self.phantom.patient_name
         age = self.phantom.age
         lesion_type = self.phantom.lesion_type
@@ -66,7 +66,7 @@ class Study:
 
         ct.run_scan(startZ=startZ, endZ=endZ, views=views,
                     mA=mA, kVp=kVp)
-        ct.run_recon(fov=fov)
+        ct.run_recon(fov=fov, kernel=kernel)
         self.scanner = ct
         self.images = ct.recon
 
@@ -171,7 +171,7 @@ class Study:
 def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
               mA=200, contrast=200, volume=500, lesion_type=None,
               mass_effect=True, add_positioning_augmentation=True,
-              views=1000, zspan='dynamic') -> Study:
+              views=1000, zspan='dynamic', kernel='standard') -> Study:
 
     mida_shape = (480, 480, 350)  # default shape of MIDA
     phantom = load_phantom(age=age, shape=mida_shape, name=patient_name)
@@ -192,5 +192,5 @@ def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
 
     scanner = Scanner(phantom, output_dir=output_directory)
     study = Study(scanner, 'pilot')
-    study.run_study(output_directory, kVp=kVp, mA=mA, views=views, zspan=zspan)
+    study.run_study(output_directory, kVp=kVp, mA=mA, views=views, zspan=zspan, kernel=kernel)
     return study

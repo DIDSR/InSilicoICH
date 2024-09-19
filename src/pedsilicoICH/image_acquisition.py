@@ -373,8 +373,18 @@ class Scanner():
         return self
 
     def run_recon(self, fov=None, sliceThickness=None, sliceCount=None,
-                  mu_water=None, preview=False):
-        'perform reconstruction and save to .recon attribute'
+                  mu_water=None, kernel='standard'):
+        '''
+        perform reconstruction and save to .recon attribute
+        :param kernel: reconstruction kernel, options include: ['standard',
+            'soft', 'bone', 'R-L', 'S-L']
+            'R-L': Ramachandran-Lakshminarayanan (R-L) filter
+            'S-L' for Shepp-Logan (S-L) filter
+            See: https://github.com/xcist/main/blob/master/gecatsim/cfg/Recon_Default.cfg
+        '''
+        defined_kernels = ['standard', 'soft', 'bone', 'R-L', 'S-L']
+        if kernel not in defined_kernels:
+            raise ValueError(f'{kernel} not in {defined_kernels}')
         if sliceThickness:
             self.xcist.recon.sliceThickness = sliceThickness
         if mu_water:
@@ -392,7 +402,7 @@ class Scanner():
             self.xcist.cfg.recon.fov = fov
         print(f'fov size: {self.xcist.cfg.recon.fov}')
 
-        self.xcist.cfg.recon.displayImagePictures = preview
+        self.xcist.cfg.recon.displayImagePictures = False
 
         recons = []
         for proj in self._projections:
