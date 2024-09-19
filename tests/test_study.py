@@ -22,7 +22,7 @@ def test_run_study():
     assert study.images.mean() > -1000
 
 
-sphere_lesion_tol = 33
+sphere_lesion_tol = 32
 
 
 def test_sphere_lesion_study():
