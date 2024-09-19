@@ -55,7 +55,6 @@ def test_sphere_augmented_position_study():
     study.run_study('test', zspan=(center-width//2, center+width//2),
                     views=100)
     measured_lesion_signal = study.images[study.lesion.astype(bool)].mean()
-    print(measured_lesion_signal)
     assert measured_lesion_signal > sphere_lesion_tol
 
 
@@ -72,7 +71,6 @@ def test_epidural_lesion_study():
     study.run_study('test', zspan=(center-width//2, center+width//2),
                     views=100)
     measured_lesion_signal = study.images[study.lesion.astype(bool)].mean()
-    print(measured_lesion_signal)
     assert measured_lesion_signal > 38
 
 
@@ -90,7 +88,6 @@ def test_epidural_augmented_position_study():
     study.run_study('test', zspan=(center-width//2, center+width//2),
                     views=100)
     measured_lesion_signal = study.images[study.lesion.astype(bool)].mean()
-    print(measured_lesion_signal)
     assert measured_lesion_signal > 38
 
 
@@ -107,8 +104,11 @@ def test_subdural_lesion_study():
     study.run_study('test', zspan=(center-width//2, center+width//2),
                     views=100)
     measured_lesion_signal = study.images[study.lesion.astype(bool)].mean()
-    print(measured_lesion_signal)
     assert measured_lesion_signal > 21
+    # the below assertions test that metadata is saving slice level lesion info
+    # there is a lesion on slices 0-3, but not on the remaining
+    assert study.metadata['lesion volume [mL]'].iloc[:4].sum() > 0.49
+    assert study.metadata['lesion volume [mL]'].iloc[-3:].sum() == 0
 
 
 def test_subdural_augmented_position_study():
@@ -125,20 +125,4 @@ def test_subdural_augmented_position_study():
     study.run_study('test', zspan=(center-width//2, center+width//2),
                     views=100)
     measured_lesion_signal = study.images[study.lesion.astype(bool)].mean()
-    print(measured_lesion_signal)
     assert measured_lesion_signal > 21
-
-# %%
-
-
-phantom = load_phantom(age)
-phantom.insert_lesion('epidural', volume=1000, contrast=300, seed=336)
-lesion_level_mm = (phantom.get_CT_number_phantom().shape[0]/2 -
-                   phantom._lesion_coords[0][0])*phantom.dz
-center = lesion_level_mm
-width = 8
-
-scanner = Scanner(phantom)
-# %%
-scanner.run_scan(startZ=center-width//2, endZ=center+width//2, views=100)
-scanner.run_recon()

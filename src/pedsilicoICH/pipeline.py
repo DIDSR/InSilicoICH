@@ -76,6 +76,7 @@ class Study:
 
         mask_files = [None]*len(dcm_files)
         z, x, y = 3*[None]
+        vol_by_slice_mL = [None]*len(dcm_files)
         vol_ml = None
         if lesion_type:
             lesion_only = ct
@@ -94,6 +95,8 @@ class Study:
                             list(dcm.PixelSpacing)))
 
             vol_ml = np.prod(spacings) * mask.sum() / 1000
+            vol_by_slice_mL = np.prod(spacings) *\
+                self.lesion.sum(axis=(1, 2)) / 1000
             z, x, y = center_of_mass(mask)
             self.lesion_coords = (z, x, y)
         ages = []
@@ -111,7 +114,8 @@ class Study:
         center_z_list = []
         lesion_volume_list = []
 
-        for f, m in zip(dcm_files, mask_files):
+        for idx, (f, m, vol_ml) in enumerate(zip(dcm_files, mask_files,
+                                                 vol_by_slice_mL)):
             names.append(patient_name)
             ages.append(age)
             files.append(f)
@@ -120,11 +124,25 @@ class Study:
             fovs.append(fov)
             views_list.append(views)
             masks.append(m)
-            contrast_list.append(contrast)
-            lesion_type_list.append(lesion_type)
-            center_x_list.append(x)
-            center_y_list.append(y)
-            center_z_list.append(z)
+
+            if vol_ml > 0:
+                slice_contrast = contrast
+                slice_x = int(x)
+                slice_y = int(y)
+                slice_z = int(z)
+                slice_type = lesion_type
+            else:
+                slice_contrast = None
+                slice_x = None
+                slice_y = None
+                slice_z = None
+                slice_type = None
+
+            contrast_list.append(slice_contrast)
+            lesion_type_list.append(slice_type)
+            center_x_list.append(slice_x)
+            center_y_list.append(slice_y)
+            center_z_list.append(slice_z)
             lesion_volume_list.append(vol_ml)
 
         metadata = pd.DataFrame({'name': names,
