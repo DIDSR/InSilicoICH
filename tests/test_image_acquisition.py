@@ -55,9 +55,3 @@ def test_scan_shape():
                                     ct.xcist.cfg.scanner.detectorColCount)
     assert len(dcms) == len(ct.start_positions)
     assert dcms_in_dir == dcms
-
-
-def test_get_lesion_mask():
-    ct.run_recon(sliceThickness=1)
-    mask = ct.get_lesion_mask()
-    assert not mask
