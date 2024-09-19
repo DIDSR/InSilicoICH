@@ -224,9 +224,10 @@ class Scanner():
         lesion_phantom._phantom = np.where(ground_truth_lesion > 0, 0, - 1000)
         lesion_phantom.patient_name = 'lesion only'
         lesion_only = Scanner(lesion_phantom,
-                            materials={
+                              materials={
                                 'ICRU_lung_adult_healthy': -1000,
-                                'water': 0})
+                                'water': 0},
+                              output_dir=self.output_dir / 'lesion_mask')
         lesion_only.xcist.cfg.physics.energyCount = 2
         lesion_only.xcist.cfg.physics.monochromatic = 0
         lesion_only.xcist.cfg.physics.enableElectronicNoise = 0
