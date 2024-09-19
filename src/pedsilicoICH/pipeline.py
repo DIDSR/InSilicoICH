@@ -76,7 +76,7 @@ class Study:
 
         mask_files = [None]*len(dcm_files)
         z, x, y = 3*[None]
-        vol_by_slice_mL = [None]*len(dcm_files)
+        vol_by_slice_mL = [0]*len(dcm_files)
         vol_ml = 0
         if lesion_type:
             lesion_only = ct
