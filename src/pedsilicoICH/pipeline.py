@@ -4,6 +4,7 @@ lesion definitions, augmentations, and CT simulation together into the final
 ct_simulation function.
 '''
 from pathlib import Path
+from shutil import rmtree
 
 import numpy as np
 import pydicom
@@ -51,7 +52,7 @@ class Study:
     def size(self):
         return np.array(self.phantom.spacings)*self.phantom._phantom.shape
 
-    def run_study(self, output_directory, kVp=120, mA=200, views=1000,
+    def run_study(self, output_directory=None, kVp=120, mA=200, views=1000,
                   fov=250, zspan='dynamic', kernel='standard'):
         patient_name = self.phantom.patient_name
         age = self.phantom.age
@@ -69,8 +70,10 @@ class Study:
         ct.run_recon(fov=fov, kernel=kernel)
         self.scanner = ct
         self.images = ct.recon
-
-        output_directory = Path(output_directory) / patient_name
+        if output_directory is None:
+            output_directory = self.scanner.output_dir
+        else:
+            output_directory = Path(output_directory) / patient_name
         dicom_path = output_directory / 'dicoms'
         dcm_files = ct.write_to_dicom(dicom_path / f'{patient_name}.dcm')
 
@@ -105,6 +108,7 @@ class Study:
         kVps = []
         mA_list = []
         fovs = []
+        kernels = []
         views_list = []
         masks = []
         contrast_list = []
@@ -115,14 +119,14 @@ class Study:
         center_z_list = []
         lesion_volume_list = []
 
-        for idx, (f, m, vol_ml) in enumerate(zip(dcm_files, mask_files,
-                                                 vol_by_slice_mL)):
+        for f, m, vol_ml in zip(dcm_files, mask_files, vol_by_slice_mL):
             names.append(patient_name)
             ages.append(age)
             files.append(f)
             kVps.append(kVp)
             mA_list.append(mA)
             fovs.append(fov)
+            kernels.append(kernel)
             views_list.append(views)
             masks.append(m)
 
@@ -160,8 +164,9 @@ class Study:
                                  'lesion volume [mL]': lesion_volume_list,
                                  'mA': mA_list,
                                  'kVp': kVps,
-                                 'fov [mm]': fovs,
                                  'views': views_list,
+                                 'fov [mm]': fovs,
+                                 'kernel': kernels,
                                  'image file': files,
                                  'mask file': masks})
         self.metadata = metadata
@@ -171,7 +176,8 @@ class Study:
 def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
               mA=200, contrast=200, volume=500, lesion_type=None,
               mass_effect=True, add_positioning_augmentation=True,
-              views=1000, zspan='dynamic', kernel='standard') -> Study:
+              views=1000, zspan='dynamic', kernel='standard',
+              keep_raw=False) -> Study:
 
     mida_shape = (480, 480, 350)  # default shape of MIDA
     phantom = load_phantom(age=age, shape=mida_shape, name=patient_name)
@@ -192,5 +198,9 @@ def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
 
     scanner = Scanner(phantom, output_dir=output_directory)
     study = Study(scanner, 'pilot')
-    study.run_study(output_directory, kVp=kVp, mA=mA, views=views, zspan=zspan, kernel=kernel)
+    study.run_study(kVp=kVp, mA=mA, views=views, zspan=zspan,
+                    kernel=kernel)
+    if keep_raw is False:
+        rmtree(study.scanner.output_dir / 'phantoms')
+        rmtree(study.scanner.output_dir / 'simulations')
     return study

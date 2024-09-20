@@ -223,18 +223,19 @@ class Scanner():
         lesion_phantom = deepcopy(self.phantom)
         lesion_phantom._phantom = np.where(ground_truth_lesion > 0, 0, - 1000)
         lesion_phantom.patient_name = 'lesion only'
+        lesion_dir = self.output_dir / 'lesion_mask'
         lesion_only = Scanner(lesion_phantom,
                               materials={
                                 'ICRU_lung_adult_healthy': -1000,
                                 'water': 0},
-                              output_dir=self.output_dir / 'lesion_mask')
+                              output_dir=lesion_dir)
         lesion_only.xcist.cfg.physics.energyCount = 2
         lesion_only.xcist.cfg.physics.monochromatic = 0
         lesion_only.xcist.cfg.physics.enableElectronicNoise = 0
         lesion_only.xcist.cfg.physics.enableQuantumNoise = 0
         lesion_only.run_scan(mA=500, views=100, startZ=startZ, endZ=endZ)
         lesion_only.run_recon()
-        rmtree(lesion_only.output_dir)
+        rmtree(lesion_dir)
         return lesion_only.recon > - 950
 
     def scout_view(self, startZ=None, endZ=None, table_speed=0):
