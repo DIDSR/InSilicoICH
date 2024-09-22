@@ -47,12 +47,11 @@ def voxelize_ground_truth(dicom_path, phantom_path, material_threshold_dict=None
     slice_range = list(range(nfiles))
     if not material_threshold_dict:
         material_threshold_dict = dict(zip(
-                                        ['ICRU_lung_adult_healthy',
-                                         'ICRU_adipose_adult2',
-                                         'ICRU_liver_adult',
-                                         'water',
-                                         'ICRU_skeleton_cortical_bone_adult'],
-                                        [-1000, -200, 0, 100, 300]))
+                                        ['ncat_adipose',
+                                         'ncat_water',
+                                         'ncat_brain',
+                                         'ncat_skull'],
+                                        [-200, -10, 10, 300]))
 
     cfg_file_str = f"""
 # Path where the DICOM images are located:
