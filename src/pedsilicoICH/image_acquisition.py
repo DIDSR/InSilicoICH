@@ -236,7 +236,7 @@ class Scanner():
         lesion_only.run_scan(mA=500, views=100, startZ=startZ, endZ=endZ)
         lesion_only.run_recon()
         rmtree(lesion_dir)
-        return lesion_only.recon > - 950
+        return (lesion_only.recon > -950) & (self.recon > -300)
 
     def scout_view(self, startZ=None, endZ=None, table_speed=0):
         '''
