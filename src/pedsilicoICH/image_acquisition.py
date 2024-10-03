@@ -306,12 +306,12 @@ class Scanner():
         return repr
 
     def run_scan(self, mA=200, kVp=120, startZ=None, endZ=None, views=None,
-                 table_speed=0):
+                 table_speed=0, bhc=True):
         """
         Runs the CT simulation using the stored parameters.
 
         :param mA: x-ray source milliamps, increases x-ray flux linearly,
-            $noise \propto 1/sqrt(mA)$
+            $noise ~ 1/sqrt(mA)$
         :param kVp: x-ray source potential, increases x-ray flux
             nonlinearly and reduces contrast as increased
         :param startZ: optional starting table position in mm of the scan,
@@ -324,6 +324,10 @@ class Scanner():
             updates, if False they are suppressed.
         :param table_speed: optional [float, str] str options include
             'Low': 26.67, 'Intermediate': 48, 'High': 64, units in mm/s
+        :param bhc: optional [bool, str], if True applies polynomial beam
+            hardening correction to correct for polychromatic cupping artifact,
+            if `default` applied default XCIST bhc, caution this gives capping
+            artifacts. Options include [True, False, 'default']
         """
         self.xcist.cfg.protocol.mA = mA
         kVp_options = [70, 80, 90, 100, 110, 120, 130, 140]
@@ -340,12 +344,12 @@ class Scanner():
         self.start_positions = self.calculate_start_positions()
         start_positions = self.start_positions
 
-        if startZ:
+        if startZ is not None:
             if startZ < start_positions.min():
                 raise ValueError(f'startZ is outside the range of valid\
                                   start positions: {self.start_positions}')
             start_positions = start_positions[start_positions > startZ]
-        if endZ:
+        if endZ is not None:
             if endZ > start_positions.max():
                 raise ValueError(f'startZ is outside the range of valid\
                                   start positions: {self.start_positions}')
@@ -355,6 +359,15 @@ class Scanner():
             self.xcist.cfg.protocol.viewCount = views
             self.xcist.protocol.stopViewId = self.xcist.cfg.protocol.startViewId+self.xcist.cfg.protocol.viewCount-1
             self.xcist.cfg.protocol.viewsPerRotation = views
+
+        if bhc is True:
+            self.xcist.cfg.physics.callback_post_log = 'Prep_BHC_Accurate'
+            self.xcist.cfg.physics.EffectiveMu = 0.2
+            self.xcist.cfg.physics.BHC_poly_order = 5
+            self.xcist.cfg.physics.BHC_max_length_mm = int(self.phantom.size[1])
+            self.xcist.cfg.physics.BHC_length_step_mm = 10
+        elif bhc is False:
+            self.xcist.cfg.physics.callback_post_log = ""
 
         self.results_dir = self.output_dir / 'simulations' / \
             f'{self.phantom.patientid}'
@@ -386,16 +399,20 @@ class Scanner():
         defined_kernels = ['standard', 'soft', 'bone', 'R-L', 'S-L']
         if kernel not in defined_kernels:
             raise ValueError(f'{kernel} not in {defined_kernels}')
+        self.xcist.recon.kernelType = kernel
         if sliceThickness:
             self.xcist.recon.sliceThickness = sliceThickness
         if mu_water:
             self.xcist.cfg.recon.mu = mu_water
         if not sliceCount:
-            detector_width = self.xcist.scanner.detectorRowCount * self.xcist.scanner.detectorRowSize
+            detector_width = self.xcist.scanner.detectorRowCount *\
+                self.xcist.scanner.detectorRowSize
             magnification = self.xcist.scanner.sdd / self.xcist.scanner.sid
             detector_width_at_isocenter = detector_width / magnification
-            safe_width_at_isocenter = detector_width_at_isocenter - 2*self.xcist.scanner.detectorRowSize
-            valid_slices = int(safe_width_at_isocenter // self.xcist.recon.sliceThickness)
+            safe_width_at_isocenter = detector_width_at_isocenter -\
+                2*self.xcist.scanner.detectorRowSize
+            valid_slices = int(safe_width_at_isocenter //
+                self.xcist.recon.sliceThickness)
             self.xcist.cfg.recon.sliceCount = valid_slices
         else:
             self.xcist.cfg.recon.sliceCount = sliceCount

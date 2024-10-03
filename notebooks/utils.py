@@ -4,6 +4,14 @@ from pedsilicoICH.image_acquisition import read_dicom
 
 from ipywidgets import interact, IntSlider
 
+def get_effective_diameter(ground_truth_mu, pixel_width_mm):
+    '''
+    effective diameter defined in AAPM TG204:
+       https://www.aapm.org/pubs/reports/RPT_204.pdf
+    '''
+    A = np.sum(ground_truth_mu > -1000)*pixel_width_mm**2
+    return 2*np.sqrt(A/np.pi)
+
 # https://radiopaedia.org/articles/windowing-ct?lang=us
 display_settings = {
     'brain': (80, 40),
