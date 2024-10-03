@@ -156,6 +156,13 @@ class Scanner():
         img = phantom.get_CT_number_phantom()
         if isinstance(img, monai.data.meta_tensor.MetaTensor):
             img = img.numpy()
+
+        print(type(img))
+        print(img.shape)
+        import nibabel as nib
+        new_img = nib.Nifti1Image(img, affine=np.eye(4))
+        nib.save(new_img, 'temporary_image.nii')
+        print('TESTING IMAGE')
         self.phantom = phantom
         self.studyname = studyname or self.patientname
         self.studyid = studyid
@@ -185,8 +192,8 @@ class Scanner():
 
         safe_width_at_isocenter = detector_width_at_isocenter - 2*self.xcist.scanner.detectorRowSize
         self.scan_width = self.xcist.cfg.protocol.rotationTime * self.xcist.cfg.protocol.tableSpeed + safe_width_at_isocenter
-        img = self.phantom.get_CT_number_phantom()
-        self.total_scan_length = self.phantom.spacings[0]*img.shape[0]
+        #img = self.phantom.get_CT_number_phantom()
+        self.total_scan_length = self.phantom.spacings[0]*self.phantom.shape[0]
         return np.arange(-self.total_scan_length/2,
                          self.total_scan_length/2,
                          self.scan_width)
@@ -386,10 +393,18 @@ class Scanner():
         defined_kernels = ['standard', 'soft', 'bone', 'R-L', 'S-L']
         if kernel not in defined_kernels:
             raise ValueError(f'{kernel} not in {defined_kernels}')
+        else:
+            self.xcist.cfg.recon.kernelType = kernel
         if sliceThickness:
             self.xcist.recon.sliceThickness = sliceThickness
         if mu_water:
             self.xcist.cfg.recon.mu = mu_water
+        else:
+            print(self.xcist.recon.mu)
+            print(self.xcist.physics.monochromatic)
+            print('updating mu')
+            self.xcist.recon.mu = xc.GetMu('water', self.xcist.physics.monochromatic)[0]/10
+            print(self.xcist.recon.mu)
         if not sliceCount:
             detector_width = self.xcist.scanner.detectorRowCount * self.xcist.scanner.detectorRowSize
             magnification = self.xcist.scanner.sdd / self.xcist.scanner.sid
