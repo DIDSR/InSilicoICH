@@ -51,8 +51,8 @@ if __name__ == "__main__":
     nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
     mida_age = 38  # median US adult age to represent MIDA
     possible_ages = nihpd_ages + [mida_age]
-    kVp_list = [70, 80, 90, 100, 110, 120, 130, 140]
-    mA_list = list(range(50, 400, 50))
+    kVp_list = [120]
+    mA_list = list(range(300, 400, 50))
     lesion_types = [None, 'sphere', 'epidural', 'subdural']
     min_vol, max_vol = 34, 34000  # applied only to spheres [units of voxels, TODO convert to mL or mm^3]
     min_contrast, max_contrast = 20, 200

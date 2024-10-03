@@ -44,13 +44,14 @@ def convert_to_dicom(img_slice: np.ndarray, phantom_path: str,
     ds.Rows, ds.Columns = img_slice.shape
     ds.SliceThickness = spacings[0]
     ds.PixelSpacing = [spacings[1], spacings[2]]
-    ds.PixelData = img_slice.copy(order='C').astype('int16') - int(ds.RescaleIntercept)
+    ds.PixelData = img_slice.copy(order='C').astype('int16') -\
+        int(ds.RescaleIntercept)
     pydicom.dcmwrite(phantom_path, ds)
 
 
 def get_projection_data(ct):
     '''takes as input xcist cfg struct and returns ndarray'''
-    return xc.rawread(ct.resultsName+'.prep', 
+    return xc.rawread(ct.resultsName+'.prep',
                       [ct.protocol.viewCount,
                        ct.scanner.detectorRowCount,
                        ct.scanner.detectorColCount],
@@ -98,7 +99,7 @@ def initialize_xcist(ground_truth_image, spacings=(1, 1, 1),
 
     dicom_path = phantom_path / 'dicom'
     for slice_id, img in enumerate(ground_truth_image):
-        dicom_filename = dicom_path / f'1-{slice_id:03d}.dcm'    
+        dicom_filename = dicom_path / f'1-{slice_id:03d}.dcm'
         convert_to_dicom(img, dicom_filename, spacings=spacings)
 
     voxelize_ground_truth(dicom_path, phantom_path,
@@ -179,12 +180,15 @@ class Scanner():
 
     def calculate_start_positions(self):
         'determine number of axial scans required to cover the phantom'
-        detector_width = self.xcist.scanner.detectorRowCount * self.xcist.scanner.detectorRowSize
+        detector_width = self.xcist.scanner.detectorRowCount *\
+            self.xcist.scanner.detectorRowSize
         magnification = self.xcist.scanner.sdd / self.xcist.scanner.sid
         detector_width_at_isocenter = detector_width / magnification
 
-        safe_width_at_isocenter = detector_width_at_isocenter - 2*self.xcist.scanner.detectorRowSize
-        self.scan_width = self.xcist.cfg.protocol.rotationTime * self.xcist.cfg.protocol.tableSpeed + safe_width_at_isocenter
+        safe_width_at_isocenter = detector_width_at_isocenter -\
+            2*self.xcist.scanner.detectorRowSize
+        self.scan_width = self.xcist.cfg.protocol.rotationTime *\
+            self.xcist.cfg.protocol.tableSpeed + safe_width_at_isocenter
         img = self.phantom.get_CT_number_phantom()
         self.total_scan_length = self.phantom.spacings[0]*img.shape[0]
         return np.arange(-self.total_scan_length/2,
@@ -236,7 +240,7 @@ class Scanner():
         lesion_only.run_scan(mA=500, views=100, startZ=startZ, endZ=endZ)
         lesion_only.run_recon()
         rmtree(lesion_dir)
-        return lesion_only.recon > - 950
+        return (lesion_only.recon > -950) & (self.recon > -300)
 
     def scout_view(self, startZ=None, endZ=None, table_speed=0):
         '''
@@ -306,12 +310,12 @@ class Scanner():
         return repr
 
     def run_scan(self, mA=200, kVp=120, startZ=None, endZ=None, views=None,
-                 table_speed=0):
+                 table_speed=0, bhc=True):
         """
         Runs the CT simulation using the stored parameters.
 
         :param mA: x-ray source milliamps, increases x-ray flux linearly,
-            $noise \propto 1/sqrt(mA)$
+            $noise ~ 1/sqrt(mA)$
         :param kVp: x-ray source potential, increases x-ray flux
             nonlinearly and reduces contrast as increased
         :param startZ: optional starting table position in mm of the scan,
@@ -324,13 +328,18 @@ class Scanner():
             updates, if False they are suppressed.
         :param table_speed: optional [float, str] str options include
             'Low': 26.67, 'Intermediate': 48, 'High': 64, units in mm/s
+        :param bhc: optional [bool, str], if True applies polynomial beam
+            hardening correction to correct for polychromatic cupping artifact,
+            if `default` applied default XCIST bhc, caution this gives capping
+            artifacts. Options include [True, False, 'default']
         """
         self.xcist.cfg.protocol.mA = mA
         kVp_options = [70, 80, 90, 100, 110, 120, 130, 140]
         if kVp not in kVp_options:
             raise ValueError(f'Selected kVP [{kVp}] not available,\
                               please choose from {kVp_options}')
-        self.xcist.cfg.protocol.spectrumFilename = f'tungsten_tar7.0_{kVp}_filt.dat'
+        self.xcist.cfg.protocol.spectrumFilename =\
+            f'tungsten_tar7.0_{kVp}_filt.dat'
         self.kVp = kVp
         if isinstance(table_speed, str):
             self.xcist.cfg.protocol.tableSpeed = _table_speed[table_speed]
@@ -340,12 +349,12 @@ class Scanner():
         self.start_positions = self.calculate_start_positions()
         start_positions = self.start_positions
 
-        if startZ:
+        if startZ is not None:
             if startZ < start_positions.min():
                 raise ValueError(f'startZ is outside the range of valid\
                                   start positions: {self.start_positions}')
             start_positions = start_positions[start_positions > startZ]
-        if endZ:
+        if endZ is not None:
             if endZ > start_positions.max():
                 raise ValueError(f'startZ is outside the range of valid\
                                   start positions: {self.start_positions}')
@@ -353,12 +362,24 @@ class Scanner():
 
         if views:
             self.xcist.cfg.protocol.viewCount = views
-            self.xcist.protocol.stopViewId = self.xcist.cfg.protocol.startViewId+self.xcist.cfg.protocol.viewCount-1
+            self.xcist.protocol.stopViewId =\
+                self.xcist.cfg.protocol.startViewId +\
+                self.xcist.cfg.protocol.viewCount-1
             self.xcist.cfg.protocol.viewsPerRotation = views
+
+        if bhc is True:
+            self.xcist.cfg.physics.callback_post_log = 'Prep_BHC_Accurate'
+            self.xcist.cfg.physics.EffectiveMu = 0.2
+            self.xcist.cfg.physics.BHC_poly_order = 5
+            self.xcist.cfg.physics.BHC_max_length_mm = int(self.phantom.size[1])
+            self.xcist.cfg.physics.BHC_length_step_mm = 10
+        elif bhc is False:
+            self.xcist.cfg.physics.callback_post_log = ""
+            self.xcist.cfg.protocol.bowtie = ""
 
         self.results_dir = self.output_dir / 'simulations' / \
             f'{self.phantom.patientid}'
-        self.results_dir.mkdir(exist_ok=True, parents=True)    
+        self.results_dir.mkdir(exist_ok=True, parents=True)
         self.xcist.protocol.spectrumFilename = f"tungsten_tar7.0_{int(kVp)}_filt.dat"  # name of the spectrum file
         self.xcist.cfg.experimentDirectory = str(self.results_dir)
 
@@ -386,16 +407,20 @@ class Scanner():
         defined_kernels = ['standard', 'soft', 'bone', 'R-L', 'S-L']
         if kernel not in defined_kernels:
             raise ValueError(f'{kernel} not in {defined_kernels}')
+        self.xcist.recon.kernelType = kernel
         if sliceThickness:
             self.xcist.recon.sliceThickness = sliceThickness
         if mu_water:
             self.xcist.cfg.recon.mu = mu_water
         if not sliceCount:
-            detector_width = self.xcist.scanner.detectorRowCount * self.xcist.scanner.detectorRowSize
+            detector_width = self.xcist.scanner.detectorRowCount *\
+                self.xcist.scanner.detectorRowSize
             magnification = self.xcist.scanner.sdd / self.xcist.scanner.sid
             detector_width_at_isocenter = detector_width / magnification
-            safe_width_at_isocenter = detector_width_at_isocenter - 2*self.xcist.scanner.detectorRowSize
-            valid_slices = int(safe_width_at_isocenter // self.xcist.recon.sliceThickness)
+            safe_width_at_isocenter = detector_width_at_isocenter -\
+                2*self.xcist.scanner.detectorRowSize
+            valid_slices = int(safe_width_at_isocenter //
+                               self.xcist.recon.sliceThickness)
             self.xcist.cfg.recon.sliceCount = valid_slices
         else:
             self.xcist.cfg.recon.sliceCount = sliceCount
@@ -409,8 +434,8 @@ class Scanner():
         for proj in self._projections:
             self.xcist.cfg.resultsName = proj
             self.xcist.resultsName = self.xcist.cfg.resultsName
-            recon.recon(self.xcist.cfg)
-            recons.append(get_reconstructed_data(self.xcist))
+            vol = recon.recon_direct(self.xcist.cfg).transpose(2, 0, 1)
+            recons.append(vol)
         self.recon = np.concatenate(recons, axis=0)
         self.projections = get_projection_data(self.xcist)
         self.groundtruth = None
@@ -458,7 +483,8 @@ class Scanner():
         ds.Exposure = self.xcist.cfg.protocol.mA
 
         # load image data
-        ds.StudyDescription = f"{self.I0} photons " + self.seriesname + " " + ds.ConvolutionKernel + self.xcist.cfg.recon.reconType
+        ds.StudyDescription = f"{self.I0} photons " + self.seriesname +\
+            " " + ds.ConvolutionKernel + self.xcist.cfg.recon.reconType
         if self.recon.ndim == 2:
             self.recon = self.recon[None]
         nslices, ds.Rows, ds.Columns = self.recon.shape
@@ -500,15 +526,20 @@ class Scanner():
             # MediaStorageSOPInstanceUID changes every slice
             end = ds.file_meta.MediaStorageSOPInstanceUID.split('.')[-1]
             new_end = str(int(end) + slice_idx + self.studyid + self.seriesid)
-            ds.file_meta.MediaStorageSOPInstanceUID = ds.file_meta.MediaStorageSOPInstanceUID.replace(end, new_end)
+            ds.file_meta.MediaStorageSOPInstanceUID =\
+                ds.file_meta.MediaStorageSOPInstanceUID.replace(end, new_end)
             # slice location and image position changes every slice
-            ds.SliceLocation = self.nsims//2*ds.SliceThickness + slice_idx*ds.SliceThickness
+            ds.SliceLocation = self.nsims//2*ds.SliceThickness +\
+                slice_idx*ds.SliceThickness
             ds.ImagePositionPatient[-1] = ds.SliceLocation
             ds.ImagePositionPatient[0] = -ds.Rows//2*ds.PixelSpacing[0]
             ds.ImagePositionPatient[1] = -ds.Columns//2*ds.PixelSpacing[1]
             ds.ImagePositionPatient[2] = ds.SliceLocation
-            ds.PixelData = array_slice.copy(order='C').astype('int16') - int(ds.RescaleIntercept)
-            dcm_fname = fname.parent / f'{fname.stem}_{slice_idx:03d}{fname.suffix}' if nslices > 1 else fname
+            ds.PixelData = array_slice.copy(order='C').astype('int16') -\
+                int(ds.RescaleIntercept)
+            dcm_fname = fname.parent /\
+                f'{fname.stem}_{slice_idx:03d}{fname.suffix}'\
+                if nslices > 1 else fname
             fnames.append(dcm_fname)
             pydicom.write_file(dcm_fname, ds)
         return fnames
