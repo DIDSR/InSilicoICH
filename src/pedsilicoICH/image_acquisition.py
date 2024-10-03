@@ -375,6 +375,7 @@ class Scanner():
             self.xcist.cfg.physics.BHC_length_step_mm = 10
         elif bhc is False:
             self.xcist.cfg.physics.callback_post_log = ""
+            self.xcist.cfg.protocol.bowtie = ""
 
         self.results_dir = self.output_dir / 'simulations' / \
             f'{self.phantom.patientid}'
