@@ -445,15 +445,10 @@ class MIDA_Head(HeadPhantom):
         phantom[phantom == 50] = -1000  # air
         phantom[phantom == 52] = 800 # the MIDA text file has an unknown character after "Skull Diplo" that makes the above method not work if not removed
         
-        print('saving dataframe')
-        material_lut.to_csv('test_LUT.csv')
-        nib.save(nib.Nifti1Image(phantom, np.eye(4)), 'test_preLUT_phantom.nii')
-
         HU_phantom = np.copy(phantom)
         for _, row in material_lut[~material_lut['CT Number [HU]'].isna()].iterrows():
             HU_phantom[phantom == row.grayscale] = row['CT Number [HU]']
-        
-        nib.save(nib.Nifti1Image(HU_phantom, np.eye(4)), 'test_postLUT_phantom.nii')
+
         return HU_phantom
 
     def get_material_mask(self, material):

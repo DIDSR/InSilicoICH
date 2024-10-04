@@ -29,8 +29,9 @@ def spherical_lesion(phantom: np.ndarray,
 
 def insert_dural_3D(phantom, desired_volume, init_slice, hematoma_type, mass_effect,
                     seed=None):
+    
+    random = np.random.default_rng(seed)
 
-    init_slice = 75
     num_slices = coverage_from_volume(volume=desired_volume, hematoma_type=hematoma_type, slice_thickness=phantom.dz)
     ab = (desired_volume*2000)/(num_slices * phantom.dz) # using ABC/2 formula (although /2000 for mL and mm)
     #print('AB: ' + str(ab))
@@ -40,22 +41,22 @@ def insert_dural_3D(phantom, desired_volume, init_slice, hematoma_type, mass_eff
         desired_distance = math.sqrt(10*ab)
 
     HU_array = phantom.get_CT_number_phantom()
+
+    # TODO: better logic for hemorrhage starting slice
+    init_slice = int(random.choice(np.linspace(0, int(HU_array.shape[0]/3), int(HU_array.shape[0]/3) + 1)))
+
     dura_map = phantom.get_dura_map()
     skull_map = phantom.get_skull_map()
 
     new_volume = np.copy(HU_array)
 
     boundary = dura_map
-    #distances = [50/phantom.spacings[2], 75/phantom.spacings[2]]  # length range in mm, will divide by voxel size (assuming isotropic) to convert
     distances = [(desired_distance-5)/phantom.spacings[2], (desired_distance+5)/phantom.spacings[2]]
-    print(distances)
 
-    #num_slices = 11  # number of slices to have hemorrhage, try to make this odd
     slice_counter = slice_idx = 0  # will iterate on this
     iter_flag = True
 
     # desired_thickness = 0.5 # slice thickness in mm
-    random = np.random.default_rng(seed)
     hemisphere = random.choice(['left', 'right'])  # can either be random or pre-defined
 
     if hemisphere == 'left':
@@ -66,14 +67,13 @@ def insert_dural_3D(phantom, desired_volume, init_slice, hematoma_type, mass_eff
     hemorrhage_mask = np.zeros_like(boundary)
     while iter_flag:
         if slice_counter == 0:  # need to do the slice in the middle of the hemorrhage, same as before
-            # print('Processing center slice: ' + str(init_slice))
-            temp_boundary = boundary[init_slice]
-            dura_idx = np.argwhere(temp_boundary == 1.0)
 
-            tol = 1000
+            tol = 2000
             count = 0
             while count < tol:
-                print(count)
+                temp_boundary = boundary[init_slice]
+                dura_idx = np.argwhere(temp_boundary == 1.0)
+
                 try:
                     # choose a random start point, and calculate distance from all available boundary voxels to start point
                     start_point = dura_idx[random.choice(range(len(dura_idx)))]
@@ -90,6 +90,7 @@ def insert_dural_3D(phantom, desired_volume, init_slice, hematoma_type, mass_eff
                     orig_end = end_point
                 except:
                     count += 1
+                    init_slice = int(random.choice(np.linspace(0, int(HU_array.shape[0]/3), int(HU_array.shape[0]/3) + 1)))
                 else:
                     count = tol
 
@@ -174,7 +175,7 @@ def connect_points(start, end, boundary, hematoma_type):
         bezier_weight = 0.14 # weight should probably be below 0.2 to avoid ballooning too much, but line breaks if below 0.04....
         bezier_middle = (int(rows/2), int(cols/2))  # center of the image, should probably randomize it somewhere along center later
     elif hematoma_type == 'subdural':
-        bezier_weight = 1.5
+        bezier_weight = 2
         bezier_middle = boundary_coords[round(len(boundary_coords)/2)]  # use the middle point of the dura line 
     else:
         bezier_weight = 0.0
