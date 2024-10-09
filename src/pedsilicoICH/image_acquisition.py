@@ -423,9 +423,10 @@ class Scanner():
         else:
             print(self.xcist.recon.mu)
             print(self.xcist.physics.monochromatic)
-            print('updating mu')
-            self.xcist.recon.mu = xc.GetMu('water', self.xcist.physics.monochromatic)[0]/10
-            print(self.xcist.recon.mu)
+            if self.xcist.physics.monochromatic != -1:
+                self.xcist.recon.mu = xc.GetMu('water', self.xcist.physics.monochromatic)[0]/10
+            else:
+                print(self.xcist.recon.mu)
         if not sliceCount:
             detector_width = self.xcist.scanner.detectorRowCount *\
                 self.xcist.scanner.detectorRowSize
