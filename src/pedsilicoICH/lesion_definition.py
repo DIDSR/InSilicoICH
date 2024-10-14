@@ -8,27 +8,28 @@ import skimage as ski
 import scipy
 
 
-def elliptical_lesion(phantom: np.ndarray,
-                     center: tuple | None = None, radius: tuple | None = None):
+def elliptical_lesion(shape: tuple | list,
+                      center: tuple | None = None, radius: tuple | None = None):
     '''
-    Returns binary elliptical mask based on input phantom array and
+    Returns binary elliptical mask based on input matrix shape and
     center coordinates and radii parameters
 
     sphere defined as r^2 = z^2 + x^2 + y^2
 
-    :param phantom: 3D array to add sphere to
+    :param shape: sequence of ints, shape of the new array
     '''
-    center = center or [dim//2 for dim in phantom.shape]
-    radius = radius or [dim//10 for dim in phantom.shape]
+    center = center or [dim//2 for dim in shape]
+    radius = radius or [dim//10 for dim in shape]
     if not isinstance(radius, list | tuple):
         radius = 3*[radius]
     ell = ski.draw.ellipsoid(*radius)
     starts = center - np.array(ell.shape)//2
     ends = center + np.array(ell.shape)//2 + 1
-    phantom[starts[0]:ends[0], 
-            starts[1]:ends[1],
-            starts[2]:ends[2]] = ell
-    return np.where(phantom > 0, True, False)
+    lesion_only = np.zeros(shape)
+    lesion_only[starts[0]:ends[0], 
+                starts[1]:ends[1],
+                starts[2]:ends[2]] = ell    
+    return np.where(lesion_only > 0, True, False)
 
 
 def insert_dural_3D(phantom, init_slice, hematoma_type, mass_effect,

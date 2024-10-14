@@ -16,7 +16,7 @@ from . import dicom_to_voxelized_phantom
 from ..artifact_generation import transform_image_label_pair
 
 from ..lesion_definition import elliptical_lesion, insert_dural_3D
-from scipy.ndimage import center_of_mass
+from scipy.ndimage import center_of_mass, distance_transform_edt
 
 
 def sphere_radius_from_volume(volume):
@@ -272,11 +272,12 @@ class HeadPhantom(Phantom):
         # this while loop identifies a suitable insertion point
             lesion_vol = np.zeros_like(img)
             rng = np.random.default_rng(seed)
-            z, x, y = np.argwhere(mask)[rng.integers(0, mask.sum())]
+            suitable_points = distance_transform_edt(mask) > r
+            z, x, y = np.argwhere(suitable_points)[rng.integers(0, suitable_points.sum())]
             if mask[z].sum() < np.pi*r**2:
                 continue
             counts += 1
-            sphere = elliptical_lesion(img, center=(z, x, y),
+            sphere = elliptical_lesion(img.shape, center=(z, x, y),
                                       radius=r)
             overlap = np.sum(mask & sphere)/(np.sum(sphere))
             if counts > tol:
@@ -286,7 +287,7 @@ class HeadPhantom(Phantom):
         # now actually insert the lesion in the desired point
         for ri in radii:
             for ci in contrast:
-                sphere = elliptical_lesion(img, center=(z, x, y),
+                sphere = elliptical_lesion(img.shape, center=(z, x, y),
                                           radius=ri)
                 lesion_vol[sphere] += ci
         img_w_lesion = img + lesion_vol
