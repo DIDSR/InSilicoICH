@@ -237,8 +237,7 @@ class HeadPhantom(Phantom):
                           contrast: list[int] = [-100],
                           material: str = 'white matter',
                           mass_effect: bool = False,  # add mass effect for spherical lesions? These are typically associated with metastases
-                          seed: int | None = None,
-                          tol: int = 20) -> tuple:
+                          seed: int | None = None) -> tuple:
         '''
         adds lesion to img in random location within mask of size radius
         and contrast level contrast
@@ -253,8 +252,6 @@ class HeadPhantom(Phantom):
 
         :returns: img_w_lesion, lesion_vol, (z, x, y)
         '''
-        if seed:
-            tol = 1
         if not isinstance(volume, list):
             volume = [volume]
         if not isinstance(contrast, list):
