@@ -265,33 +265,20 @@ class HeadPhantom(Phantom):
         img = self.get_CT_number_phantom()
         mask = self.get_material_mask(material).astype(int)
 
-        overlap = 0
-        counts = 0
-        sphere = np.zeros_like(img, dtype=bool)
-        while overlap < 0.8:  # can increase threshold to size of lesion
-        # this while loop identifies a suitable insertion point
-            lesion_vol = np.zeros_like(img)
-            rng = np.random.default_rng(seed)
-            suitable_points = distance_transform_edt(mask) > r
-            z, x, y = np.argwhere(suitable_points)[rng.integers(0, suitable_points.sum())]
-            if mask[z].sum() < np.pi*r**2:
-                continue
-            counts += 1
-            sphere = elliptical_lesion(img.shape, center=(z, x, y),
-                                      radius=r)
-            overlap = np.sum(mask & sphere)/(np.sum(sphere))
-            if counts > tol:
-                raise ValueError("Failed to insert lesion into mask")
-
         lesion_vol = np.zeros_like(img)
-        # now actually insert the lesion in the desired point
+        rng = np.random.default_rng(seed)
+        suitable_points = distance_transform_edt(mask) > r # lower distance threshold to allow overlap
+        z, x, y = np.argwhere(suitable_points)[rng.integers(0, suitable_points.sum())]
+
+        lesion_vol = np.full(img.shape, fill_value=-1000)
         for ri in radii:
             for ci in contrast:
                 sphere = elliptical_lesion(img.shape, center=(z, x, y),
                                           radius=ri)
-                lesion_vol[sphere] += ci
-        img_w_lesion = img + lesion_vol
-        return img_w_lesion, lesion_vol, (z, x, y)
+                lesion_vol[sphere] = ci
+        img_w_lesion = img.copy()
+        img_w_lesion[lesion_vol > -1000] = lesion_vol[lesion_vol > -1000]
+        return img_w_lesion, lesion_vol > -1000, (z, x, y)
 
     def _add_dural_lesion(self, lesion_type, contrast, init_slice=None,
                           seed=None, mass_effect=True):
