@@ -28,7 +28,7 @@ def elliptical_lesion(phantom: np.ndarray,
     phantom[starts[0]:ends[0], 
             starts[1]:ends[1],
             starts[2]:ends[2]] = ell
-    return phantom
+    return np.where(phantom > 0, True, False)
 
 
 def insert_dural_3D(phantom, init_slice, hematoma_type, mass_effect,
