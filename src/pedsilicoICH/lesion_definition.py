@@ -22,10 +22,13 @@ def elliptical_lesion(phantom: np.ndarray,
     radius = radius or [dim//10 for dim in phantom.shape]
     if not isinstance(radius, list | tuple):
         radius = 3*[radius]
-    mesh = np.stack(np.meshgrid(*list(map(range, phantom.shape)), indexing='ij'))
-    center_mesh = np.stack([np.full(phantom.shape, fill_value=c) for c in center])
-    radius_mesh = np.stack([np.full(phantom.shape, fill_value=r) for r in radius])
-    return np.where(np.sqrt(np.sum(((mesh - center_mesh)/radius_mesh)**2, axis=0)) > 1, False, True)
+    ell = ski.draw.ellipsoid(*radius)
+    starts = center - np.array(ell.shape)//2
+    ends = center + np.array(ell.shape)//2 + 1
+    phantom[starts[0]:ends[0], 
+            starts[1]:ends[1],
+            starts[2]:ends[2]] = ell
+    return phantom
 
 
 def insert_dural_3D(phantom, init_slice, hematoma_type, mass_effect,
