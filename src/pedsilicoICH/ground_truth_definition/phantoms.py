@@ -15,7 +15,7 @@ from torchvision.datasets.utils import download_and_extract_archive
 from . import dicom_to_voxelized_phantom
 from ..artifact_generation import transform_image_label_pair
 
-from ..lesion_definition import spherical_lesion, insert_dural_3D
+from ..lesion_definition import elliptical_lesion, insert_dural_3D
 from scipy.ndimage import center_of_mass
 
 
@@ -269,23 +269,25 @@ class HeadPhantom(Phantom):
         counts = 0
         sphere = np.zeros_like(img, dtype=bool)
         while overlap < 0.8:  # can increase threshold to size of lesion
+        # this while loop identifies a suitable insertion point
             lesion_vol = np.zeros_like(img)
             rng = np.random.default_rng(seed)
             z, x, y = np.argwhere(mask)[rng.integers(0, mask.sum())]
             if mask[z].sum() < np.pi*r**2:
                 continue
             counts += 1
-            sphere = spherical_lesion(img, center=(z, x, y),
-                                      radius=r).transpose(1, 0, 2)
+            sphere = elliptical_lesion(img, center=(z, x, y),
+                                      radius=r)
             overlap = np.sum(mask & sphere)/(np.sum(sphere))
             if counts > tol:
                 raise ValueError("Failed to insert lesion into mask")
 
         lesion_vol = np.zeros_like(img)
+        # now actually insert the lesion in the desired point
         for ri in radii:
             for ci in contrast:
-                sphere = spherical_lesion(img, center=(z, x, y),
-                                          radius=ri).transpose(1, 0, 2)
+                sphere = elliptical_lesion(img, center=(z, x, y),
+                                          radius=ri)
                 lesion_vol[sphere] += ci
         img_w_lesion = img + lesion_vol
         return img_w_lesion, lesion_vol, (z, x, y)

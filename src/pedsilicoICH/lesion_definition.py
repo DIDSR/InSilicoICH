@@ -8,10 +8,10 @@ import skimage as ski
 import scipy
 
 
-def spherical_lesion(phantom: np.ndarray,
+def elliptical_lesion(phantom: np.ndarray,
                      center: tuple | None = None, radius: tuple | None = None):
     '''
-    Returns binary sphere mask based on input phantom array and
+    Returns binary elliptical mask based on input phantom array and
     center coordinates and radii parameters
 
     sphere defined as r^2 = z^2 + x^2 + y^2
@@ -20,11 +20,12 @@ def spherical_lesion(phantom: np.ndarray,
     '''
     center = center or [dim//2 for dim in phantom.shape]
     radius = radius or [dim//10 for dim in phantom.shape]
-    z, x, y = np.meshgrid(range(phantom.shape[0]),
-                          range(phantom.shape[1]),
-                          range(phantom.shape[2]))
-    distance_matrix = (z - center[0])**2 + (x-center[1])**2 + (y-center[2])**2
-    return np.where(distance_matrix > radius**2, False, True)
+    if not isinstance(radius, list | tuple):
+        radius = 3*[radius]
+    mesh = np.stack(np.meshgrid(*list(map(range, phantom.shape)), indexing='ij'))
+    center_mesh = np.stack([np.full(phantom.shape, fill_value=c) for c in center])
+    radius_mesh = np.stack([np.full(phantom.shape, fill_value=r) for r in radius])
+    return np.where(np.sqrt(np.sum(((mesh - center_mesh)/radius_mesh)**2, axis=0)) > 1, False, True)
 
 
 def insert_dural_3D(phantom, init_slice, hematoma_type, mass_effect,
