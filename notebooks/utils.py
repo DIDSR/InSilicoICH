@@ -4,6 +4,19 @@ from pedsilicoICH.image_acquisition import read_dicom
 
 from ipywidgets import interact, IntSlider
 
+
+def hematoma_phase(contrast):
+    if contrast > 60:
+        return 'acute'
+    if contrast > 30:
+        return 'subacute'
+    if contrast > 10:
+        return 'chronic'
+    if contrast > -10:
+        return 'gliosis'
+    else:
+        return None
+
 def get_effective_diameter(ground_truth_mu, pixel_width_mm):
     '''
     effective diameter defined in AAPM TG204:

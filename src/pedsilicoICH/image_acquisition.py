@@ -218,7 +218,7 @@ class Scanner():
                 self.phantom.spacings[0]
         return (suggested_start_mm, suggested_end_mm)
 
-    def get_lesion_mask(self, startZ=None, endZ=None):
+    def get_lesion_mask(self, startZ=None, endZ=None, slice_thickness=1):
         '''takes lesion in object space and returns a mask in CT image space
         for the given imaging system'''
         if not self.phantom._lesion:
@@ -238,7 +238,7 @@ class Scanner():
         lesion_only.xcist.cfg.physics.enableElectronicNoise = 0
         lesion_only.xcist.cfg.physics.enableQuantumNoise = 0
         lesion_only.run_scan(mA=500, views=100, startZ=startZ, endZ=endZ)
-        lesion_only.run_recon()
+        lesion_only.run_recon(sliceThickness=slice_thickness)
         rmtree(lesion_dir)
         return (lesion_only.recon > -950) & (self.recon > -300)
 

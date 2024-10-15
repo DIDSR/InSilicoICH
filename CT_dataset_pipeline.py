@@ -48,6 +48,7 @@ if __name__ == "__main__":
     # find parameter
 # %%
     recon_kernel = 'soft'  # options include ['standard', 'soft', 'bone', 'R-L', 'S-L']
+    slice_thickness = 5 # in mm
     nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
     mida_age = 38  # median US adult age to represent MIDA
     possible_ages = nihpd_ages + [mida_age]
@@ -99,7 +100,8 @@ if __name__ == "__main__":
                           volume=volume,
                           lesion_type=lesion_type,
                           mass_effect=mass_effect,
-                          views=views, zspan=zspan)
+                          views=views, zspan=zspan,
+                          kernel=recon_kernel, slice_thickness=slice_thickness)
         study.metadata.to_csv(output_directory / patient_name /
                               f'metadata_{patientid}.csv',
                               index=False)
