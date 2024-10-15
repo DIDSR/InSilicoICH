@@ -53,7 +53,7 @@ if __name__ == "__main__":
     possible_ages = nihpd_ages + [mida_age]
     kVp_list = [120]
     mA_list = list(range(300, 400, 50))
-    lesion_types = [None, 'sphere', 'epidural', 'subdural']
+    lesion_types = [None, 'round', 'epidural', 'subdural']
     min_vol, max_vol = 34, 34000  # applied only to spheres [units of voxels, TODO convert to mL or mm^3]
     min_contrast, max_contrast = 20, 200
     contrast_list = np.arange(20, 200)

@@ -18,6 +18,8 @@ def elliptical_lesion(shape: tuple | list,
 
     :param shape: sequence of ints, shape of the new array
     '''
+    if isinstance(radius, np.ndarray):
+        radius = list(radius)
     center = center or [dim//2 for dim in shape]
     radius = radius or [dim//10 for dim in shape]
     if not isinstance(radius, list | tuple):
