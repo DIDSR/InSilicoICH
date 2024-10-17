@@ -389,6 +389,8 @@ class Scanner():
             self.xcist.cfg.resultsName = str((self.results_dir / f'{idx:03d}_{mA}mA_{kVp}kV').absolute())  # keep projection data from each scan
             self.xcist.resultsName = self.xcist.cfg.resultsName
             self.xcist.protocol.startZ = table_position
+            print('** PHANTOM FILENAME **')
+            print(self.xcist.cfg.phantom.filename)
             self.xcist.run_all()
             projections.append(self.xcist.cfg.resultsName)
         self._projections = projections
