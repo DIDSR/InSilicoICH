@@ -158,12 +158,6 @@ class Scanner():
         if isinstance(img, monai.data.meta_tensor.MetaTensor):
             img = img.numpy()
 
-        print(type(img))
-        print(img.shape)
-        import nibabel as nib
-        new_img = nib.Nifti1Image(img, affine=np.eye(4))
-        nib.save(new_img, 'temporary_image.nii')
-        print('TESTING IMAGE')
         self.phantom = phantom
         self.studyname = studyname or self.patientname
         self.studyid = studyid
@@ -238,10 +232,10 @@ class Scanner():
         lesion_only = Scanner(lesion_phantom,
                               materials={
                                 'ICRU_lung_adult_healthy': -1000,
-                                'water': 0},
+                                'water': -100},
                               output_dir=lesion_dir)
         lesion_only.xcist.cfg.physics.energyCount = 2
-        lesion_only.xcist.cfg.physics.monochromatic = 0
+        lesion_only.xcist.cfg.physics.monochromatic = -1
         lesion_only.xcist.cfg.physics.enableElectronicNoise = 0
         lesion_only.xcist.cfg.physics.enableQuantumNoise = 0
         lesion_only.run_scan(mA=500, views=100, startZ=startZ, endZ=endZ)
