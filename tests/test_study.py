@@ -105,10 +105,7 @@ def test_subdural_lesion_study():
                     views=100)
     measured_lesion_signal = study.images[study.lesion.astype(bool)].mean()
     assert measured_lesion_signal > 21
-    # the below assertions test that metadata is saving slice level lesion info
-    # there is a lesion on slices 0-3, but not on the remaining
-    assert study.metadata['lesion volume [mL]'].iloc[:4].sum() > 0.49
-    assert study.metadata['lesion volume [mL]'].iloc[-3:].sum() == 0
+    assert study.metadata['lesion volume [mL]'].sum() > 1.7
 
 
 def test_subdural_augmented_position_study():

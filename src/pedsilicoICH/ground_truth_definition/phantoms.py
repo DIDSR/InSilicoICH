@@ -267,7 +267,8 @@ class HeadPhantom(Phantom):
                 self.add_round_lesion(volume=volume,
                                       intensity=intensity,
                                       mass_effect=mass_effect,
-                                      seed=seed)
+                                      seed=seed,
+                                      **kwargs)
         elif lesion_type == 'epidural':
             if isinstance(intensity, list):
                 intensity = max(intensity)
@@ -302,8 +303,8 @@ class HeadPhantom(Phantom):
                                        seed=seed)
 
     def add_round_lesion(self,
-                         volume: list[int] = [2],
-                         intensity: list[int] = [-100],
+                         volume: list[int] = 2,
+                         intensity: list[int] = -100,
                          material: str = 'white matter',
                          eccentricity: float = 0.5,
                          mass_effect: bool = False,
