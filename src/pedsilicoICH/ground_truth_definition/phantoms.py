@@ -40,7 +40,13 @@ def get_closest_key(key, dictionary):
     return diffs[min([o for o in diffs])]
 
 
-def get_semimajor_axes(eccentricity, seed=None):
+def calc_mean_eccentricity(a, b, c):
+    return np.mean([calculate_eccentricity(a, b),
+                    calculate_eccentricity(a, c),\
+                    calculate_eccentricity(b, c)])
+
+
+def get_eccentricity_dict():
     eccentricity_dict = {}
     sample_range = np.linspace(0.1, 1, 10)
     for a in sample_range:
@@ -53,14 +59,18 @@ def get_semimajor_axes(eccentricity, seed=None):
                     np.stack(sample_eccentricity).mean(), decimals=2)
                 eccentricity_dict[float(sample_eccentricity)] =\
                     list(map(float, (a, b, c)))
-    eccentricity_dict
+    return {c: eccentricity_dict[c] for c in sorted(eccentricity_dict)}
 
-    rng = np.random.default_rng(seed)
 
+def get_semimajor_axes(eccentricity, seed=None):
+    eccentricity_dict = get_eccentricity_dict()
     key = get_closest_key(eccentricity, eccentricity_dict)
     foci = eccentricity_dict[key]
+
+    rng = np.random.default_rng(seed)
     rng.shuffle(foci)
     return np.array(foci)
+
 
 def get_mean_age(age_range: str):
     return (float(age_range.split('-')[1])+float(age_range.split('-')[0]))/2
@@ -231,7 +241,7 @@ class HeadPhantom(Phantom):
     def spacings(self):
         return self.dz, self.dx, self.dy
 
-    def insert_lesion(self, lesion_type, volume=500, intensity=100,
+    def insert_lesion(self, lesion_type, volume=2, intensity=100,
                       init_slice=None, mass_effect=False, seed=None, **kwargs):
         '''
         inserts lesion of `lesion_type` into phantom array
@@ -254,9 +264,10 @@ class HeadPhantom(Phantom):
         self.mass_effect = mass_effect
         if lesion_type == 'round':
             img_w_lesion, lesion_image, lesion_coords =\
-                self.add_round_lesion(volume=volume, intensity=intensity,
-                                       mass_effect=mass_effect,
-                                       seed=seed)
+                self.add_round_lesion(volume=volume,
+                                      intensity=intensity,
+                                      mass_effect=mass_effect,
+                                      seed=seed)
         elif lesion_type == 'epidural':
             if isinstance(intensity, list):
                 intensity = max(intensity)
@@ -284,13 +295,14 @@ class HeadPhantom(Phantom):
         if not self._lesion:
             self._phantom = transform(self.get_CT_number_phantom())
             return
-        self._phantom, self._lesion[0] = transform_image_label_pair(transform,
-                                                                    self.get_CT_number_phantom(),
-                                                                    self.get_lesion_mask(),
-                                                                    seed=seed)
+        self._phantom, self._lesion[0] =\
+            transform_image_label_pair(transform,
+                                       self.get_CT_number_phantom(),
+                                       self.get_lesion_mask(),
+                                       seed=seed)
 
     def add_round_lesion(self,
-                         volume: list[int] = [200],
+                         volume: list[int] = [2],
                          intensity: list[int] = [-100],
                          material: str = 'white matter',
                          eccentricity: float = 0.5,
@@ -316,14 +328,15 @@ class HeadPhantom(Phantom):
         rng = np.random.default_rng(seed)
 
         r = sphere_radius_from_volume(volume)
-        eccentricity = rng.normal(eccentricity, scale=0.1, size=1)[0]
-        foci = r*get_semimajor_axes(eccentricity, seed)
+        axes = get_semimajor_axes(eccentricity, seed)
+        print(f'ellipsoid foci: {axes}, mean: {calc_mean_eccentricity(*axes)}')
+        foci = r * axes
 
         img = self.get_CT_number_phantom()
         mask = self.get_material_mask(material).astype(int)
 
         lesion_vol = np.zeros_like(img)
-        suitable_points = distance_transform_edt(mask) > r # lower distance threshold to allow overlap
+        suitable_points = distance_transform_edt(mask) > r  # lower distance threshold to allow overlap
         z, x, y = np.argwhere(suitable_points)[rng.integers(0, suitable_points.sum())]
 
         lesion_vol = np.full(img.shape, fill_value=-1000)
@@ -339,8 +352,8 @@ class HeadPhantom(Phantom):
         img_w_lesion[lesion_vol > -1000] = lesion_vol[lesion_vol > -1000]
         return img_w_lesion, lesion_vol > -1000, (z, x, y)
 
-    def _add_dural_lesion(self, volume, lesion_type, intensity, init_slice=None,
-                          seed=None, mass_effect=True):
+    def _add_dural_lesion(self, volume, lesion_type, intensity,
+                          init_slice=None, seed=None, mass_effect=True):
         rng = np.random.default_rng(seed)
         dura_map = self.get_dura_map()
         HU_volume = self.get_CT_number_phantom()

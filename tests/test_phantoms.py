@@ -48,8 +48,7 @@ def transforms_performed_correctly(phantom, transform, lesion_type, tol=0.2,
                                    seed=None):
     print(phantom, transform, lesion_type)
     phantom = deepcopy(phantom)
-    radius = 3
-    volume = 4/3*np.pi*radius**3
+    volume = 5
     phantom.insert_lesion(lesion_type, volume=volume, intensity=200,
                           mass_effect=False, seed=seed)
     lesion = phantom.get_lesion_mask()
