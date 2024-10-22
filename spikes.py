@@ -9,10 +9,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from skimage.morphology import white_tophat
 # %%
-phantom = load_phantom(6.5)
-phantom.insert_lesion('epidural', volume=10, mass_effect=True)
-# %%
-ctshow(phantom.get_CT_number_phantom()[phantom._lesion_coords[0][0]], 'brain')
+# phantom = load_phantom(6.5)
+# phantom.insert_lesion('epidural', volume=10, mass_effect=True)
+# # %%
+# ctshow(phantom.get_CT_number_phantom()[phantom._lesion_coords[0][0]], 'brain')
 # %%
 phantom = load_phantom(6.5)
 phantom.insert_lesion('round', volume=10, eccentricity=0, seed=42)
@@ -27,4 +27,4 @@ ctshow(HU_array, fig=f, ax=axs[0])
 axs[1].imshow(skull_map)
 axs[2].imshow(lesion)
 # %%
-warped = warp_slice(HU_array, skull_map, src, dst)
+# warped = warp_slice(HU_array, skull_map, src, dst)
