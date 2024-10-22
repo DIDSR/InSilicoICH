@@ -15,8 +15,10 @@ from torchvision.datasets.utils import download_and_extract_archive
 from . import dicom_to_voxelized_phantom
 from ..artifact_generation import transform_image_label_pair
 
-from ..lesion_definition import spherical_lesion, insert_dural_3D
-from scipy.ndimage import center_of_mass
+from ..lesion_definition import elliptical_lesion, insert_dural_3D
+from scipy.ndimage import (center_of_mass,
+                           distance_transform_edt,
+                           binary_dilation)
 
 
 def sphere_radius_from_volume(volume):
@@ -25,6 +27,40 @@ def sphere_radius_from_volume(volume):
     '''
     return np.power(3/4/np.pi*volume*1000, 1/3)
 
+
+def calculate_eccentricity(a, b):
+    if a > b:
+        return np.sqrt(1 - b**2/a**2)
+    else:
+        return np.sqrt(1 - a**2/b**2)
+
+
+def get_closest_key(key, dictionary):
+    diffs = {abs(k - key): k for k in dictionary}
+    return diffs[min([o for o in diffs])]
+
+
+def get_semimajor_axes(eccentricity, seed=None):
+    eccentricity_dict = {}
+    sample_range = np.linspace(0.1, 1, 10)
+    for a in sample_range:
+        for b in sample_range:
+            for c in sample_range:
+                sample_eccentricity = calculate_eccentricity(a, b), \
+                                      calculate_eccentricity(a, c), \
+                                      calculate_eccentricity(b, c)
+                sample_eccentricity = np.round(
+                    np.stack(sample_eccentricity).mean(), decimals=2)
+                eccentricity_dict[float(sample_eccentricity)] =\
+                    list(map(float, (a, b, c)))
+    eccentricity_dict
+
+    rng = np.random.default_rng(seed)
+
+    key = get_closest_key(eccentricity, eccentricity_dict)
+    foci = eccentricity_dict[key]
+    rng.shuffle(foci)
+    return np.array(foci)
 
 def get_mean_age(age_range: str):
     return (float(age_range.split('-')[1])+float(age_range.split('-')[0]))/2
@@ -84,7 +120,7 @@ def load_phantom(age=38, shape=(480, 480, 350), name='default'):
     :param age: patient age in years, MIDA currently hard coded at 38 yrs
     :param shape: shape of that the ground truth phantom will be interpolated
     :param name: patient name to be saved in DICOM header
-    :param lesion_type: options include: ['sphere', 'epidural', 'subdural']
+    :param lesion_type: options include: ['round', 'epidural', 'subdural']
     :param radius: lesion radius if sphere is selected
     :param intensity: uniform intensity of the lesion (HU)
     :param add_positioning_augmentation: bool, apply random affine to phantom
@@ -196,13 +232,29 @@ class HeadPhantom(Phantom):
         return self.dz, self.dx, self.dy
 
     def insert_lesion(self, lesion_type, volume=500, intensity=100,
-                      init_slice=None, mass_effect=False, seed=None):
-        'return img_w_lesion, lesion_image, lesion_coords'
+                      init_slice=None, mass_effect=False, seed=None, **kwargs):
+        '''
+        inserts lesion of `lesion_type` into phantom array
+
+        :param lesion_type: str, options include ['round', 'epidural', 'subdural'],
+            see associated methods `add_round_lesion`, `_add_dural_lesion`
+        :param volume: in mL, volume of the lesion
+        :param contrast: lesion CT number in HU
+        :param init_slice: optional, slice to add dural_lesions to
+        :param meass_effect: optional, bool whether to apply mass effect processing to
+            displace brain tissue following lesion insertion
+        :param edema: optional, bool or int. whether to add a ring of low contrast, 10 HU,
+            edema around the lesion, currently only implemented for sphere
+        :param seed: optional, int specify seed for reproducible lesion insertion,
+            otherwise random
+
+        return img_w_lesion, lesion_image, lesion_coords
+        '''
         self.lesion_type.append(lesion_type)
         self.mass_effect = mass_effect
-        if lesion_type == 'sphere':
+        if lesion_type == 'round':
             img_w_lesion, lesion_image, lesion_coords =\
-                self.add_sphere_lesion(volume=volume, intensity=intensity,
+                self.add_round_lesion(volume=volume, intensity=intensity,
                                        mass_effect=mass_effect,
                                        seed=seed)
         elif lesion_type == 'epidural':
@@ -211,14 +263,16 @@ class HeadPhantom(Phantom):
             img_w_lesion, lesion_image, lesion_coords =\
                 self._add_dural_lesion(volume, 'epidural', intensity,
                                        init_slice, mass_effect=mass_effect,
-                                       seed=seed)
+                                       seed=seed,
+                                       **kwargs)
         else:
             if isinstance(intensity, list):
                 intensity = max(intensity)
             img_w_lesion, lesion_image, lesion_coords =\
                 self._add_dural_lesion(volume, 'subdural', intensity,
                                        init_slice, mass_effect=mass_effect,
-                                       seed=seed)
+                                       seed=seed,
+                                       **kwargs)
 
         self._phantom = img_w_lesion
         self._lesion.append(lesion_image)
@@ -235,13 +289,14 @@ class HeadPhantom(Phantom):
                                                                     self.get_lesion_mask(),
                                                                     seed=seed)
 
-    def add_sphere_lesion(self,
-                          volume: list[int] = [5], # mL
-                          intensity: list[int] = [-100], # HU
-                          material: str = 'white matter',
-                          mass_effect: bool = False,  # add mass effect for spherical lesions? These are typically associated with metastases
-                          seed: int | None = None,
-                          tol: int = 20) -> tuple:
+    def add_round_lesion(self,
+                         volume: list[int] = [200],
+                         intensity: list[int] = [-100],
+                         material: str = 'white matter',
+                         eccentricity: float = 0.5,
+                         mass_effect: bool = False,
+                         edema: bool | int = False,
+                         seed: int | None = None) -> tuple:
         '''
         adds lesion to img in random location within mask of size radius
         and intensity level intensity
@@ -252,48 +307,37 @@ class HeadPhantom(Phantom):
             if provided a list it will make concentric lesions of intensities
         :param material: which material region to insert lesion into,
             self.materials for options
+        :param eccentricity: between 0, 1 defines how elongated the lesions are, with 0 being spherical,
+            1 being very oblong
         :param seed: optional, defaults to None, set seed for reproducible lesion insertion
 
         :returns: img_w_lesion, lesion_vol, (z, x, y)
         '''
-        if seed:
-            tol = 1
-        if not isinstance(volume, list):
-            volume = [volume]
-        if not isinstance(intensity, list):
-            intensity = [intensity]
-        radii = [sphere_radius_from_volume(v)/self.dx for v in volume]
-        r = max(radii)
+        rng = np.random.default_rng(seed)
+
+        r = sphere_radius_from_volume(volume)
+        eccentricity = rng.normal(eccentricity, scale=0.1, size=1)[0]
+        foci = r*get_semimajor_axes(eccentricity, seed)
 
         img = self.get_CT_number_phantom()
         mask = self.get_material_mask(material).astype(int)
 
-        overlap = 0
-        counts = 0
-        sphere = np.zeros_like(img, dtype=bool)
-        while overlap < 0.8:  # can increase threshold to size of lesion
-            lesion_vol = np.zeros_like(img)
-            rng = np.random.default_rng(seed)
-            z, x, y = np.argwhere(mask)[rng.integers(0, mask.sum())]
-            if mask[z].sum() < np.pi*r**2:
-                continue
-            counts += 1
-            sphere = spherical_lesion(img, center=(z, x, y),
-                                      radius=r).transpose(1, 0, 2)
-            overlap = np.sum(mask & sphere)/(np.sum(sphere))
-
-            if counts > tol:
-                raise ValueError("Failed to insert lesion into mask")
-
         lesion_vol = np.zeros_like(img)
-        for ri in radii:
-            for ci in intensity:
-                sphere = spherical_lesion(img, center=(z, x, y),
-                                          radius=ri).transpose(1, 0, 2)
-                lesion_vol[sphere] += ci
-                img[sphere] = 0
-        img_w_lesion = img + lesion_vol
-        return img_w_lesion, lesion_vol, (z, x, y)
+        suitable_points = distance_transform_edt(mask) > r # lower distance threshold to allow overlap
+        z, x, y = np.argwhere(suitable_points)[rng.integers(0, suitable_points.sum())]
+
+        lesion_vol = np.full(img.shape, fill_value=-1000)
+        sphere = elliptical_lesion(img.shape, center=(z, x, y), radius=foci)
+        lesion_vol[sphere] = intensity
+        if edema:
+            edema_pixels = 5
+            edema_HU = 10
+            edema = edema_pixels if edema is True else edema
+            edema_mask = binary_dilation(sphere, np.ones(3*[edema])) ^ sphere
+            lesion_vol[edema_mask] = edema_HU
+        img_w_lesion = img.copy()
+        img_w_lesion[lesion_vol > -1000] = lesion_vol[lesion_vol > -1000]
+        return img_w_lesion, lesion_vol > -1000, (z, x, y)
 
     def _add_dural_lesion(self, volume, lesion_type, intensity, init_slice=None,
                           seed=None, mass_effect=True):

@@ -62,12 +62,14 @@ if __name__ == "__main__":
         intensity_list = np.arange(20, 200)
     
     recon_kernel = 'soft'  # options include ['standard', 'soft', 'bone', 'R-L', 'S-L']
+    slice_thickness = 5 # in mm
     nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
     mida_age = 38  # median US adult age to represent MIDA
     possible_ages = nihpd_ages + [mida_age]
     kVp_list = [120]
     mA_list = list(range(300, 400, 50))
-    lesion_types = [None, 'sphere', 'epidural', 'subdural']
+    lesion_types = [None, 'round', 'epidural', 'subdural']
+    min_vol, max_vol = 34, 34000  # applied only to spheres [units of voxels, TODO convert to mL or mm^3]
     mass_effect = [True, False]
     l_parameter_comb = []
 
@@ -96,35 +98,6 @@ if __name__ == "__main__":
             lesion_id,
             random.choice(mass_effect),
         ])
-    # for age_id in possible_ages:
-    #     for kVp_id in kVp_list:
-    #         for mA_id in mA_list:
-    #             for intensity_id in intensity_list:
-    #                 for vol_id in volume_list:
-    #                     for lesion_id in lesion_types:
-    #                         for mass_effect_id in mass_effect:
-    #                             for simulation_id in simulations_list:
-
-    #                                 if lesion_id == None:
-    #                                     vol_id = 0
-    #                                     intensity_id = 0
-    #                                 elif lesion_id == 'epidural':
-    #                                     vol_id = random.choices(df_volume['EDH_volume'], weights=df_volume['EDH_weight'])[0]
-    #                                     intensity_id = random.choices(df_HU['EDH_HU'], weights=df_HU['EDH_weight'])[0]
-    #                                 elif lesion_id == 'subdural':
-    #                                     vol_id = random.choices(df_volume['SDH_volume'], weights=df_volume['SDH_weight'])[0]
-    #                                     intensity_id = random.choices(df_HU['SDH_HU'], weights=df_HU['SDH_weight'])[0]
-
-    #                                 l_parameter_comb.append([age_id,
-    #                                                         kVp_id,
-    #                                                         mA_id,
-    #                                                         intensity_id,
-    #                                                         vol_id,
-    #                                                         lesion_id,
-    #                                                         mass_effect_id,
-    #                                                         simulation_id])
-    # shuffle(l_parameter_comb)
-    # l_parameter_comb = l_parameter_comb[:desired_cases]
 
     n_params = len(l_parameter_comb)
 
@@ -146,7 +119,8 @@ if __name__ == "__main__":
                           volume=volume,
                           lesion_type=lesion_type,
                           mass_effect=mass_effect,
-                          views=views, zspan=zspan)
+                          views=views, zspan=zspan,
+                          kernel=recon_kernel, slice_thickness=slice_thickness)
         study.metadata.to_csv(output_directory / patient_name /
                               f'metadata_{patientid}.csv',
                               index=False)

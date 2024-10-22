@@ -81,7 +81,7 @@ def test_transforms_on_phantoms(seed=885):
     affine = Affine(rotate_params=np.pi/4, padding_mode="border")
 
     transforms = [randaffine, affine]
-    lesions = ['sphere', 'epidural', 'subdural']
+    lesions = ['round', 'epidural', 'subdural']
 
     for age, phantom in zip(ages, phantoms):
         print(f'phantom of age: {age}, seed: {seed}')

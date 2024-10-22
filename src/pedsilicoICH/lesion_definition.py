@@ -8,23 +8,30 @@ import skimage as ski
 import scipy
 
 
-def spherical_lesion(phantom: np.ndarray,
-                     center: tuple | None = None, radius: tuple | None = None):
+def elliptical_lesion(shape: tuple | list,
+                      center: tuple | None = None, radius: tuple | None = None):
     '''
-    Returns binary sphere mask based on input phantom array and
+    Returns binary elliptical mask based on input matrix shape and
     center coordinates and radii parameters
 
     sphere defined as r^2 = z^2 + x^2 + y^2
 
-    :param phantom: 3D array to add sphere to
+    :param shape: sequence of ints, shape of the new array
     '''
-    center = center or [dim//2 for dim in phantom.shape]
-    radius = radius or [dim//10 for dim in phantom.shape]
-    z, x, y = np.meshgrid(range(phantom.shape[0]),
-                          range(phantom.shape[1]),
-                          range(phantom.shape[2]))
-    distance_matrix = (z - center[0])**2 + (x-center[1])**2 + (y-center[2])**2
-    return np.where(distance_matrix > radius**2, False, True)
+    if isinstance(radius, np.ndarray):
+        radius = list(radius)
+    center = center or [dim//2 for dim in shape]
+    radius = radius or [dim//10 for dim in shape]
+    if not isinstance(radius, list | tuple):
+        radius = 3*[radius]
+    ell = ski.draw.ellipsoid(*radius)
+    starts = center - np.array(ell.shape)//2
+    ends = center + np.array(ell.shape)//2 + 1
+    lesion_only = np.zeros(shape)
+    lesion_only[starts[0]:ends[0], 
+                starts[1]:ends[1],
+                starts[2]:ends[2]] = ell    
+    return np.where(lesion_only > 0, True, False)
 
 
 def insert_dural_3D(phantom, desired_volume, init_slice, hematoma_type, mass_effect,
@@ -96,7 +103,7 @@ def insert_dural_3D(phantom, desired_volume, init_slice, hematoma_type, mass_eff
 
             # now that the two starting points for the hemorrhage have been defined, need to connect them
             # process should be the same on any given slice, and this function can be updated with new connection options
-            filled_array, boundary_coords, connect_coords = connect_points(start=orig_start, 
+            filled_array, boundary_coords, connect_coords = connect_points(start=orig_start,
                                                                            end=orig_end,
                                                                            boundary=temp_boundary,
                                                                            hematoma_type=hematoma_type)
