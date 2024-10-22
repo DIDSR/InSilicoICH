@@ -4,6 +4,17 @@ from pedsilicoICH.image_acquisition import read_dicom
 
 from ipywidgets import interact, IntSlider
 
+def show_lesions(phantom):
+    n_lesions = len(phantom._lesion_coords)
+    f, axs = plt.subplots(2, n_lesions, dpi=150, tight_layout=True)
+    if n_lesions < 2:
+        axs = axs[:, None]
+    for idx, (lesion, coords) in enumerate(zip(phantom._lesion, phantom._lesion_coords)):
+        ctshow(phantom.get_CT_number_phantom()[coords[0]], ax=axs[0, idx], fig=f)
+        axs[0, idx].set_title(f'slice {coords[0]}')
+        ctshow(phantom.get_CT_number_phantom()[coords[0]], ax=axs[1, idx], fig=f)
+        axs[1, idx].imshow(lesion[coords[0]], cmap='Reds', alpha=0.1)
+        axs[1, idx].set_title(f'{phantom.lesion_type[idx]}')
 
 def hematoma_phase(contrast):
     if contrast > 60:

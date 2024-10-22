@@ -16,14 +16,16 @@ from . import dicom_to_voxelized_phantom
 from ..artifact_generation import transform_image_label_pair
 
 from ..lesion_definition import elliptical_lesion, insert_dural_3D
-from scipy.ndimage import center_of_mass, distance_transform_edt, binary_dilation
+from scipy.ndimage import (center_of_mass,
+                           distance_transform_edt,
+                           binary_dilation)
 
 
 def sphere_radius_from_volume(volume):
     return np.power(3/4/np.pi*volume, 1/3)
 
 
-def calculate_eccentricity(a,b):
+def calculate_eccentricity(a, b):
     if a > b:
         return np.sqrt(1 - b**2/a**2)
     else:
@@ -41,9 +43,13 @@ def get_semimajor_axes(eccentricity, seed=None):
     for a in sample_range:
         for b in sample_range:
             for c in sample_range:
-                sample_eccentricity = calculate_eccentricity(a,b), calculate_eccentricity(a,c), calculate_eccentricity(b,c)
-                sample_eccentricity = np.round(np.stack(sample_eccentricity).mean(), decimals=2)
-                eccentricity_dict[float(sample_eccentricity)] = list(map(float,(a, b, c)))
+                sample_eccentricity = calculate_eccentricity(a, b), \
+                                      calculate_eccentricity(a, c), \
+                                      calculate_eccentricity(b, c)
+                sample_eccentricity = np.round(
+                    np.stack(sample_eccentricity).mean(), decimals=2)
+                eccentricity_dict[float(sample_eccentricity)] =\
+                    list(map(float, (a, b, c)))
     eccentricity_dict
 
     rng = np.random.default_rng(seed)
@@ -246,8 +252,8 @@ class HeadPhantom(Phantom):
         if lesion_type == 'round':
             img_w_lesion, lesion_image, lesion_coords =\
                 self.add_round_lesion(volume=volume, contrast=contrast,
-                                       mass_effect=mass_effect, seed=seed,
-                                       **kwargs)
+                                      mass_effect=mass_effect, seed=seed,
+                                      **kwargs)
         elif lesion_type == 'epidural':
             if isinstance(contrast, list):
                 contrast = max(contrast)
@@ -281,13 +287,13 @@ class HeadPhantom(Phantom):
                                                                     seed=seed)
 
     def add_round_lesion(self,
-                          volume: list[int] = [200],
-                          contrast: list[int] = [-100],
-                          material: str = 'white matter',
-                          eccentricity: float = 0.5,
-                          mass_effect: bool = False,  # add mass effect for spherical lesions? These are typically associated with metastases
-                          edema: bool | int = False,
-                          seed: int | None = None) -> tuple:
+                         volume: list[int] = [200],
+                         contrast: list[int] = [-100],
+                         material: str = 'white matter',
+                         eccentricity: float = 0.5,
+                         mass_effect: bool = False,  # add mass effect for spherical lesions? These are typically associated with metastases
+                         edema: bool | int = False,
+                         seed: int | None = None) -> tuple:
         '''
         adds lesion to img in random location within mask of size radius
         and contrast level contrast
