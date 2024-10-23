@@ -157,6 +157,7 @@ class Scanner():
         img = phantom.get_CT_number_phantom()
         if isinstance(img, monai.data.meta_tensor.MetaTensor):
             img = img.numpy()
+
         self.phantom = phantom
         self.studyname = studyname or self.patientname
         self.studyid = studyid
@@ -189,8 +190,8 @@ class Scanner():
             2*self.xcist.scanner.detectorRowSize
         self.scan_width = self.xcist.cfg.protocol.rotationTime *\
             self.xcist.cfg.protocol.tableSpeed + safe_width_at_isocenter
-        img = self.phantom.get_CT_number_phantom()
-        self.total_scan_length = self.phantom.spacings[0]*img.shape[0]
+        #img = self.phantom.get_CT_number_phantom()
+        self.total_scan_length = self.phantom.spacings[0]*self.phantom.shape[0]
         return np.arange(-self.total_scan_length/2,
                          self.total_scan_length/2,
                          self.scan_width)
@@ -218,7 +219,7 @@ class Scanner():
                 self.phantom.spacings[0]
         return (suggested_start_mm, suggested_end_mm)
 
-    def get_lesion_mask(self, startZ=None, endZ=None):
+    def get_lesion_mask(self, startZ=None, endZ=None, slice_thickness=1):
         '''takes lesion in object space and returns a mask in CT image space
         for the given imaging system'''
         if not self.phantom._lesion:
@@ -231,14 +232,14 @@ class Scanner():
         lesion_only = Scanner(lesion_phantom,
                               materials={
                                 'ICRU_lung_adult_healthy': -1000,
-                                'water': 0},
+                                'water': -100},
                               output_dir=lesion_dir)
         lesion_only.xcist.cfg.physics.energyCount = 2
-        lesion_only.xcist.cfg.physics.monochromatic = 0
+        lesion_only.xcist.cfg.physics.monochromatic = -1
         lesion_only.xcist.cfg.physics.enableElectronicNoise = 0
         lesion_only.xcist.cfg.physics.enableQuantumNoise = 0
         lesion_only.run_scan(mA=500, views=100, startZ=startZ, endZ=endZ)
-        lesion_only.run_recon()
+        lesion_only.run_recon(sliceThickness=slice_thickness)
         rmtree(lesion_dir)
         return (lesion_only.recon > -950) & (self.recon > -300)
 
@@ -407,11 +408,19 @@ class Scanner():
         defined_kernels = ['standard', 'soft', 'bone', 'R-L', 'S-L']
         if kernel not in defined_kernels:
             raise ValueError(f'{kernel} not in {defined_kernels}')
-        self.xcist.recon.kernelType = kernel
+        else:
+            self.xcist.cfg.recon.kernelType = kernel
         if sliceThickness:
             self.xcist.recon.sliceThickness = sliceThickness
         if mu_water:
             self.xcist.cfg.recon.mu = mu_water
+        else:
+            print(self.xcist.recon.mu)
+            print(self.xcist.physics.monochromatic)
+            if self.xcist.physics.monochromatic != -1:
+                self.xcist.recon.mu = xc.GetMu('water', self.xcist.physics.monochromatic)[0]/10
+            else:
+                print(self.xcist.recon.mu)
         if not sliceCount:
             detector_width = self.xcist.scanner.detectorRowCount *\
                 self.xcist.scanner.detectorRowSize

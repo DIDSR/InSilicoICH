@@ -48,9 +48,8 @@ def transforms_performed_correctly(phantom, transform, lesion_type, tol=0.2,
                                    seed=None):
     print(phantom, transform, lesion_type)
     phantom = deepcopy(phantom)
-    radius = 3
-    volume = 4/3*np.pi*radius**3
-    phantom.insert_lesion(lesion_type, volume=volume, contrast=200,
+    volume = 5
+    phantom.insert_lesion(lesion_type, volume=volume, intensity=200,
                           mass_effect=False, seed=seed)
     lesion = phantom.get_lesion_mask()
     phantom.apply_transform(transform, seed=seed)
@@ -81,7 +80,7 @@ def test_transforms_on_phantoms(seed=885):
     affine = Affine(rotate_params=np.pi/4, padding_mode="border")
 
     transforms = [randaffine, affine]
-    lesions = ['sphere', 'epidural', 'subdural']
+    lesions = ['round', 'epidural', 'subdural']
 
     for age, phantom in zip(ages, phantoms):
         print(f'phantom of age: {age}, seed: {seed}')
