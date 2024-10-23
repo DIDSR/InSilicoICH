@@ -241,7 +241,7 @@ class HeadPhantom(Phantom):
     def spacings(self):
         return self.dz, self.dx, self.dy
 
-    def insert_lesion(self, lesion_type, volume=2, intensity=100,
+    def insert_lesion(self, lesion_type, volume=10, intensity=50,
                       init_slice=None, mass_effect=False, seed=None, **kwargs):
         '''
         inserts lesion of `lesion_type` into phantom array
@@ -249,11 +249,11 @@ class HeadPhantom(Phantom):
         :param lesion_type: str, options include ['round', 'epidural', 'subdural'],
             see associated methods `add_round_lesion`, `_add_dural_lesion`
         :param volume: in mL, volume of the lesion
-        :param contrast: lesion CT number in HU
+        :param intensity: lesion CT number in HU
         :param init_slice: optional, slice to add dural_lesions to
         :param meass_effect: optional, bool whether to apply mass effect processing to
             displace brain tissue following lesion insertion
-        :param edema: optional, bool or int. whether to add a ring of low contrast, 10 HU,
+        :param edema: optional, bool or int. whether to add a ring of low intensity, 10 HU,
             edema around the lesion, currently only implemented for sphere
         :param seed: optional, int specify seed for reproducible lesion insertion,
             otherwise random
@@ -303,8 +303,8 @@ class HeadPhantom(Phantom):
                                        seed=seed)
 
     def add_round_lesion(self,
-                         volume: list[int] = 2,
-                         intensity: list[int] = -100,
+                         volume: list[int] = 10,
+                         intensity: list[int] = 50,
                          material: str = 'white matter',
                          eccentricity: float = 0.5,
                          mass_effect: bool = False,
