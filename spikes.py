@@ -2,29 +2,40 @@
 # https://github.com/DIDSR/MISS-tool/blob/main/hat_rho.m
 # https://github.com/DIDSR/MISS-tool/blob/main/mod_spike.m
 
-from pedsilicoICH.ground_truth_definition.phantoms import load_phantom
-from pedsilicoICH.lesion_definition import warp_slice, connect_points
+from pedsilicoICH.ground_truth_definition.phantoms import (load_phantom,
+                                                           get_transformation_src_dst,
+                                                           insert_with_mass_effect)
+from pedsilicoICH.lesion_definition import warp_slice
 from notebooks.utils import ctshow
 import matplotlib.pyplot as plt
 import numpy as np
-from skimage.morphology import white_tophat
-# %%
-# phantom = load_phantom(6.5)
-# phantom.insert_lesion('epidural', volume=10, mass_effect=True)
-# # %%
-# ctshow(phantom.get_CT_number_phantom()[phantom._lesion_coords[0][0]], 'brain')
+
 # %%
 phantom = load_phantom(6.5)
-phantom.insert_lesion('round', volume=10, eccentricity=0, seed=42)
-ctshow(phantom.get_CT_number_phantom()[phantom._lesion_coords[0][0]])
-# %%
-HU_array = phantom.get_CT_number_phantom()[phantom._lesion_coords[0][0]]
-skull_map = phantom.get_skull_map()[phantom._lesion_coords[0][0]]
-lesion = phantom.get_lesion_mask()[phantom._lesion_coords[0][0]]
-# %%
-f, axs = plt.subplots(1,3)
-ctshow(HU_array, fig=f, ax=axs[0])
-axs[1].imshow(skull_map)
-axs[2].imshow(lesion)
-# %%
-# warped = warp_slice(HU_array, skull_map, src, dst)
+img_w_lesion, lesion_vol, (z, x, y) =\
+    phantom.add_round_lesion(volume=10, intensity=100,
+                             eccentricity=0.9, seed=42)
+strength = 0.9
+
+src, dst = get_transformation_src_dst(lesion_vol[z], strength)
+if strength > 0:
+    dst_coords = np.argwhere(dst)
+    src_coords = np.argwhere(src)
+    warped = warp_slice(phantom.get_CT_number_phantom()[z],
+                        phantom.get_skull_map()[z],
+                        src_coords, dst_coords)
+else:
+    warped = img_w_lesion[z].copy()
+
+warped[lesion_vol[z]] = img_w_lesion[z][lesion_vol[z]]
+f, axs = plt.subplots(1, 2, dpi=150)
+ctshow(img_w_lesion[z], 'brain', fig=f, ax=axs[0])
+axs[0].imshow(src, alpha=0.2, cmap='Reds')
+axs[0].set_title('src')
+
+ctshow(warped, 'brain', fig=f, ax=axs[1])
+axs[1].imshow(src, alpha=0.2, cmap='Reds')
+axs[1].imshow(dst, alpha=0.2, cmap='Reds')
+axs[1].set_title(f'dst, strength: {strength}')
+plt.show()
+

@@ -6,10 +6,13 @@ import math
 import numpy as np
 import skimage as ski
 import scipy
+from monai.transforms import RandAffine
 
 
 def elliptical_lesion(shape: tuple | list,
-                      center: tuple | None = None, radius: tuple | None = None):
+                      center: tuple | None = None,
+                      radius: tuple | None = None,
+                      random_rotate: bool = True):
     '''
     Returns binary elliptical mask based on input matrix shape and
     center coordinates and radii parameters
@@ -17,6 +20,7 @@ def elliptical_lesion(shape: tuple | list,
     sphere defined as r^2 = z^2 + x^2 + y^2
 
     :param shape: sequence of ints, shape of the new array
+    :param center: sequence of ints, coord
     '''
     if isinstance(radius, np.ndarray):
         radius = list(radius)
@@ -25,12 +29,21 @@ def elliptical_lesion(shape: tuple | list,
     if not isinstance(radius, list | tuple):
         radius = 3*[radius]
     ell = ski.draw.ellipsoid(*radius)
+    if random_rotate:
+        transform = RandAffine(prob=1, rotate_range=[np.pi/2, np.pi/2, np.pi/2],
+                               scale_range=[0.1, 0.1, 0.1], padding_mode="zeros")
+
+        ell = np.pad(ell, ((int(max(radius)-radius[0]),),
+                           (int(max(radius)-radius[1]),),
+                           (int(max(radius)-radius[2]),)))
+        ell = transform(ell)
+
     starts = center - np.array(ell.shape)//2
     ends = center + np.array(ell.shape)//2 + 1
     lesion_only = np.zeros(shape)
-    lesion_only[starts[0]:ends[0], 
+    lesion_only[starts[0]:ends[0],
                 starts[1]:ends[1],
-                starts[2]:ends[2]] = ell    
+                starts[2]:ends[2]] = ell 
     return np.where(lesion_only > 0, True, False)
 
 

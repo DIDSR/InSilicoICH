@@ -15,7 +15,7 @@ from torchvision.datasets.utils import download_and_extract_archive
 from . import dicom_to_voxelized_phantom
 from ..artifact_generation import transform_image_label_pair
 
-from ..lesion_definition import elliptical_lesion, insert_dural_3D
+from ..lesion_definition import elliptical_lesion, insert_dural_3D, warp_slice
 from scipy.ndimage import (center_of_mass,
                            distance_transform_edt,
                            binary_dilation)
@@ -70,6 +70,51 @@ def get_semimajor_axes(eccentricity, seed=None):
     rng = np.random.default_rng(seed)
     rng.shuffle(foci)
     return np.array(foci)
+
+
+def get_perimeter(lesion):
+    return ski.morphology.binary_dilation(lesion, np.ones((3, 3))) ^\
+           ski.morphology.binary_erosion(lesion, np.ones((3, 3)))
+
+
+def get_transformation_src_dst(lesion: np.ndarray[bool],
+                               strength: int = 0):
+    '''
+    returns `src` and `dst` arrays to insert `lesion` into an img of the same
+    shape. e.g. of the head and applies a mass effect warping of the local
+    tissues.
+
+    This function takes a solid lesion and extracts the perimeter as the input
+     `dst` to `warp_slice` and applies the perimeter `strength` to determine
+    how many erosions make up the `src` input to `warp` slice, where higher
+    strength yields a greater degree of warping by creating a greater distance
+    between `src` and `dst`. See `warp_slice` for more details.
+    :param lesion: a 2D binary image of the lesion, must be same shape as img
+    '''
+    if (strength < 0) or (strength > 1):
+        raise ValueError(f'strength {strength} is not in allowed range [0, 1]')
+    footprint = int(strength*np.ceil(distance_transform_edt(lesion).max()))
+    dst = get_perimeter(lesion)
+    src = get_perimeter(ski.morphology.binary_erosion(lesion,
+                                                      np.ones(2*[footprint])))
+    return src, dst
+
+
+def insert_with_mass_effect(img, lesion, boundary, strength=1):
+    if img.ndim == 2:
+        img = img[None]
+    assert img.ndim == 3
+
+    warped = np.zeros_like(img)
+    for idx in range(lesion.shape[0]):
+        if not lesion[idx].any():
+            continue
+        src, dst = get_transformation_src_dst(lesion[idx], strength)
+        dst_coords = np.argwhere(dst)
+        src_coords = np.argwhere(src)
+        warped[idx] = warp_slice(img[idx], boundary[idx],
+                                 src_coords, dst_coords)
+    return warped
 
 
 def get_mean_age(age_range: str):
@@ -303,11 +348,11 @@ class HeadPhantom(Phantom):
                                        seed=seed)
 
     def add_round_lesion(self,
-                         volume: list[int] = 2,
-                         intensity: list[int] = -100,
+                         volume: int = 2,
+                         intensity: int = -100,
                          material: str = 'white matter',
                          eccentricity: float = 0.5,
-                         mass_effect: bool = False,
+                         mass_effect: bool | float = 0.5,
                          edema: bool | int = False,
                          seed: int | None = None) -> tuple:
         '''
@@ -320,9 +365,12 @@ class HeadPhantom(Phantom):
             if provided a list it will make concentric lesions of intensities
         :param material: which material region to insert lesion into,
             self.materials for options
-        :param eccentricity: between 0, 1 defines how elongated the lesions are, with 0 being spherical,
-            1 being very oblong
-        :param seed: optional, defaults to None, set seed for reproducible lesion insertion
+        :param eccentricity: between 0, 1 defines how elongated the lesions
+            are, with 0 being spherical, 1 being very oblong
+        :param edema: bool or int, refering to the number of pixels thick of
+            an edema layer to add around the lesion
+        :param seed: optional, defaults to None, set seed for reproducible
+            lesion insertion
 
         :returns: img_w_lesion, lesion_vol, (z, x, y)
         '''
@@ -330,7 +378,6 @@ class HeadPhantom(Phantom):
 
         r = sphere_radius_from_volume(volume)
         axes = get_semimajor_axes(eccentricity, seed)
-        print(f'ellipsoid foci: {axes}, mean: {calc_mean_eccentricity(*axes)}')
         foci = r * axes
 
         img = self.get_CT_number_phantom()
@@ -351,7 +398,19 @@ class HeadPhantom(Phantom):
             lesion_vol[edema_mask] = edema_HU
         img_w_lesion = img.copy()
         img_w_lesion[lesion_vol > -1000] = lesion_vol[lesion_vol > -1000]
-        return img_w_lesion, lesion_vol > -1000, (z, x, y)
+        lesion_vol = lesion_vol > -1000
+
+        if mass_effect:
+            if mass_effect is True:
+                mass_effect = 0.5
+            warped = insert_with_mass_effect(img,
+                                             lesion_vol,
+                                             self.get_skull_map(),
+                                             strength=mass_effect)
+            warped[lesion_vol] = img_w_lesion[lesion_vol]
+            img_w_lesion = warped
+
+        return img_w_lesion, lesion_vol, (z, x, y)
 
     def _add_dural_lesion(self, volume, lesion_type, intensity,
                           init_slice=None, seed=None, mass_effect=True):
