@@ -5,6 +5,7 @@ module for working with phantoms
 from pathlib import Path
 from io import StringIO
 
+import os
 import numpy as np
 import nibabel as nib
 import pandas as pd
@@ -381,7 +382,7 @@ class MIDA_Head(HeadPhantom):
     def __init__(self, phantom_dir, csf_HU=10, gm_HU=40, wm_HU=30,
                  skull_HU=1000, shape=None):
         super().__init__(phantom_dir)
-        self.age = 39  # median american age
+        self.age = 38  # median american age
         self.csf_HU = csf_HU
         self.gm_HU = gm_HU
         self.wm_HU = wm_HU
@@ -391,6 +392,9 @@ class MIDA_Head(HeadPhantom):
 
         img = nib.load(self.phantom_dir/'MIDA_v1.nii')
         self._phantom = np.array(img.get_fdata()).transpose(1, 0, 2)[::-1]
+
+        header = img.header
+        self.dx, self.dy, self.dz = header['pixdim'][1:4]
 
         original_shape = self._phantom.shape
         if shape:
@@ -403,109 +407,26 @@ class MIDA_Head(HeadPhantom):
         self.nz, self.nx, self.ny = shape
 
     def _load_material_LUT(self):
-
-        with open(self.phantom_dir / 'MIDA_v1.txt', 'rb') as data:
-            df = pd.read_csv(StringIO(data.read().decode(errors='replace')), sep='\t', names=['grayscale','c1', 'c2', 'c3', 'material'])
-            material_lut = df.iloc[:-8] # read in the material look up table from the top of the txt file
-            image_size_info = df.iloc[-8:, :2].set_index('grayscale').T
-            self.nx, self.ny, self.nz = int(image_size_info.nx.item()), int(image_size_info.ny.item()), int(image_size_info.nz.item())
-            self.dx, self.dy, self.dz = image_size_info.dx.item()*1000, image_size_info.dy.item()*1000, image_size_info.dz.item()*1000
-
-        # BRAIN TISSUE / FLUIDS
-        material_lut.loc[material_lut.material == 'Cerebellum Gray Matter', 'grayscale'] = 10
-        material_lut.loc[material_lut.material == 'Cerebellum  Gray Matter', 'xcist material'] = 'gray_matter'
-        material_lut.loc[material_lut.material == 'Cerebellum  Gray Matter', 'CT Number [HU]'] = self.gm_HU
-
-        material_lut.loc[material_lut.material == 'Brain Gray Matter', 'grayscale'] = 10
-        material_lut.loc[material_lut.material == 'Brain Gray Matter', 'xcist material'] = 'gray_matter'
-        material_lut.loc[material_lut.material == 'Brain Gray Matter', 'CT Number [HU]'] = self.gm_HU
-
-        material_lut.loc[material_lut.material == 'Thalamus', 'grayscale'] = 116
-        material_lut.loc[material_lut.material == 'Thalamus', 'xcist material'] = 'gray_matter'
-        material_lut.loc[material_lut.material == 'Thalamus', 'CT Number [HU]'] = self.gm_HU
-
-        material_lut.loc[material_lut.material == 'Cerebellum White Matter', 'grayscale'] = 12
-        material_lut.loc[material_lut.material == 'Cerebellum White Matter', 'xcist material'] = 'white_matter'
-        material_lut.loc[material_lut.material == 'Cerebellum White Matter', 'CT Number [HU]'] = self.wm_HU
-
-        material_lut.loc[material_lut.material == 'Brain White Matter', 'grayscale'] = 12
-        material_lut.loc[material_lut.material == 'Brain White Matter', 'xcist material'] = 'white_matter'
-        material_lut.loc[material_lut.material == 'Brain White Matter', 'CT Number [HU]'] = self.wm_HU
-
-        material_lut.loc[material_lut.material == 'CSF Ventricles', 'grayscale'] = 6
-        material_lut.loc[material_lut.material == 'CSF Ventricles', 'xcist material'] = 'CSF'
-        material_lut.loc[material_lut.material == 'CSF Ventricles', 'CT Number [HU]'] = self.csf_HU
-
-        material_lut.loc[material_lut.material == 'CSF General', 'grayscale'] = 32
-        material_lut.loc[material_lut.material == 'CSF General', 'xcist material'] = 'CSF'
-        material_lut.loc[material_lut.material == 'CSF General', 'CT Number [HU]'] = self.csf_HU
-
-        # BONE
-        material_lut.loc[material_lut.material == 'Skull', 'grayscale'] = 40
-        material_lut.loc[material_lut.material == 'Skull', 'xcist material'] = 'ncat_skull'
-        material_lut.loc[material_lut.material == 'Skull', 'CT Number [HU]'] = 900
-
-        material_lut.loc[material_lut.material == 'Skull Diplo', 'grayscale'] = 52
-        material_lut.loc[material_lut.material == 'Skull Diplo', 'xcist material'] = 'ncat_skull'
-        material_lut.loc[material_lut.material == 'Skull Diplo', 'CT Number [HU]'] = 800 # https://en.wikipedia.org/wiki/Diplo%C3%AB
-
-        material_lut.loc[material_lut.material == 'Skull Inner Table', 'grayscale'] = 53
-        material_lut.loc[material_lut.material == 'Skull Inner Table', 'xcist material'] = 'ncat_skull'
-        material_lut.loc[material_lut.material == 'Skull Inner Table', 'CT Number [HU]'] = 1000
-
-        material_lut.loc[material_lut.material == 'Skull Outer Table', 'grayscale'] = 54
-        material_lut.loc[material_lut.material == 'Skull Outer Table', 'xcist material'] = 'ncat_skull'
-        material_lut.loc[material_lut.material == 'Skull Outer Table', 'CT Number [HU]'] = 1000
-
-        # OTHER TISSUES
-        material_lut.loc[material_lut.material == 'Adipose Tissue', 'grayscale'] = 43
-        material_lut.loc[material_lut.material == 'Adipose Tissue', 'CT Number [HU]'] = -120
-
-        material_lut.loc[material_lut.material == 'Epidermis/Dermis', 'grayscale'] = 51
-        material_lut.loc[material_lut.material == 'Epidermis/Dermis', 'CT Number [HU]'] = 50
-
-        material_lut.loc[material_lut.material == 'Subcutaneous Adipose Tissue', 'grayscale'] = 62
-        material_lut.loc[material_lut.material == 'Subcutaneous Adipose Tissue', 'CT Number [HU]'] = -120
-
-        material_lut.loc[material_lut.material == 'Muscle (General)', 'grayscale'] = 63
-        material_lut.loc[material_lut.material == 'Muscle (General)', 'CT Number [HU]'] = 55
-
-        # AIR
-        material_lut.loc[material_lut.material == 'Air Internal - Ethmoidal Sinus', 'grayscale'] = 26
-        material_lut.loc[material_lut.material == 'Air Internal - Ethmoidal Sinus', 'CT Number [HU]'] = -1000
-
-        material_lut.loc[material_lut.material == 'Air Internal - Frontal Sinus', 'grayscale'] = 27
-        material_lut.loc[material_lut.material == 'Air Internal - Frontal Sinus', 'CT Number [HU]'] = -1000
-
-        material_lut.loc[material_lut.material == 'Air Internal - Maxillary Sinus', 'grayscale'] = 28
-        material_lut.loc[material_lut.material == 'Air Internal - Maxillary Sinus', 'CT Number [HU]'] = -1000
-
-        material_lut.loc[material_lut.material == 'Air Internal - Sphenoidal Sinus', 'grayscale'] = 29
-        material_lut.loc[material_lut.material == 'Air Internal - Sphenoidal Sinus', 'CT Number [HU]'] = -1000
-        
-        material_lut.loc[material_lut.material == 'Air Internal - Mastoid', 'grayscale'] = 30
-        material_lut.loc[material_lut.material == 'Air Internal - Mastoid', 'CT Number [HU]'] = -1000
-
-        material_lut.loc[material_lut.material == 'Air Internal - Nasal/Pharynx', 'grayscale'] = 31
-        material_lut.loc[material_lut.material == 'Air Internal - Nasal/Pharynx', 'CT Number [HU]'] = -1000
-        
-        material_lut.loc[material_lut.material == 'Air Internal - Oral Cavity', 'grayscale'] = 97
-        material_lut.loc[material_lut.material == 'Air Internal - Oral Cavity', 'CT Number [HU]'] = -1000
-
-
-        return material_lut[~material_lut['CT Number [HU]'].isna()]
+        return pd.read_csv(os.path.join(Path(__file__).parent.resolve(), 'MIDA_v1.csv'))
 
     def get_CT_number_phantom(self):
         if len(self._lesion_coords) > 0:
             return self._phantom
         phantom = self._phantom
         material_lut = self.material_lut
-        phantom[phantom == 50] = -1000  # air
-        phantom[phantom == 52] = 800 # the MIDA text file has an unknown character after "Skull Diplo" that makes the above method not work if not removed
+        # phantom[phantom == 50] = -1000  # air
+        # phantom[phantom == 52] = 800 # the MIDA text file has an unknown character after "Skull Diplo" that makes the above method not work if not removed
         
         HU_phantom = np.copy(phantom)
-        for _, row in material_lut[~material_lut['CT Number [HU]'].isna()].iterrows():
-            HU_phantom[phantom == row.grayscale] = row['CT Number [HU]']
+        # for _, row in material_lut[~material_lut['CT Number [HU]'].isna()].iterrows():
+        #     HU_phantom[phantom == row.grayscale] = row['CT Number [HU]']
+        for _, row in material_lut[~material_lut['HU'].isna()].iterrows():
+            if row['HU'] == 8888:
+                HU_phantom[phantom == row['MIDA_ID']] = self.wm_HU
+            elif row['HU'] == 9999:
+                HU_phantom[phantom == row['MIDA_ID']] = self.gm_HU
+            else:
+                HU_phantom[phantom == row['MIDA_ID']] = row['HU']
 
         return HU_phantom
 
