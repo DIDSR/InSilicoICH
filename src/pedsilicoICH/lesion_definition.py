@@ -12,7 +12,7 @@ from monai.transforms import RandAffine
 def elliptical_lesion(shape: tuple | list,
                       center: tuple | None = None,
                       radius: tuple | None = None,
-                      random_rotate: bool = True):
+                      random_rotate: bool | int = True):
     '''
     Returns binary elliptical mask based on input matrix shape and
     center coordinates and radii parameters
@@ -21,6 +21,9 @@ def elliptical_lesion(shape: tuple | list,
 
     :param shape: sequence of ints, shape of the new array
     :param center: sequence of ints, coord
+    :param radius: sequence of 3 ints specifying the 3 semimajor axes
+    :param random_rotate: bool or int, if an integer is given, sets random
+        seed of transform for repeatability.
     '''
     if isinstance(radius, np.ndarray):
         radius = list(radius)
@@ -32,6 +35,8 @@ def elliptical_lesion(shape: tuple | list,
     if random_rotate:
         transform = RandAffine(prob=1, rotate_range=[np.pi/2, np.pi/2, np.pi/2],
                                scale_range=[0.1, 0.1, 0.1], padding_mode="zeros")
+        if isinstance(random_rotate, int):
+            transform.set_random_state(seed=random_rotate)
 
         ell = np.pad(ell, ((int(max(radius)-radius[0]),),
                            (int(max(radius)-radius[1]),),

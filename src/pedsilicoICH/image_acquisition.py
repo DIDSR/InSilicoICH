@@ -219,7 +219,9 @@ class Scanner():
                 self.phantom.spacings[0]
         return (suggested_start_mm, suggested_end_mm)
 
-    def get_lesion_mask(self, startZ=None, endZ=None, slice_thickness=1):
+    def get_lesion_mask(self, startZ: int | None = None,
+                        endZ: int | None = None,
+                        slice_thickness=1) -> np.ndarray[bool]:
         '''takes lesion in object space and returns a mask in CT image space
         for the given imaging system'''
         if not self.phantom._lesion:

@@ -361,10 +361,14 @@ class HeadPhantom(Phantom):
                          eccentricity: float = 0.5,
                          mass_effect: bool | float = 0.5,
                          edema: bool | int = False,
+                         complexity: int = 3,
                          seed: int | None = None) -> tuple:
         '''
-        adds lesion to img in random location within mask of size radius
+        adds ronud lesion to img in random location within mask of size radius
         and intensity level intensity
+
+        See parameter descriptions below for further modifications that can
+        be added:
 
         :param volume: int or list of ints, volume of the sphere lesion in mL,
             if provided a list it will make concentric lesions
@@ -382,6 +386,9 @@ class HeadPhantom(Phantom):
             `insert_with_mass_effect` for more details
         :param edema: bool or int, refering to the number of pixels thick of
             an edema layer to add around the lesion
+        :param complexity: int, number of ellipses to aid with
+            random jiggle, 1 gives a single ellipsoid, increasing to 2 or 3
+            yields overlapping ellipsoids with a more complex shape.
         :param seed: optional, defaults to None, set seed for reproducible
             lesion insertion
 
@@ -390,9 +397,6 @@ class HeadPhantom(Phantom):
         rng = np.random.default_rng(seed)
 
         r = sphere_radius_from_volume(volume)
-        axes = get_semimajor_axes(eccentricity, seed)
-        foci = r * axes
-
         img = self.get_CT_number_phantom()
         mask = self.get_material_mask(material).astype(int)
 
@@ -403,29 +407,40 @@ class HeadPhantom(Phantom):
                                                suitable_points.sum())]
 
         lesion_vol = np.full(img.shape, fill_value=-1000)
-        sphere = elliptical_lesion(img.shape, center=(z, x, y), radius=foci)
-        lesion_vol[sphere] = intensity
+        for _ in range(complexity):
+            axes = get_semimajor_axes(eccentricity, seed)
+            foci = r * axes
+            random_rotate = seed or True
+            sphere = elliptical_lesion(img.shape, center=(z, x, y),
+                                       radius=foci,
+                                       random_rotate=random_rotate)
+            transform = RandAffine(prob=1, translate_range=[r, r])
+            transform.set_random_state(seed)
+            sphere = transform(sphere).astype(bool)
+            lesion_vol[sphere] = intensity
+        lesion_mask = lesion_vol > -1000
+
         if edema:
             edema_pixels = 5
             edema_HU = 10
             edema = edema_pixels if edema is True else edema
-            edema_mask = binary_dilation(sphere, np.ones(3*[edema])) ^ sphere
+            edema_mask = binary_dilation(lesion_mask, np.ones(3*[edema])) ^ lesion_mask
             lesion_vol[edema_mask] = edema_HU
+            lesion_mask = lesion_vol > -1000
         img_w_lesion = img.copy()
-        img_w_lesion[lesion_vol > -1000] = lesion_vol[lesion_vol > -1000]
-        lesion_vol = lesion_vol > -1000
+        img_w_lesion[lesion_mask] = lesion_vol[lesion_mask]
 
         if mass_effect:
             if mass_effect is True:
                 mass_effect = 0.5
             warped = insert_with_mass_effect(img,
-                                             lesion_vol,
+                                             lesion_mask,
                                              self.get_skull_map(),
                                              strength=mass_effect)
-            warped[lesion_vol] = img_w_lesion[lesion_vol]
+            warped[lesion_mask] = img_w_lesion[lesion_mask]
             img_w_lesion = warped
 
-        return img_w_lesion, lesion_vol, (z, x, y)
+        return img_w_lesion, lesion_mask, (z, x, y)
 
     def _add_dural_lesion(self, volume, lesion_type, intensity,
                           init_slice=None, seed=None, mass_effect=True):
