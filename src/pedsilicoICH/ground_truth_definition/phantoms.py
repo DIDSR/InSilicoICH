@@ -42,7 +42,7 @@ def get_closest_key(key, dictionary):
 
 def calc_mean_eccentricity(a, b, c):
     return np.mean([calculate_eccentricity(a, b),
-                    calculate_eccentricity(a, c),\
+                    calculate_eccentricity(a, c),
                     calculate_eccentricity(b, c)])
 
 
@@ -127,15 +127,20 @@ def resize(phantom, shape):
     return resized
 
 
-def voxelize_ground_truth(dicom_path, phantom_path, material_threshold_dict=None):
+def voxelize_ground_truth(dicom_path: str | Path, phantom_path: str | Path,
+                          material_threshold_dict: dict | None = None):
     '''
-    Used to convert ground truth image into segmented volumes used by XCIST to run simulations
+    Used to convert ground truth image into segmented volumes used by XCIST to
+    run simulations
 
-    Inputs:
-    dicom_path    (string)           Path where the DICOM images are located.
-    phantom_path  (string)           Path where the phantom files are to be written
-    dicom_path [str]: directory containing ground truth dicom images, these are typically the output of `convert_to_dicom`
-    material_threshold_dict [dict]: dictionary mapping XCIST materials to appropriate lower thresholds in the ground truth image, see the .cfg here for examples <https://github.com/xcist/phantoms-voxelized/tree/main/DICOM_to_voxelized>
+    :param dicom_path: str | Path, path where the DICOM images are located,
+        these are typically the output of `convert_to_dicom`
+    :param phantom_path: str or Path, where the phantom files are to be
+        written
+    :param material_threshold_dict: dictionary mapping XCIST materials to
+        appropriate lower thresholds in the ground truth image, see the .cfg
+        here for examples
+        <https://github.com/xcist/phantoms-voxelized/tree/main/DICOM_to_voxelized>
     '''
     nfiles = len(list(Path(dicom_path).rglob('*.dcm')))
     slice_range = list(range(nfiles))
@@ -257,7 +262,7 @@ class HeadPhantom(Phantom):
         self._lesion = []
         self._lesion_coords = []
         self.lesion_type = []
-        self.lesion_intensity = [] # HU
+        self.lesion_intensity = []  # HU
         self.mass_effect = False
 
     def get_material_mask(self, material):
@@ -291,17 +296,19 @@ class HeadPhantom(Phantom):
         '''
         inserts lesion of `lesion_type` into phantom array
 
-        :param lesion_type: str, options include ['round', 'epidural', 'subdural'],
+        :param lesion_type: str, options include
+            ['round', 'epidural', 'subdural'],
             see associated methods `add_round_lesion`, `_add_dural_lesion`
         :param volume: in mL, volume of the lesion
         :param contrast: lesion CT number in HU
         :param init_slice: optional, slice to add dural_lesions to
-        :param meass_effect: optional, bool whether to apply mass effect processing to
-            displace brain tissue following lesion insertion
-        :param edema: optional, bool or int. whether to add a ring of low contrast, 10 HU,
-            edema around the lesion, currently only implemented for sphere
-        :param seed: optional, int specify seed for reproducible lesion insertion,
-            otherwise random
+        :param meass_effect: optional, bool whether to apply mass effect
+            processing to displace brain tissue following lesion insertion
+        :param edema: optional, bool or int. whether to add a ring of low
+            contrast, 10 HU, edema around the lesion, currently only
+            implemented for sphere
+        :param seed: optional, int specify seed for reproducible lesion
+            insertion, otherwise random
 
         return img_w_lesion, lesion_image, lesion_coords
         '''
@@ -391,7 +398,8 @@ class HeadPhantom(Phantom):
 
         lesion_vol = np.zeros_like(img)
         suitable_points = distance_transform_edt(mask) > r  # lower distance threshold to allow overlap
-        z, x, y = np.argwhere(suitable_points)[rng.integers(0, suitable_points.sum())]
+        z, x, y = np.argwhere(suitable_points)[rng.integers(0,
+                                               suitable_points.sum())]
 
         lesion_vol = np.full(img.shape, fill_value=-1000)
         sphere = elliptical_lesion(img.shape, center=(z, x, y), radius=foci)
@@ -461,7 +469,8 @@ class MIDA_Head(HeadPhantom):
         if shape:
             self._phantom = resize(self._phantom, shape)
             new_shape = self._phantom.shape
-            new_spacings = np.array(original_shape) / np.array(new_shape) * [self.dz, self.dx, self.dy]
+            new_spacings = np.array(original_shape) / np.array(new_shape) *\
+                [self.dz, self.dx, self.dy]
             self.dz, self.dx, self.dy = new_spacings
         else:
             shape = original_shape
