@@ -27,7 +27,7 @@ sphere_lesion_tol = 32
 
 def test_sphere_lesion_study():
     phantom = load_phantom(age)
-    phantom.insert_lesion('sphere', volume=1000, contrast=300, seed=336)
+    phantom.insert_lesion('round', volume=5, intensity=300, seed=336)
     lesion_level_mm = (phantom.get_CT_number_phantom().shape[0]/2 -
                        phantom._lesion_coords[0][0])*phantom.dz
     center = lesion_level_mm
@@ -43,7 +43,7 @@ def test_sphere_lesion_study():
 
 def test_sphere_augmented_position_study():
     phantom = load_phantom(age)
-    phantom.insert_lesion('sphere', volume=1000, contrast=300, seed=336)
+    phantom.insert_lesion('round', volume=5, intensity=300, seed=336)
     phantom.apply_transform(transform, seed=42)
     lesion_level_mm = (phantom.get_CT_number_phantom().shape[0]/2 -
                        phantom._lesion_coords[0][0])*phantom.dz
@@ -60,7 +60,7 @@ def test_sphere_augmented_position_study():
 
 def test_epidural_lesion_study():
     phantom = load_phantom(age)
-    phantom.insert_lesion('epidural', volume=1000, contrast=300, seed=336)
+    phantom.insert_lesion('epidural', volume=5, intensity=300, seed=336)
     lesion_level_mm = (phantom.get_CT_number_phantom().shape[0]/2 -
                        phantom._lesion_coords[0][0])*phantom.dz
     center = lesion_level_mm
@@ -76,7 +76,7 @@ def test_epidural_lesion_study():
 
 def test_epidural_augmented_position_study():
     phantom = load_phantom(age)
-    phantom.insert_lesion('epidural', volume=1000, contrast=300, seed=336)
+    phantom.insert_lesion('epidural', volume=5, intensity=300, seed=336)
     phantom.apply_transform(transform, seed=42)
     lesion_level_mm = (phantom.get_CT_number_phantom().shape[0]/2 -
                        phantom._lesion_coords[0][0])*phantom.dz
@@ -93,7 +93,7 @@ def test_epidural_augmented_position_study():
 
 def test_subdural_lesion_study():
     phantom = load_phantom(age)
-    phantom.insert_lesion('subdural', volume=1000, contrast=300, seed=336)
+    phantom.insert_lesion('subdural', volume=5, intensity=300, seed=336)
     lesion_level_mm = (phantom.get_CT_number_phantom().shape[0]/2 -
                        phantom._lesion_coords[0][0])*phantom.dz
     center = lesion_level_mm
@@ -105,15 +105,12 @@ def test_subdural_lesion_study():
                     views=100)
     measured_lesion_signal = study.images[study.lesion.astype(bool)].mean()
     assert measured_lesion_signal > 21
-    # the below assertions test that metadata is saving slice level lesion info
-    # there is a lesion on slices 0-3, but not on the remaining
-    assert study.metadata['lesion volume [mL]'].iloc[:4].sum() > 0.49
-    assert study.metadata['lesion volume [mL]'].iloc[-3:].sum() == 0
+    assert study.metadata['lesion volume [mL]'].sum() > 1.7
 
 
 def test_subdural_augmented_position_study():
     phantom = load_phantom(age)
-    phantom.insert_lesion('subdural', volume=1000, contrast=300, seed=336)
+    phantom.insert_lesion('subdural', volume=5, intensity=300, seed=336)
     phantom.apply_transform(transform, seed=42)
     lesion_level_mm = (phantom.get_CT_number_phantom().shape[0]/2 -
                        phantom._lesion_coords[0][0])*phantom.dz

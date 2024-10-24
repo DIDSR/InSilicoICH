@@ -53,11 +53,12 @@ class Study:
         return np.array(self.phantom.spacings)*self.phantom._phantom.shape
 
     def run_study(self, output_directory=None, kVp=120, mA=200, views=1000,
-                  fov=250, zspan='dynamic', kernel='standard'):
+                  fov=250, zspan='dynamic',
+                  kernel='standard', slice_thickness=1):
         patient_name = self.phantom.patient_name
         age = self.phantom.age
         lesion_type = self.phantom.lesion_type
-        contrast = self.phantom.lesion_contrast
+        intensity = self.phantom.lesion_intensity
 
         ct = self.scanner
         if zspan == 'dynamic':
@@ -67,7 +68,7 @@ class Study:
 
         ct.run_scan(startZ=startZ, endZ=endZ, views=views,
                     mA=mA, kVp=kVp)
-        ct.run_recon(fov=fov, kernel=kernel)
+        ct.run_recon(fov=fov, kernel=kernel, sliceThickness=slice_thickness)
         self.scanner = ct
         self.images = ct.recon
         if output_directory is None:
@@ -83,7 +84,7 @@ class Study:
         vol_ml = 0
         if lesion_type:
             lesion_only = ct
-            mask = ct.get_lesion_mask(startZ=startZ, endZ=endZ)
+            mask = ct.get_lesion_mask(startZ=startZ, endZ=endZ, slice_thickness=slice_thickness)
 
             lesion_only.recon = mask
             dicom_path = output_directory / 'lesion_masks'
@@ -111,7 +112,7 @@ class Study:
         kernels = []
         views_list = []
         masks = []
-        contrast_list = []
+        intensity_list = []
         lesion_type_list = []
         mass_effect = []
         center_x_list = []
@@ -132,20 +133,20 @@ class Study:
 
             if vol_ml > 0:
                 slice_mass_effect = self.phantom.mass_effect
-                slice_contrast = contrast
+                slice_intensity = intensity
                 slice_x = int(x)
                 slice_y = int(y)
                 slice_z = int(z)
                 slice_type = lesion_type
             else:
                 slice_mass_effect = None
-                slice_contrast = None
+                slice_intensity = None
                 slice_x = None
                 slice_y = None
                 slice_z = None
                 slice_type = None
 
-            contrast_list.append(slice_contrast)
+            intensity_list.append(slice_intensity)
             lesion_type_list.append(slice_type)
             mass_effect.append(slice_mass_effect)
             center_x_list.append(slice_x)
@@ -155,7 +156,7 @@ class Study:
 
         metadata = pd.DataFrame({'name': names,
                                  'age': ages,
-                                 'contrast': contrast_list,
+                                 'intensity': intensity_list,
                                  'center x': center_x_list,
                                  'center y': center_y_list,
                                  'center z': center_z_list,
@@ -174,10 +175,10 @@ class Study:
 
 
 def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
-              mA=200, contrast=200, volume=500, lesion_type=None,
+              mA=200, intensity=200, volume=500, lesion_type=None,
               mass_effect=True, add_positioning_augmentation=True,
               views=1000, zspan='dynamic', kernel='standard',
-              keep_raw=False) -> Study:
+              slice_thickness=1, keep_raw=False) -> Study:
 
     mida_shape = (480, 480, 350)  # default shape of MIDA
     phantom = load_phantom(age=age, shape=mida_shape, name=patient_name)
@@ -185,7 +186,7 @@ def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
     if lesion_type:
         phantom.insert_lesion(lesion_type,
                               volume=volume,
-                              contrast=contrast,
+                              intensity=intensity,
                               mass_effect=mass_effect)
 
     if add_positioning_augmentation:
@@ -199,7 +200,7 @@ def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
     scanner = Scanner(phantom, output_dir=output_directory)
     study = Study(scanner, 'pilot')
     study.run_study(kVp=kVp, mA=mA, views=views, zspan=zspan,
-                    kernel=kernel)
+                    kernel=kernel, slice_thickness=slice_thickness)
     if keep_raw is False:
         rmtree(study.scanner.output_dir / 'phantoms')
         rmtree(study.scanner.output_dir / 'simulations')
