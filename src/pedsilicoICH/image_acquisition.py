@@ -190,7 +190,7 @@ class Scanner():
             2*self.xcist.scanner.detectorRowSize
         self.scan_width = self.xcist.cfg.protocol.rotationTime *\
             self.xcist.cfg.protocol.tableSpeed + safe_width_at_isocenter
-        #img = self.phantom.get_CT_number_phantom()
+        # img = self.phantom.get_CT_number_phantom()
         self.total_scan_length = self.phantom.spacings[0]*self.phantom.shape[0]
         return np.arange(-self.total_scan_length/2,
                          self.total_scan_length/2,

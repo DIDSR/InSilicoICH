@@ -424,7 +424,8 @@ class HeadPhantom(Phantom):
             edema_pixels = 5
             edema_HU = 10
             edema = edema_pixels if edema is True else edema
-            edema_mask = binary_dilation(lesion_mask, np.ones(3*[edema])) ^ lesion_mask
+            edema_mask = binary_dilation(lesion_mask,
+                                         np.ones(3*[edema])) ^ lesion_mask
             lesion_vol[edema_mask] = edema_HU
             lesion_mask = lesion_vol > -1000
         img_w_lesion = img.copy()
