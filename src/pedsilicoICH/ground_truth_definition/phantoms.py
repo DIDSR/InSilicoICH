@@ -361,12 +361,18 @@ class HeadPhantom(Phantom):
 
         :param volume: int or list of ints, volume of the sphere lesion in mL,
             if provided a list it will make concentric lesions
-        :param intensity: int or list of ints, intensity of the sphere lesion in HU,
-            if provided a list it will make concentric lesions of intensities
+        :param intensity: int or list of ints, intensity of the sphere lesion
+            in HU, if provided a list it will make concentric lesions of
+            intensities
         :param material: which material region to insert lesion into,
             self.materials for options
         :param eccentricity: between 0, 1 defines how elongated the lesions
             are, with 0 being spherical, 1 being very oblong
+        :param mass_effect: bool or float between [0, 1], if 0 or False no
+            mass effect is applied, a mass effect > 0 but < 1 controls mass
+            effect strength where 1 is a large degree of mass effect warping
+            and 0.2 is a smaller amount of warping, see
+            `insert_with_mass_effect` for more details
         :param edema: bool or int, refering to the number of pixels thick of
             an edema layer to add around the lesion
         :param seed: optional, defaults to None, set seed for reproducible
