@@ -70,24 +70,25 @@ if __name__ == "__main__":
     mA_list = list(range(300, 400, 50))
     lesion_types = [None, 'round', 'epidural', 'subdural']
     min_vol, max_vol = 34, 34000  # applied only to spheres [units of voxels, TODO convert to mL or mm^3]
-    mass_effect = [True, False]
+    mass_effect = np.linspace(0, 1, 10)
     l_parameter_comb = []
 
     for case_idx in range(desired_cases):
         lesion_id = random.choice(lesion_types) # select a random lesion type
-        if lesion_id == None: 
+        if lesion_id == None:
             vol = 0
             intensity = 0
         elif lesion_id == 'epidural':
-            vol = random.choices(df_volume['EDH_volume'], weights=df_volume['EDH_weight'])[0]
-            intensity = random.choices(df_HU['EDH_HU'], weights=df_HU['EDH_weight'])[0]
+            vol = random.choices(df_volume['EDH_volume'],
+                                 weights=df_volume['EDH_weight'])[0]
+            intensity = random.choices(df_HU['EDH_HU'],
+                         weights=df_HU['EDH_weight'])[0]
         elif lesion_id == 'subdural':
             vol = random.choices(df_volume['SDH_volume'], weights=df_volume['SDH_weight'])[0]
             intensity = random.choices(df_HU['SDH_HU'], weights=df_HU['SDH_weight'])[0]
         elif lesion_id == 'sphere':
             vol = random.choices(df_volume['IPH_volume'], weights=df_volume['IPH_weight'])[0]
             intensity = random.choices(df_HU['IPH_HU'], weights=df_HU['IPH_weight'])[0]
-        
 
         l_parameter_comb.append([
             random.choice(possible_ages), # age

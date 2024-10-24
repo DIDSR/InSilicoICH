@@ -1,8 +1,9 @@
 [project]
 name = "PedSilicoICH"
-version = "0.0.1"
+version = "0.0.2"
 authors = [
-  { name="Brandon Nelson", email="brandon.nelson@fda.hhs.gov" },
+  {name="Brandon Nelson", email="brandon.nelson@fda.hhs.gov"},
+  {name="Jayse M. Weaver", email="jayse.weaver@fda.hhs.gov"}
 ]
 description = "CT Simulations of virtual pediatric intracranial hemorrhage for computer aided triage device evaluation"
 readme = "README.rst"
