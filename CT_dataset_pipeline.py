@@ -20,7 +20,6 @@
 
 from pathlib import Path
 from argparse import ArgumentParser
-from random import shuffle
 import os
 
 import numpy as np
@@ -37,15 +36,15 @@ if __name__ == "__main__":
     parser.add_argument('--views', type=int, default=1000,
                         help='number of angular CT views per rotation')
     parser.add_argument('--desired_cases', type=int, default=1000,
-                        help='number of simulations to run')    
+                        help='number of simulations to run')
     parser.add_argument('--zspan', nargs='+', default='dynamic',
                         help='z range of scans [mm], defaults to dynamic')
     args = parser.parse_args()
 
-    output_directory = Path(args.output_directory)
-    desired_cases = args.desired_cases
     zspan = args.zspan
-    views = args.views
+    if isinstance(zspan, list):
+        zspan = list(map(int, zspan))
+    output_directory = Path(args.output_directory)
     # </https://www.aapm.org/pubs/CTProtocols/documents/PediatricRoutineHeadCT.pdf>
     # find parameter
 # %%
@@ -56,26 +55,25 @@ if __name__ == "__main__":
         df_HU = pd.read_csv('src/pedsilicoICH/distributions/BHSD_HU_distributions.csv')
         print('Successfully loaded volume and HU distributions')
     except:
-        min_vol, max_vol = 34, 34000  # applied only to spheres [units of voxels, TODO convert to mL or mm^3]
+        min_vol, max_vol = 1, 60  # applied only to spheres [units of voxels, TODO convert to mL or mm^3]
         volume_list = np.linspace(min_vol, max_vol, 20)
         min_intensity, max_intensity = 20, 200
         intensity_list = np.arange(20, 200)
-    
+
     recon_kernel = 'soft'  # options include ['standard', 'soft', 'bone', 'R-L', 'S-L']
-    slice_thickness = 5 # in mm
+    slice_thickness = 5  # in mm
     nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
     mida_age = 38  # median US adult age to represent MIDA
     possible_ages = nihpd_ages + [mida_age]
     kVp_list = [120]
     mA_list = list(range(300, 400, 50))
     lesion_types = [None, 'round', 'epidural', 'subdural']
-    min_vol, max_vol = 34, 34000  # applied only to spheres [units of voxels, TODO convert to mL or mm^3]
     mass_effect = np.linspace(0, 1, 10)
     l_parameter_comb = []
 
-    for case_idx in range(desired_cases):
-        lesion_id = random.choice(lesion_types) # select a random lesion type
-        if lesion_id == None:
+    for case_idx in range(args.desired_cases):
+        lesion_id = random.choice(lesion_types)  # select a random lesion type
+        if lesion_id is None:
             vol = 0
             intensity = 0
         elif lesion_id == 'epidural':
@@ -91,9 +89,9 @@ if __name__ == "__main__":
             intensity = random.choices(df_HU['IPH_HU'], weights=df_HU['IPH_weight'])[0]
 
         l_parameter_comb.append([
-            random.choice(possible_ages), # age
-            random.choice(kVp_list), # kVp
-            random.choice(mA_list), # mA
+            random.choice(possible_ages),  # age
+            random.choice(kVp_list),  # kVp
+            random.choice(mA_list),  # mA
             intensity,
             vol,
             lesion_id,
@@ -120,7 +118,7 @@ if __name__ == "__main__":
                           volume=volume,
                           lesion_type=lesion_type,
                           mass_effect=mass_effect,
-                          views=views, zspan=zspan,
+                          views=args.views, zspan=args.zspan,
                           kernel=recon_kernel, slice_thickness=slice_thickness)
         study.metadata.to_csv(output_directory / patient_name /
                               f'metadata_{patientid}.csv',

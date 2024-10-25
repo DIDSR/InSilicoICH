@@ -63,7 +63,7 @@ class Study:
         ct = self.scanner
         if zspan == 'dynamic':
             startZ, endZ = ct.recommend_scan_range()
-        elif isinstance(zspan, tuple):
+        elif isinstance(zspan, tuple | list):
             startZ, endZ = zspan
 
         ct.run_scan(startZ=startZ, endZ=endZ, views=views,
@@ -84,7 +84,8 @@ class Study:
         vol_ml = 0
         if lesion_type:
             lesion_only = ct
-            mask = ct.get_lesion_mask(startZ=startZ, endZ=endZ, slice_thickness=slice_thickness)
+            mask = ct.get_lesion_mask(startZ=startZ, endZ=endZ,
+                                      slice_thickness=slice_thickness)
 
             lesion_only.recon = mask
             dicom_path = output_directory / 'lesion_masks'
@@ -175,7 +176,7 @@ class Study:
 
 
 def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
-              mA=200, intensity=200, volume=500, lesion_type=None,
+              mA=200, intensity=200, volume=5, lesion_type=None,
               mass_effect=True, add_positioning_augmentation=True,
               views=1000, zspan='dynamic', kernel='standard',
               slice_thickness=1, keep_raw=False) -> Study:
@@ -183,7 +184,7 @@ def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
     mida_shape = (480, 480, 350)  # default shape of MIDA
     phantom = load_phantom(age=age, shape=mida_shape, name=patient_name)
 
-    if lesion_type:
+    if lesion_type and (volume > 0):
         phantom.insert_lesion(lesion_type,
                               volume=volume,
                               intensity=intensity,
