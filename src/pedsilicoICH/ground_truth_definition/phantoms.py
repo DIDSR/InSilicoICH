@@ -439,7 +439,8 @@ class HeadPhantom(Phantom):
                                              self.get_skull_map(),
                                              strength=mass_effect)
             warped[lesion_mask] = img_w_lesion[lesion_mask]
-            img_w_lesion = warped
+            img_w_lesion[lesion_mask.sum(axis=(1, 2)) > 0] =\
+                warped[lesion_mask.sum(axis=(1, 2)) > 0]
 
         return img_w_lesion, lesion_mask, (z, x, y)
 
