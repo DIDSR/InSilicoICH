@@ -179,7 +179,7 @@ def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
               mA=200, intensity=200, volume=5, lesion_type=None,
               mass_effect=True, add_positioning_augmentation=True,
               views=1000, zspan='dynamic', kernel='standard',
-              slice_thickness=1, keep_raw=False) -> Study:
+              slice_thickness=1, keep_raw=False, seed=None) -> Study:
 
     mida_shape = (480, 480, 350)  # default shape of MIDA
     phantom = load_phantom(age=age, shape=mida_shape, name=patient_name)
@@ -188,7 +188,8 @@ def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
         phantom.insert_lesion(lesion_type,
                               volume=volume,
                               intensity=intensity,
-                              mass_effect=mass_effect)
+                              mass_effect=mass_effect,
+                              seed=seed)
 
     if add_positioning_augmentation:
         transform = RandAffine(prob=0.5,
@@ -196,7 +197,7 @@ def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
                                translate_range=[10, 10, 10],
                                scale_range=[0.1, 0.1, 0.1],
                                padding_mode="border")
-        phantom.apply_transform(transform)
+        phantom.apply_transform(transform, seed=seed)
 
     scanner = Scanner(phantom, output_dir=output_directory)
     study = Study(scanner, 'pilot')
