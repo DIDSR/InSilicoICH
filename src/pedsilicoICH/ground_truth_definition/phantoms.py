@@ -312,6 +312,8 @@ class HeadPhantom(Phantom):
 
         return img_w_lesion, lesion_image, lesion_coords
         '''
+        if volume <= 0:
+            return self
         self.lesion_type.append(lesion_type)
         self.mass_effect = mass_effect
         if lesion_type == 'round':

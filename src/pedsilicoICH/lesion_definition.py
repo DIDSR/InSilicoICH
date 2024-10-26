@@ -134,10 +134,17 @@ def insert_dural_3D(phantom, desired_volume, init_slice, hematoma_type,
                                hematoma_type=hematoma_type)
 
             if mass_effect:
-                warped_slice = warp_slice(HU_array[init_slice, :],
-                                          skull_map[init_slice, :],
-                                          boundary_coords, connect_coords)
-                new_volume[init_slice, :] = warped_slice
+                try:
+                    warped_slice = warp_slice(HU_array[init_slice],
+                                              skull_map[init_slice],
+                                              boundary_coords, connect_coords)
+                except ValueError:
+                    Warning(f'Failed to perform mass effect insertion for\
+                          volume: {desired_volume}, now inserting with mass\
+                          effect to 0')
+                    new_volume[init_slice] = HU_array[init_slice]
+                    phantom.mass_effect = 0
+                new_volume[init_slice] = warped_slice
 
             hemorrhage_mask[init_slice] = filled_array
 
@@ -174,10 +181,18 @@ def insert_dural_3D(phantom, desired_volume, init_slice, hematoma_type,
                                boundary=temp_boundary,
                                hematoma_type=hematoma_type)
             if mass_effect:
-                warped_slice = warp_slice(HU_array[init_slice-slice_idx, :],
-                                          skull_map[init_slice, :],
-                                          boundary_coords, connect_coords)
-                new_volume[init_slice-slice_idx, :] = warped_slice
+                try:
+                    warped_slice = warp_slice(HU_array[init_slice-slice_idx],
+                                              skull_map[init_slice],
+                                              boundary_coords, connect_coords)
+                    new_volume[init_slice-slice_idx] = warped_slice
+                except ValueError:
+                    Warning(f'Failed to perform mass effect insertion for\
+                          volume: {desired_volume}, now inserting with mass\
+                          effect to 0')
+                    new_volume[init_slice-slice_idx] =\
+                        HU_array[init_slice-slice_idx]
+                    phantom.mass_effect = 0
 
             hemorrhage_mask[init_slice-slice_idx] = filled_array
 
