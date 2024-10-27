@@ -30,7 +30,8 @@ from pedsilicoICH.pipeline import run_study
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser(description='Runs XCIST CT simulations of ICH models')
+    parser = ArgumentParser(
+        description='Runs XCIST CT simulations of ICH models')
     parser.add_argument('--output_directory', type=str, default="",
                         help='output directory to save simulation results')
     parser.add_argument('--views', type=int, default=1000,
@@ -51,16 +52,19 @@ if __name__ == "__main__":
     # load volume and HU distributions
     try:
         print(os.getcwd())
-        df_volume = pd.read_csv('src/pedsilicoICH/distributions/BHSD_volume_distributions.csv')
-        df_HU = pd.read_csv('src/pedsilicoICH/distributions/BHSD_HU_distributions.csv')
+        df_volume = pd.read_csv(
+            'src/pedsilicoICH/distributions/BHSD_volume_distributions.csv')
+        df_HU = pd.read_csv(
+            'src/pedsilicoICH/distributions/BHSD_HU_distributions.csv')
         print('Successfully loaded volume and HU distributions')
-    except:
-        min_vol, max_vol = 1, 60  # applied only to spheres [units of voxels, TODO convert to mL or mm^3]
+    except FileNotFoundError:
+        min_vol, max_vol = 1, 60
         volume_list = np.linspace(min_vol, max_vol, 20)
         min_intensity, max_intensity = 20, 200
         intensity_list = np.arange(20, 200)
 
-    recon_kernel = 'soft'  # options include ['standard', 'soft', 'bone', 'R-L', 'S-L']
+    recon_kernel = 'soft'
+    # options include ['standard', 'soft', 'bone', 'R-L', 'S-L']
     slice_thickness = 5  # in mm
     nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
     mida_age = 38  # median US adult age to represent MIDA
@@ -80,13 +84,17 @@ if __name__ == "__main__":
             vol = random.choices(df_volume['EDH_volume'],
                                  weights=df_volume['EDH_weight'])[0]
             intensity = random.choices(df_HU['EDH_HU'],
-                         weights=df_HU['EDH_weight'])[0]
+                                       weights=df_HU['EDH_weight'])[0]
         elif lesion_id == 'subdural':
-            vol = random.choices(df_volume['SDH_volume'], weights=df_volume['SDH_weight'])[0]
-            intensity = random.choices(df_HU['SDH_HU'], weights=df_HU['SDH_weight'])[0]
-        elif lesion_id == 'sphere':
-            vol = random.choices(df_volume['IPH_volume'], weights=df_volume['IPH_weight'])[0]
-            intensity = random.choices(df_HU['IPH_HU'], weights=df_HU['IPH_weight'])[0]
+            vol = random.choices(df_volume['SDH_volume'],
+                                 weights=df_volume['SDH_weight'])[0]
+            intensity = random.choices(df_HU['SDH_HU'],
+                                       weights=df_HU['SDH_weight'])[0]
+        elif lesion_id == 'round':
+            vol = random.choices(df_volume['IPH_volume'],
+                                 weights=df_volume['IPH_weight'])[0]
+            intensity = random.choices(df_HU['IPH_HU'],
+                                       weights=df_HU['IPH_weight'])[0]
 
         l_parameter_comb.append([
             random.choice(possible_ages),  # age
@@ -102,7 +110,7 @@ if __name__ == "__main__":
 
     try:
         patientids = [int(os.environ['SLURM_ARRAY_TASK_ID']) - 1]
-    except:
+    except KeyError:
         print('SLURM_ARRAY_TASK_ID not set, running in serial')
         patientids = list(range(n_params))
 
