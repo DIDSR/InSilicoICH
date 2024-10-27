@@ -508,11 +508,7 @@ class MIDA_Head(HeadPhantom):
             return self._phantom
         phantom = self._phantom
         material_lut = self.material_lut
-        # phantom[phantom == 50] = -1000  # air
-        # phantom[phantom == 52] = 800 # the MIDA text file has an unknown character after "Skull Diplo" that makes the above method not work if not removed
         HU_phantom = np.copy(phantom)
-        # for _, row in material_lut[~material_lut['CT Number [HU]'].isna()].iterrows():
-        #     HU_phantom[phantom == row.grayscale] = row['CT Number [HU]']
         for _, row in material_lut[~material_lut['HU'].isna()].iterrows():
             if row['HU'] == 8888:
                 HU_phantom[phantom == row['MIDA_ID']] = self.wm_HU
@@ -586,11 +582,21 @@ class NIHPD_Head(HeadPhantom):
         header = nib_img.header
         self.dx, self.dy, self.dz = header['pixdim'][1:4]
 
-        self.csf = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_csf.nii').get_fdata().transpose(2, 1, 0)[:, ::-1, :]
-        self.gm = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_gm.nii').get_fdata().transpose(2, 1, 0)[:, ::-1, :]
-        self.wm = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_wm.nii').get_fdata().transpose(2, 1, 0)[:, ::-1, :]
-        self.mask = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_mask.nii').get_fdata().transpose(2, 1, 0)[:, ::-1, :]
-        self.pdw = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_pdw.nii').get_fdata().transpose(2, 1, 0)[:, ::-1, :]
+        self.csf = nib.load(
+            base_dir / f'nihpd_{symmetry}_{age_range}_csf.nii'
+            ).get_fdata().transpose(2, 1, 0)[:, ::-1, :]
+        self.gm = nib.load(
+            base_dir / f'nihpd_{symmetry}_{age_range}_gm.nii'
+            ).get_fdata().transpose(2, 1, 0)[:, ::-1, :]
+        self.wm = nib.load(
+            base_dir / f'nihpd_{symmetry}_{age_range}_wm.nii'
+            ).get_fdata().transpose(2, 1, 0)[:, ::-1, :]
+        self.mask = nib.load(
+            base_dir / f'nihpd_{symmetry}_{age_range}_mask.nii'
+            ).get_fdata().transpose(2, 1, 0)[:, ::-1, :]
+        self.pdw = nib.load(
+            base_dir / f'nihpd_{symmetry}_{age_range}_pdw.nii'
+            ).get_fdata().transpose(2, 1, 0)[:, ::-1, :]
 
         self.csf = self.csf[::-1]
         self.gm = self.gm[::-1]
