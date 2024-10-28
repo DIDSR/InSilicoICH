@@ -3,9 +3,8 @@ module for working with phantoms
 '''
 
 from pathlib import Path
-from io import StringIO
-
 import os
+
 import numpy as np
 import nibabel as nib
 import pandas as pd
@@ -16,7 +15,7 @@ from torchvision.datasets.utils import download_and_extract_archive
 from . import dicom_to_voxelized_phantom
 from ..artifact_generation import transform_image_label_pair
 
-from ..lesion_definition import elliptical_lesion, insert_dural_3D
+from ..lesion_definition import elliptical_lesion, insert_dural_3D, warp_slice
 from scipy.ndimage import (center_of_mass,
                            distance_transform_edt,
                            binary_dilation)
@@ -43,7 +42,7 @@ def get_closest_key(key, dictionary):
 
 def calc_mean_eccentricity(a, b, c):
     return np.mean([calculate_eccentricity(a, b),
-                    calculate_eccentricity(a, c),\
+                    calculate_eccentricity(a, c),
                     calculate_eccentricity(b, c)])
 
 
@@ -73,6 +72,51 @@ def get_semimajor_axes(eccentricity, seed=None):
     return np.array(foci)
 
 
+def get_perimeter(lesion):
+    return ski.morphology.binary_dilation(lesion, np.ones((3, 3))) ^\
+           ski.morphology.binary_erosion(lesion, np.ones((3, 3)))
+
+
+def get_transformation_src_dst(lesion: np.ndarray[bool],
+                               strength: int = 0):
+    '''
+    returns `src` and `dst` arrays to insert `lesion` into an img of the same
+    shape. e.g. of the head and applies a mass effect warping of the local
+    tissues.
+
+    This function takes a solid lesion and extracts the perimeter as the input
+     `dst` to `warp_slice` and applies the perimeter `strength` to determine
+    how many erosions make up the `src` input to `warp` slice, where higher
+    strength yields a greater degree of warping by creating a greater distance
+    between `src` and `dst`. See `warp_slice` for more details.
+    :param lesion: a 2D binary image of the lesion, must be same shape as img
+    '''
+    if (strength < 0) or (strength > 1):
+        raise ValueError(f'strength {strength} is not in allowed range [0, 1]')
+    footprint = int(strength*np.ceil(distance_transform_edt(lesion).max()))
+    dst = get_perimeter(lesion)
+    src = get_perimeter(ski.morphology.binary_erosion(lesion,
+                                                      np.ones(2*[footprint])))
+    return src, dst
+
+
+def insert_with_mass_effect(img, lesion, boundary, strength=1):
+    if img.ndim == 2:
+        img = img[None]
+    assert img.ndim == 3
+
+    warped = np.zeros_like(img)
+    for idx in range(lesion.shape[0]):
+        if not lesion[idx].any():
+            continue
+        src, dst = get_transformation_src_dst(lesion[idx], strength)
+        dst_coords = np.argwhere(dst)
+        src_coords = np.argwhere(src)
+        warped[idx] = warp_slice(img[idx], boundary[idx],
+                                 src_coords, dst_coords)
+    return warped
+
+
 def get_mean_age(age_range: str):
     return (float(age_range.split('-')[1])+float(age_range.split('-')[0]))/2
 
@@ -83,15 +127,20 @@ def resize(phantom, shape):
     return resized
 
 
-def voxelize_ground_truth(dicom_path, phantom_path, material_threshold_dict=None):
+def voxelize_ground_truth(dicom_path: str | Path, phantom_path: str | Path,
+                          material_threshold_dict: dict | None = None):
     '''
-    Used to convert ground truth image into segmented volumes used by XCIST to run simulations
+    Used to convert ground truth image into segmented volumes used by XCIST to
+    run simulations
 
-    Inputs:
-    dicom_path    (string)           Path where the DICOM images are located.
-    phantom_path  (string)           Path where the phantom files are to be written
-    dicom_path [str]: directory containing ground truth dicom images, these are typically the output of `convert_to_dicom`
-    material_threshold_dict [dict]: dictionary mapping XCIST materials to appropriate lower thresholds in the ground truth image, see the .cfg here for examples <https://github.com/xcist/phantoms-voxelized/tree/main/DICOM_to_voxelized>
+    :param dicom_path: str | Path, path where the DICOM images are located,
+        these are typically the output of `convert_to_dicom`
+    :param phantom_path: str or Path, where the phantom files are to be
+        written
+    :param material_threshold_dict: dictionary mapping XCIST materials to
+        appropriate lower thresholds in the ground truth image, see the .cfg
+        here for examples
+        <https://github.com/xcist/phantoms-voxelized/tree/main/DICOM_to_voxelized>
     '''
     nfiles = len(list(Path(dicom_path).rglob('*.dcm')))
     slice_range = list(range(nfiles))
@@ -213,7 +262,7 @@ class HeadPhantom(Phantom):
         self._lesion = []
         self._lesion_coords = []
         self.lesion_type = []
-        self.lesion_intensity = [] # HU
+        self.lesion_intensity = []  # HU
         self.mass_effect = False
 
     def get_material_mask(self, material):
@@ -242,25 +291,29 @@ class HeadPhantom(Phantom):
     def spacings(self):
         return self.dz, self.dx, self.dy
 
-    def insert_lesion(self, lesion_type, volume=2, intensity=100,
+    def insert_lesion(self, lesion_type, volume=10, intensity=50,
                       init_slice=None, mass_effect=False, seed=None, **kwargs):
         '''
         inserts lesion of `lesion_type` into phantom array
 
-        :param lesion_type: str, options include ['round', 'epidural', 'subdural'],
+        :param lesion_type: str, options include
+            ['round', 'epidural', 'subdural'],
             see associated methods `add_round_lesion`, `_add_dural_lesion`
         :param volume: in mL, volume of the lesion
-        :param contrast: lesion CT number in HU
+        :param intensity: lesion CT number in HU
         :param init_slice: optional, slice to add dural_lesions to
-        :param meass_effect: optional, bool whether to apply mass effect processing to
-            displace brain tissue following lesion insertion
-        :param edema: optional, bool or int. whether to add a ring of low contrast, 10 HU,
-            edema around the lesion, currently only implemented for sphere
-        :param seed: optional, int specify seed for reproducible lesion insertion,
-            otherwise random
+        :param meass_effect: optional, bool whether to apply mass effect
+            processing to displace brain tissue following lesion insertion
+        :param edema: optional, bool or int. whether to add a ring of low
+            contrast, 10 HU, edema around the lesion, currently only
+            implemented for sphere
+        :param seed: optional, int specify seed for reproducible lesion
+            insertion, otherwise random
 
         return img_w_lesion, lesion_image, lesion_coords
         '''
+        if volume <= 0:
+            return self
         self.lesion_type.append(lesion_type)
         self.mass_effect = mass_effect
         if lesion_type == 'round':
@@ -304,55 +357,94 @@ class HeadPhantom(Phantom):
                                        seed=seed)
 
     def add_round_lesion(self,
-                         volume: list[int] = 2,
-                         intensity: list[int] = -100,
+                         volume: int = 10,
+                         intensity: int = 50,
                          material: str = 'white matter',
                          eccentricity: float = 0.5,
-                         mass_effect: bool = False,
+                         mass_effect: bool | float = 0.5,
                          edema: bool | int = False,
+                         complexity: int = 3,
                          seed: int | None = None) -> tuple:
         '''
-        adds lesion to img in random location within mask of size radius
+        adds ronud lesion to img in random location within mask of size radius
         and intensity level intensity
+
+        See parameter descriptions below for further modifications that can
+        be added:
 
         :param volume: int or list of ints, volume of the sphere lesion in mL,
             if provided a list it will make concentric lesions
-        :param intensity: int or list of ints, intensity of the sphere lesion in HU,
-            if provided a list it will make concentric lesions of intensities
+        :param intensity: int or list of ints, intensity of the sphere lesion
+            in HU, if provided a list it will make concentric lesions of
+            intensities
         :param material: which material region to insert lesion into,
             self.materials for options
-        :param eccentricity: between 0, 1 defines how elongated the lesions are, with 0 being spherical,
-            1 being very oblong
-        :param seed: optional, defaults to None, set seed for reproducible lesion insertion
+        :param eccentricity: between 0, 1 defines how elongated the lesions
+            are, with 0 being spherical, 1 being very oblong
+        :param mass_effect: bool or float between [0, 1], if 0 or False no
+            mass effect is applied, a mass effect > 0 but < 1 controls mass
+            effect strength where 1 is a large degree of mass effect warping
+            and 0.2 is a smaller amount of warping, see
+            `insert_with_mass_effect` for more details
+        :param edema: bool or int, refering to the number of pixels thick of
+            an edema layer to add around the lesion
+        :param complexity: int, number of ellipses to aid with
+            random jiggle, 1 gives a single ellipsoid, increasing to 2 or 3
+            yields overlapping ellipsoids with a more complex shape.
+        :param seed: optional, defaults to None, set seed for reproducible
+            lesion insertion
 
         :returns: img_w_lesion, lesion_vol, (z, x, y)
         '''
         rng = np.random.default_rng(seed)
 
         r = sphere_radius_from_volume(volume)
-        axes = get_semimajor_axes(eccentricity, seed)
-        print(f'ellipsoid foci: {axes}, mean: {calc_mean_eccentricity(*axes)}')
-        foci = r * axes
-
         img = self.get_CT_number_phantom()
         mask = self.get_material_mask(material).astype(int)
 
         lesion_vol = np.zeros_like(img)
-        suitable_points = distance_transform_edt(mask) > r  # lower distance threshold to allow overlap
-        z, x, y = np.argwhere(suitable_points)[rng.integers(0, suitable_points.sum())]
+        suitable_points = distance_transform_edt(mask) > r
+        # lower distance threshold `r` to allow overlap
+        z, x, y = np.argwhere(suitable_points)[rng.integers(0,
+                                               suitable_points.sum())]
 
         lesion_vol = np.full(img.shape, fill_value=-1000)
-        sphere = elliptical_lesion(img.shape, center=(z, x, y), radius=foci)
-        lesion_vol[sphere] = intensity
+        for _ in range(complexity):
+            axes = get_semimajor_axes(eccentricity, seed)
+            foci = r * axes
+            random_rotate = seed or True
+            sphere = elliptical_lesion(img.shape, center=(z, x, y),
+                                       radius=foci,
+                                       random_rotate=random_rotate)
+            transform = RandAffine(prob=1, translate_range=[r, r])
+            transform.set_random_state(seed)
+            sphere = transform(sphere).astype(bool)
+            lesion_vol[sphere] = intensity
+        lesion_mask = lesion_vol > -1000
+
         if edema:
             edema_pixels = 5
             edema_HU = 10
             edema = edema_pixels if edema is True else edema
-            edema_mask = binary_dilation(sphere, np.ones(3*[edema])) ^ sphere
+            edema_mask = binary_dilation(lesion_mask,
+                                         np.ones(3*[edema])) ^ lesion_mask
             lesion_vol[edema_mask] = edema_HU
+            lesion_mask = lesion_vol > -1000
         img_w_lesion = img.copy()
-        img_w_lesion[lesion_vol > -1000] = lesion_vol[lesion_vol > -1000]
-        return img_w_lesion, lesion_vol > -1000, (z, x, y)
+        img_w_lesion[lesion_mask] = lesion_vol[lesion_mask]
+
+        if mass_effect:
+            if mass_effect is True:
+                mass_effect = 0.5
+            warped = insert_with_mass_effect(img,
+                                             lesion_mask,
+                                             self.get_skull_map(),
+                                             strength=mass_effect)
+            warped[lesion_mask] = img_w_lesion[lesion_mask]
+            img_w_lesion[lesion_mask.sum(axis=(1, 2)) > 0] =\
+                warped[lesion_mask.sum(axis=(1, 2)) > 0]
+
+        return img_w_lesion, lesion_mask, (z, x, y)
 
     def _add_dural_lesion(self, volume, lesion_type, intensity,
                           init_slice=None, seed=None, mass_effect=True):
@@ -400,14 +492,16 @@ class MIDA_Head(HeadPhantom):
         if shape:
             self._phantom = resize(self._phantom, shape)
             new_shape = self._phantom.shape
-            new_spacings = np.array(original_shape) / np.array(new_shape) * [self.dz, self.dx, self.dy]
+            new_spacings = np.array(original_shape) / np.array(new_shape) *\
+                [self.dz, self.dx, self.dy]
             self.dz, self.dx, self.dy = new_spacings
         else:
             shape = original_shape
         self.nz, self.nx, self.ny = shape
 
     def _load_material_LUT(self):
-        return pd.read_csv(os.path.join(Path(__file__).parent.resolve(), 'MIDA_v1.csv'))
+        return pd.read_csv(os.path.join(Path(__file__).parent.resolve(),
+                                        'MIDA_v1.csv'))
 
     def get_CT_number_phantom(self):
         if len(self._lesion_coords) > 0:
@@ -416,7 +510,6 @@ class MIDA_Head(HeadPhantom):
         material_lut = self.material_lut
         # phantom[phantom == 50] = -1000  # air
         # phantom[phantom == 52] = 800 # the MIDA text file has an unknown character after "Skull Diplo" that makes the above method not work if not removed
-        
         HU_phantom = np.copy(phantom)
         # for _, row in material_lut[~material_lut['CT Number [HU]'].isna()].iterrows():
         #     HU_phantom[phantom == row.grayscale] = row['CT Number [HU]']
@@ -442,11 +535,12 @@ class MIDA_Head(HeadPhantom):
         return dura_map
 
     def get_skull_map(self):
-        '''obtains partial skull map using mida atlas, ignoring facial bones (for now)'''
+        '''obtains partial skull map using mida atlas,
+         ignoring facial bones (for now)'''
         skull_map = np.zeros_like(self._phantom)
-        skull_map[np.where(self._phantom == 53)] = 1.0 # skull outer table
-        skull_map[np.where(self._phantom == 40)] = 1.0 # skull/facial bone
-        skull_map[np.where(self._phantom == 1000)] = 1.0 # other bone voxels
+        skull_map[np.where(self._phantom == 53)] = 1.0  # skull outer table
+        skull_map[np.where(self._phantom == 40)] = 1.0  # skull/facial bone
+        skull_map[np.where(self._phantom == 1000)] = 1.0  # other bone voxels
         return skull_map
 
 
@@ -462,7 +556,7 @@ class NIHPD_Head(HeadPhantom):
         of the range (upper+lower)/2
     :param symmetry: optional, the atlases are provided in their natural
         asymmetric or artificially generated symmetric state, default is
-        asymmetric, see article for more details: 
+        asymmetric, see article for more details:
     1. Fonov V, Evans AC, Botteron K, Almli CR, McKinstry RC, Collins DL.
         Unbiased average age-appropriate atlases for pediatric studies.
         NeuroImage. 2011;54(1):313-327. doi:10.1016/j.neuroimage.2010.07.033
@@ -513,7 +607,8 @@ class NIHPD_Head(HeadPhantom):
             self.mask = resize(self.mask, shape).numpy()
             self.pdw = resize(self.pdw, shape).numpy()
 
-            new_spacings = np.array(original_shape) / np.array(new_shape) * [self.dz, self.dx, self.dy]
+            new_spacings = np.array(original_shape) / np.array(new_shape) *\
+                [self.dz, self.dx, self.dy]
             self.dz, self.dx, self.dy = new_spacings
         else:
             shape = original_shape
@@ -528,7 +623,8 @@ class NIHPD_Head(HeadPhantom):
     def get_CT_number_phantom(self):
         if len(self._lesion_coords) > 0:
             return self._phantom
-        phantom = self.csf*self.csf_HU + self.gm*self.gm_HU + self.wm*self.wm_HU + self.skull*self.skull_HU
+        phantom = self.csf*self.csf_HU + self.gm*self.gm_HU +\
+            self.wm*self.wm_HU + self.skull*self.skull_HU
         phantom[phantom <= 0] = self.air_HU
         return phantom
 
@@ -552,7 +648,8 @@ class NIHPD_Head(HeadPhantom):
                                                 background=0)
 
     def get_skull_map(self):
-        '''obtains rudimentary mask of skull voxels using threshold of proton-density weighted image and full mask'''
+        '''obtains rudimentary mask of skull voxels using threshold of
+        proton-density weighted image and full mask'''
         skull_map = (self.mask == 0)*self.pdw / self.pdw.max()
         skull_map[skull_map < 0.1] = 0
         skull_map[skull_map > 0] = 1

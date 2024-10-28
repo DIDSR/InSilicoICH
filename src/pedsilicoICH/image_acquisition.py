@@ -190,7 +190,7 @@ class Scanner():
             2*self.xcist.scanner.detectorRowSize
         self.scan_width = self.xcist.cfg.protocol.rotationTime *\
             self.xcist.cfg.protocol.tableSpeed + safe_width_at_isocenter
-        #img = self.phantom.get_CT_number_phantom()
+        # img = self.phantom.get_CT_number_phantom()
         self.total_scan_length = self.phantom.spacings[0]*self.phantom.shape[0]
         return np.arange(-self.total_scan_length/2,
                          self.total_scan_length/2,
@@ -219,7 +219,9 @@ class Scanner():
                 self.phantom.spacings[0]
         return (suggested_start_mm, suggested_end_mm)
 
-    def get_lesion_mask(self, startZ=None, endZ=None, slice_thickness=1):
+    def get_lesion_mask(self, startZ: int | None = None,
+                        endZ: int | None = None,
+                        slice_thickness=1) -> np.ndarray[bool]:
         '''takes lesion in object space and returns a mask in CT image space
         for the given imaging system'''
         if not self.phantom._lesion:

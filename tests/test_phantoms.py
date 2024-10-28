@@ -9,7 +9,9 @@ from copy import deepcopy
 from monai.transforms import RandAffine, Affine
 from torchvision.datasets.utils import download_and_extract_archive
 
-from pedsilicoICH.ground_truth_definition.phantoms import MIDA_Head, NIHPD_Head
+from pedsilicoICH.ground_truth_definition.phantoms import (MIDA_Head,
+                                                           NIHPD_Head,
+                                                           load_phantom)
 
 nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
 
@@ -88,3 +90,27 @@ def test_transforms_on_phantoms(seed=885):
             for transform in transforms:
                 transforms_performed_correctly(phantom, transform, lesion,
                                                seed=seed)
+
+
+def mass_effect_works(seed, mass_effect):
+    intensity = 100
+    age = 9
+    volume = 40
+    phantom = load_phantom(age)
+    phantom.insert_lesion('subdural', volume=volume, intensity=intensity,
+                          mass_effect=mass_effect, seed=seed)
+    return phantom.mass_effect
+
+
+def test_passing_mass_effect():
+    passing_seed = 242
+    mass_effect = 0.9
+    mass_effect_flag = mass_effect_works(passing_seed, mass_effect)
+    assert mass_effect_flag == mass_effect
+
+
+def test_failing_mass_effect():
+    failing_seed = 825
+    mass_effect = 0.9
+    mass_effect_flag = mass_effect_works(failing_seed, mass_effect)
+    assert mass_effect_flag == 0
