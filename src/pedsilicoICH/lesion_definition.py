@@ -133,9 +133,13 @@ def insert_dural_3D(phantom, desired_volume, init_slice, hematoma_type,
                 else:
                     count = tol
             if failure_occured:
-                raise RuntimeError(f'lesion insertion failed with requested volume: {desired_volume} mL, try a smaller volume')
-            # now that the two starting points for the hemorrhage have been defined, need to connect them
-            # process should be the same on any given slice, and this function can be updated with new connection options
+                raise RuntimeError(f'lesion insertion failed with\
+                                    requested volume: {desired_volume} mL,\
+                                    try a smaller volume')
+            # now that the two starting points for the hemorrhage have been
+            # defined, need to connect them.
+            # process should be the same on any given slice, and this function
+            # can be updated with new connection options
             filled_array, boundary_coords, connect_coords =\
                 connect_points(start=orig_start,
                                end=orig_end,

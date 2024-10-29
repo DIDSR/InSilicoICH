@@ -24,7 +24,6 @@ import os
 
 import numpy as np
 import pandas as pd
-import random
 
 from pedsilicoICH.pipeline import run_study
 
@@ -40,6 +39,7 @@ if __name__ == "__main__":
                         help='number of simulations to run')
     parser.add_argument('--zspan', nargs='+', default='dynamic',
                         help='z range of scans [mm], defaults to dynamic')
+    parser.add_argument('--seed', type=int, help='seed to reproduce a dataset')
     args = parser.parse_args()
 
     zspan = args.zspan
@@ -73,6 +73,8 @@ if __name__ == "__main__":
     mA_list = list(range(300, 400, 50))
     lesion_types = [None, 'round', 'epidural', 'subdural']
     mass_effect = np.linspace(0, 1, 10)
+    random = np.random.default_rng(args.seed)
+    seed = random.randint(0, 1e6, size=1)[0]
     l_parameter_comb = []
 
     for case_idx in range(args.desired_cases):
@@ -127,7 +129,9 @@ if __name__ == "__main__":
                           lesion_type=lesion_type,
                           mass_effect=mass_effect,
                           views=args.views, zspan=args.zspan,
-                          kernel=recon_kernel, slice_thickness=slice_thickness)
+                          kernel=recon_kernel,
+                          slice_thickness=slice_thickness,
+                          seed=seed)
         study.metadata.to_csv(output_directory / patient_name /
                               f'metadata_{patientid}.csv',
                               index=False)

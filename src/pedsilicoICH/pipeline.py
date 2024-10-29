@@ -203,6 +203,7 @@ def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
     study = Study(scanner, 'pilot')
     study.run_study(kVp=kVp, mA=mA, views=views, zspan=zspan,
                     kernel=kernel, slice_thickness=slice_thickness)
+    study.metadata['seed'] = seed
     if keep_raw is False:
         rmtree(study.scanner.output_dir / 'phantoms')
         rmtree(study.scanner.output_dir / 'simulations')
