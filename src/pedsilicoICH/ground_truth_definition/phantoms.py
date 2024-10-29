@@ -331,7 +331,7 @@ class HeadPhantom(Phantom):
                                        init_slice, mass_effect=mass_effect,
                                        seed=seed,
                                        **kwargs)
-        else:
+        elif lesion_type == 'subdural':
             if isinstance(intensity, list):
                 intensity = max(intensity)
             img_w_lesion, lesion_image, lesion_coords =\
@@ -339,6 +339,9 @@ class HeadPhantom(Phantom):
                                        init_slice, mass_effect=mass_effect,
                                        seed=seed,
                                        **kwargs)
+        else:
+            raise RuntimeError(f'unknown lesion type passed: currently accepts round, epidural, or subdural')
+
 
         self._phantom = img_w_lesion
         self._lesion.append(lesion_image)
