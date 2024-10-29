@@ -153,14 +153,18 @@ def voxelize_ground_truth(dicom_path: str | Path, phantom_path: str | Path,
     cfg_file_str = f"""
 # Path where the DICOM images are located:
 phantom.dicom_path = '{dicom_path}'
-# Path where the phantom files are to be written (the last folder name will be the phantom files' base name):
+# Path where the phantom files are to be written
+# (the last folder name will be the phantom files' base name):
 phantom.phantom_path = '{phantom_path}'
 phantom.materials = {list(material_threshold_dict.keys())}
-phantom.mu_energy = 60                  # Energy (keV) at which mu is to be calculated for all materials.
-phantom.thresholds = {list(material_threshold_dict.values())}	# Lower threshold (HU) for each material.
-phantom.slice_range = [{[slice_range[0], slice_range[-1]]}]			  # Range of DICOM image numbers to include. (first, last slice)
-phantom.show_phantom = False                # Flag to turn on/off image display.
-phantom.overwrite = True                   # Flag to overwrite existing files without warning.
+phantom.mu_energy = 60  # Energy (keV) at which mu is to be calculated
+for all materials.
+phantom.thresholds = {list(material_threshold_dict.values())}  # Lower
+# threshold (HU) for each material.
+phantom.slice_range = [{[slice_range[0], slice_range[-1]]}] # Range of DICOM
+# image numbers to include. (first, last slice)
+phantom.show_phantom = False  # Flag to turn on/off image display.
+phantom.overwrite = True  # Flag to overwrite existing files without warning.
 """
 
     dicom_to_voxel_cfg = phantom_path / 'dicom_to_voxelized.cfg'
@@ -327,9 +331,17 @@ class HeadPhantom(Phantom):
                                        init_slice, mass_effect=mass_effect,
                                        seed=seed,
                                        **kwargs)
+        elif lesion_type == 'subdural':
+            if isinstance(intensity, list):
+                intensity = max(intensity)
+            img_w_lesion, lesion_image, lesion_coords =\
+                self._add_dural_lesion(volume, 'subdural', intensity,
+                                       init_slice, mass_effect=mass_effect,
+                                       seed=seed,
+                                       **kwargs)
         else:
-            raise ValueError(f'lesion type: {lesion_type} not defined')
-
+            raise ValueError(f'unknown lesion type passed: {lesion_type}\
+                             currently accepts round, epidural, or subdural')
         self._phantom = img_w_lesion
         self._lesion.append(lesion_image)
         self._lesion_coords.append(lesion_coords)

@@ -154,7 +154,8 @@ class Scanner():
         output_dir.mkdir(exist_ok=True, parents=True)
         self.output_dir = output_dir
 
-        img = phantom.get_CT_number_phantom()
+        #img = phantom.get_CT_number_phantom()
+        img = phantom._phantom
         if isinstance(img, monai.data.meta_tensor.MetaTensor):
             img = img.numpy()
 
