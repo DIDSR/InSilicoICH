@@ -7,6 +7,14 @@ import numpy as np
 import skimage as ski
 import scipy
 from monai.transforms import RandAffine
+from scipy.ndimage import (binary_dilation,
+                           binary_erosion,
+                           distance_transform_edt)
+
+
+def get_perimeter(lesion):
+    return ski.morphology.binary_dilation(lesion, np.ones((3, 3))) ^\
+           ski.morphology.binary_erosion(lesion, np.ones((3, 3)))
 
 
 def elliptical_lesion(shape: tuple | list,
@@ -34,7 +42,8 @@ def elliptical_lesion(shape: tuple | list,
     ell = ski.draw.ellipsoid(*radius)
     if random_rotate:
         transform = RandAffine(prob=1, rotate_range=[np.pi/2, np.pi/2, np.pi/2],
-                               scale_range=[0.1, 0.1, 0.1], padding_mode="zeros")
+                               scale_range=[0.1, 0.1, 0.1],
+                               padding_mode="zeros")
         if isinstance(random_rotate, int):
             transform.set_random_state(seed=random_rotate)
 
@@ -132,8 +141,14 @@ def insert_dural_3D(phantom, desired_volume, init_slice, hematoma_type,
                                end=orig_end,
                                boundary=temp_boundary,
                                hematoma_type=hematoma_type)
-
             if mass_effect:
+                connect_coords = np.argwhere(get_perimeter(filled_array))
+                strength = int(mass_effect *
+                               distance_transform_edt(filled_array).max())
+                if strength:
+                    boundary_coords = np.argwhere(
+                        get_perimeter(binary_erosion(filled_array,
+                                      np.ones(2*[strength]))))
                 try:
                     warped_slice = warp_slice(HU_array[init_slice],
                                               skull_map[init_slice],
@@ -181,9 +196,16 @@ def insert_dural_3D(phantom, desired_volume, init_slice, hematoma_type,
                                boundary=temp_boundary,
                                hematoma_type=hematoma_type)
             if mass_effect:
+                connect_coords = np.argwhere(get_perimeter(filled_array))
+                strength = int(mass_effect *
+                               distance_transform_edt(filled_array).max())
+                if strength:
+                    boundary_coords = np.argwhere(
+                        get_perimeter(binary_erosion(filled_array,
+                                      np.ones(2*[strength]))))
                 try:
                     warped_slice = warp_slice(HU_array[init_slice-slice_idx],
-                                              skull_map[init_slice],
+                                              skull_map[init_slice-slice_idx],
                                               boundary_coords, connect_coords)
                     new_volume[init_slice-slice_idx] = warped_slice
                 except ValueError:
@@ -259,7 +281,8 @@ def connect_points(start, end, boundary, hematoma_type):
 def warp_slice(axial_slice, skull_slice, src, dst):
     '''perform warp of 2D slice according to hematoma boundary coordinates'''
     # to simulate mass effect, transform will need some skull coordinates to NOT move
-    skull_idx = np.argwhere(skull_slice == 1.0)
+    skull_slice = skull_slice.astype(bool)
+    skull_idx = np.argwhere(skull_slice)
     skull_sample = np.round(np.linspace(0, len(skull_idx)-1, 1000)).astype(int)  # increase from 1000 as memory allows
 
     # initialize warp source and destination with skull indices in both (shouldn't move!)
@@ -275,7 +298,9 @@ def warp_slice(axial_slice, skull_slice, src, dst):
     tps.estimate(np.flip(warp_dst), np.flip(warp_src))
     warped_slice = ski.transform.warp(axial_slice, tps,
                                       preserve_range=False, order=0)
-
+    brain_mask = (~skull_slice) & (axial_slice > -100)
+    error_map = (warped_slice - axial_slice) > axial_slice[brain_mask].mean()
+    warped_slice[error_map] = axial_slice[error_map]
     return warped_slice
 
 

@@ -15,7 +15,10 @@ from torchvision.datasets.utils import download_and_extract_archive
 from . import dicom_to_voxelized_phantom
 from ..artifact_generation import transform_image_label_pair
 
-from ..lesion_definition import elliptical_lesion, insert_dural_3D, warp_slice
+from ..lesion_definition import (elliptical_lesion,
+                                 insert_dural_3D,
+                                 warp_slice,
+                                 get_perimeter)
 from scipy.ndimage import (center_of_mass,
                            distance_transform_edt,
                            binary_dilation)
@@ -70,11 +73,6 @@ def get_semimajor_axes(eccentricity, seed=None):
     rng = np.random.default_rng(seed)
     rng.shuffle(foci)
     return np.array(foci)
-
-
-def get_perimeter(lesion):
-    return ski.morphology.binary_dilation(lesion, np.ones((3, 3))) ^\
-           ski.morphology.binary_erosion(lesion, np.ones((3, 3)))
 
 
 def get_transformation_src_dst(lesion: np.ndarray[bool],
@@ -323,22 +321,14 @@ class HeadPhantom(Phantom):
                                       mass_effect=mass_effect,
                                       seed=seed,
                                       **kwargs)
-        elif lesion_type == 'epidural':
-            if isinstance(intensity, list):
-                intensity = max(intensity)
+        elif lesion_type in ['epidural', 'subdural']:
             img_w_lesion, lesion_image, lesion_coords =\
-                self._add_dural_lesion(volume, 'epidural', intensity,
+                self._add_dural_lesion(volume, lesion_type, intensity,
                                        init_slice, mass_effect=mass_effect,
                                        seed=seed,
                                        **kwargs)
         else:
-            if isinstance(intensity, list):
-                intensity = max(intensity)
-            img_w_lesion, lesion_image, lesion_coords =\
-                self._add_dural_lesion(volume, 'subdural', intensity,
-                                       init_slice, mass_effect=mass_effect,
-                                       seed=seed,
-                                       **kwargs)
+            raise ValueError(f'lesion type: {lesion_type} not defined')
 
         self._phantom = img_w_lesion
         self._lesion.append(lesion_image)
@@ -455,17 +445,17 @@ class HeadPhantom(Phantom):
         init_slice = init_slice or rng.choice(
             np.where(dura_map.mean(axis=(1, 2)) > 0.015)[0])
 
-        lesion_vol, volume = insert_dural_3D(phantom=self,
-                                             desired_volume=volume,
-                                             init_slice=init_slice,
-                                             hematoma_type=lesion_type,
-                                             mass_effect=mass_effect,
-                                             seed=seed)
-        if not isinstance(volume, np.ndarray):
+        lesion_vol, HU_volume = insert_dural_3D(phantom=self,
+                                                desired_volume=volume,
+                                                init_slice=init_slice,
+                                                hematoma_type=lesion_type,
+                                                mass_effect=mass_effect,
+                                                seed=seed)
+        if not isinstance(HU_volume, np.ndarray):
             HU_volume = HU_volume.numpy()
 
         img_w_lesion = HU_volume.copy()
-        img_w_lesion[lesion_vol == 1] = intensity
+        img_w_lesion[lesion_vol] = intensity
         z, x, y = center_of_mass(lesion_vol)
         return img_w_lesion, lesion_vol, (int(z), int(x), int(y))
 
