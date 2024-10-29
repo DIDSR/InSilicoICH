@@ -146,6 +146,8 @@ def insert_dural_3D(phantom, desired_volume, init_slice, hematoma_type,
                                boundary=temp_boundary,
                                hematoma_type=hematoma_type)
             if mass_effect:
+                if mass_effect is True:
+                    mass_effect = 0.5
                 connect_coords = np.argwhere(get_perimeter(filled_array))
                 strength = int(mass_effect *
                                distance_transform_edt(filled_array).max())
@@ -200,6 +202,8 @@ def insert_dural_3D(phantom, desired_volume, init_slice, hematoma_type,
                                boundary=temp_boundary,
                                hematoma_type=hematoma_type)
             if mass_effect:
+                if mass_effect is True:
+                    mass_effect = 0.5
                 connect_coords = np.argwhere(get_perimeter(filled_array))
                 strength = int(mass_effect *
                                distance_transform_edt(filled_array).max())
