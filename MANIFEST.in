@@ -1,1 +1,2 @@
 include src/pedsilicoICH/defaults/*
+include src/pedsilicoICH/ground_truth_definition/MIDA_v1.csv
