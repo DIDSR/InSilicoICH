@@ -54,8 +54,15 @@ if __name__ == "__main__":
         print(os.getcwd())
         df_volume = pd.read_csv(
             'src/pedsilicoICH/distributions/BHSD_volume_distributions.csv')
+        df_volume['EDH_weight'] /= df_volume['EDH_weight'].sum()
+        df_volume['SDH_weight'] /= df_volume['SDH_weight'].sum()
+        df_volume['IPH_weight'] /= df_volume['IPH_weight'].sum()
+
         df_HU = pd.read_csv(
             'src/pedsilicoICH/distributions/BHSD_HU_distributions.csv')
+        df_HU['EDH_weight'] /= df_HU['EDH_weight'].sum()
+        df_HU['SDH_weight'] /= df_HU['SDH_weight'].sum()
+        df_HU['IPH_weight'] /= df_HU['IPH_weight'].sum()
         print('Successfully loaded volume and HU distributions')
     except FileNotFoundError:
         min_vol, max_vol = 1, 60
@@ -74,7 +81,7 @@ if __name__ == "__main__":
     lesion_types = [None, 'round', 'epidural', 'subdural']
     mass_effect = np.linspace(0, 1, 10)
     random = np.random.default_rng(args.seed)
-    seed = random.randint(0, 1e6, size=1)[0]
+    seed = random.integers(0, 1e6)
     l_parameter_comb = []
 
     for case_idx in range(args.desired_cases):
@@ -83,20 +90,20 @@ if __name__ == "__main__":
             vol = 0
             intensity = 0
         elif lesion_id == 'epidural':
-            vol = random.choices(df_volume['EDH_volume'],
-                                 weights=df_volume['EDH_weight'])[0]
-            intensity = random.choices(df_HU['EDH_HU'],
-                                       weights=df_HU['EDH_weight'])[0]
+            vol = random.choice(df_volume['EDH_volume'],
+                                p=df_volume['EDH_weight'])
+            intensity = random.choice(df_HU['EDH_HU'],
+                                      p=df_HU['EDH_weight'])
         elif lesion_id == 'subdural':
-            vol = random.choices(df_volume['SDH_volume'],
-                                 weights=df_volume['SDH_weight'])[0]
-            intensity = random.choices(df_HU['SDH_HU'],
-                                       weights=df_HU['SDH_weight'])[0]
+            vol = random.choice(df_volume['SDH_volume'],
+                                p=df_volume['SDH_weight'])
+            intensity = random.choice(df_HU['SDH_HU'],
+                                      p=df_HU['SDH_weight'])
         elif lesion_id == 'round':
-            vol = random.choices(df_volume['IPH_volume'],
-                                 weights=df_volume['IPH_weight'])[0]
-            intensity = random.choices(df_HU['IPH_HU'],
-                                       weights=df_HU['IPH_weight'])[0]
+            vol = random.choice(df_volume['IPH_volume'],
+                                p=df_volume['IPH_weight'])
+            intensity = random.choice(df_HU['IPH_HU'],
+                                      p=df_HU['IPH_weight'])
 
         l_parameter_comb.append([
             random.choice(possible_ages),  # age
