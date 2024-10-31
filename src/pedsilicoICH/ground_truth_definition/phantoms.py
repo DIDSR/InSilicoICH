@@ -157,10 +157,8 @@ phantom.dicom_path = '{dicom_path}'
 # (the last folder name will be the phantom files' base name):
 phantom.phantom_path = '{phantom_path}'
 phantom.materials = {list(material_threshold_dict.keys())}
-phantom.mu_energy = 60  # Energy (keV) at which mu is to be calculated
-for all materials.
-phantom.thresholds = {list(material_threshold_dict.values())}  # Lower
-# threshold (HU) for each material.
+phantom.mu_energy = 60
+phantom.thresholds = {list(material_threshold_dict.values())}
 phantom.slice_range = [{[slice_range[0], slice_range[-1]]}] # Range of DICOM
 # image numbers to include. (first, last slice)
 phantom.show_phantom = False  # Flag to turn on/off image display.
