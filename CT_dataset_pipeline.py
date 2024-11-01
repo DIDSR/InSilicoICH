@@ -39,6 +39,10 @@ if __name__ == "__main__":
                         help='number of simulations to run')
     parser.add_argument('--zspan', nargs='+', default='dynamic',
                         help='z range of scans [mm], defaults to dynamic')
+    parser.add_argument('--keep_raw', type=bool, default=False,
+                        help='whether to keep raw projection data and ground\
+                        truth phantoms, greatly increases\
+                        storage requirements.')
     parser.add_argument('--seed', type=int, help='seed to reproduce a dataset')
     args = parser.parse_args()
 
@@ -130,14 +134,19 @@ if __name__ == "__main__":
         print(f'{age} years, {lesion_type}, {volume} volume, {intensity} HU')
         patient_name = f'case_{patientid:03}'
         study = run_study(output_directory,
-                          patient_name, age=age,
-                          kVp=kVp, mA=mA, intensity=intensity,
+                          patient_name,
+                          age=age,
+                          kVp=kVp,
+                          mA=mA,
+                          intensity=intensity,
                           volume=volume,
                           lesion_type=lesion_type,
                           mass_effect=mass_effect,
-                          views=args.views, zspan=args.zspan,
+                          views=args.views,
+                          zspan=args.zspan,
                           kernel=recon_kernel,
                           slice_thickness=slice_thickness,
+                          keep_raw=args.keep_raw,
                           seed=seed)
         study.metadata.to_csv(output_directory / patient_name /
                               f'metadata_{patientid}.csv',
