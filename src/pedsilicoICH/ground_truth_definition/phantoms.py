@@ -397,8 +397,8 @@ class HeadPhantom(Phantom):
         :returns: img_w_lesion, lesion_vol, (z, x, y)
         '''
         rng = np.random.default_rng(seed)
-
-        r = sphere_radius_from_volume(volume)
+        vox_size_mm = np.power(self.dx*self.dy*self.dz, 1/3)
+        r = sphere_radius_from_volume(volume)/vox_size_mm
         img = self.get_CT_number_phantom()
         mask = self.get_material_mask(material).astype(int)
 
