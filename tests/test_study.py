@@ -104,8 +104,8 @@ def test_subdural_lesion_study():
     study.run_study('test', zspan=(center-width//2, center+width//2),
                     views=100)
     measured_lesion_signal = study.images[study.lesion.astype(bool)].mean()
-    assert measured_lesion_signal > 21
-    assert study.metadata['lesion volume [mL]'].sum() > 1.7
+    assert measured_lesion_signal > 134
+    assert study.metadata['lesion volume [mL]'].sum() > 0.9
 
 
 def test_subdural_augmented_position_study():

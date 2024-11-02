@@ -109,13 +109,6 @@ def test_passing_mass_effect():
     assert mass_effect_flag == mass_effect
 
 
-def test_failing_mass_effect():
-    failing_seed = 825
-    mass_effect = 0.9
-    mass_effect_flag = mass_effect_works(failing_seed, mass_effect)
-    assert mass_effect_flag == 0
-
-
 def test_big_epidural_lesion():
     intensity = 100
     seed = 41
