@@ -9,6 +9,7 @@ import numpy as np
 import nibabel as nib
 import pandas as pd
 import skimage as ski
+from dotenv import load_dotenv
 from monai.transforms import Resize, RandAffine, Affine
 from torchvision.datasets.utils import download_and_extract_archive
 
@@ -185,9 +186,18 @@ def load_phantom(age=38, shape=(480, 480, 350), name='default'):
     :param intensity: uniform intensity of the lesion (HU)
     :param add_positioning_augmentation: bool, apply random affine to phantom
     '''
-    root_dir = Path(__file__).parents[2]
-    nihpd_dir = root_dir.parent / 'NIHPD_Head_Phantom'
-    mida_dir = root_dir.parent / 'MIDA_Head_Phantom'
+    load_dotenv()
+    if 'PHANTOM_DIRECTORY' in os.environ:
+        root_dir = Path(os.environ['PHANTOM_DIRECTORY'])
+    else:
+        root_dir = Path(__file__).parents[2]
+        Warning(f'''`PHANTOM_DIRECTORY` environment variable not set,
+        please add to `.env` or export PHANTOM_DIRECTORY /path/to_phantoms
+
+        Currently downloading NIHPD phantoms to: {root_dir.absolute()}''')
+
+    nihpd_dir = root_dir / 'NIHPD_Head_Phantom'
+    mida_dir = root_dir / 'MIDA_Head_Phantom'
 
     if not nihpd_dir.exists():
         url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
@@ -292,7 +302,7 @@ class HeadPhantom(Phantom):
         return self.dz, self.dx, self.dy
 
     def insert_lesion(self, lesion_type, volume=10, intensity=50,
-                      init_slice=None, mass_effect=False, seed=None, **kwargs):
+                      mass_effect=False, seed=None, **kwargs):
         '''
         inserts lesion of `lesion_type` into phantom array
 
@@ -301,7 +311,6 @@ class HeadPhantom(Phantom):
             see associated methods `add_round_lesion`, `_add_dural_lesion`
         :param volume: in mL, volume of the lesion
         :param intensity: lesion CT number in HU
-        :param init_slice: optional, slice to add dural_lesions to
         :param meass_effect: optional, bool whether to apply mass effect
             processing to displace brain tissue following lesion insertion
         :param edema: optional, bool or int. whether to add a ring of low
@@ -326,15 +335,7 @@ class HeadPhantom(Phantom):
         elif lesion_type in ['epidural', 'subdural']:
             img_w_lesion, lesion_image, lesion_coords =\
                 self._add_dural_lesion(volume, lesion_type, intensity,
-                                       init_slice, mass_effect=mass_effect,
-                                       seed=seed,
-                                       **kwargs)
-        elif lesion_type == 'subdural':
-            if isinstance(intensity, list):
-                intensity = max(intensity)
-            img_w_lesion, lesion_image, lesion_coords =\
-                self._add_dural_lesion(volume, 'subdural', intensity,
-                                       init_slice, mass_effect=mass_effect,
+                                       mass_effect=mass_effect,
                                        seed=seed,
                                        **kwargs)
         else:
@@ -398,15 +399,19 @@ class HeadPhantom(Phantom):
         '''
         rng = np.random.default_rng(seed)
 
-        r = sphere_radius_from_volume(volume)
+        voxel_size = np.power(self.dx*self.dy*self.dz, 1/3)
+        r = sphere_radius_from_volume(volume) / voxel_size
         img = self.get_CT_number_phantom()
         mask = self.get_material_mask(material).astype(int)
 
         lesion_vol = np.zeros_like(img)
-        suitable_points = distance_transform_edt(mask) > r
+        valid_points = distance_transform_edt(mask) > (r * 0.9)  # allows for some overlap
+        if not valid_points.any():
+            raise RuntimeError(f'Requested volume: {volume} mL too\
+                                large, try smaller volume')
         # lower distance threshold `r` to allow overlap
-        z, x, y = np.argwhere(suitable_points)[rng.integers(0,
-                                               suitable_points.sum())]
+        z, x, y = np.argwhere(valid_points)[rng.integers(0,
+                                            valid_points.sum())]
 
         lesion_vol = np.full(img.shape, fill_value=-1000)
         for _ in range(complexity):
@@ -447,17 +452,11 @@ class HeadPhantom(Phantom):
         return img_w_lesion, lesion_mask, (z, x, y)
 
     def _add_dural_lesion(self, volume, lesion_type, intensity,
-                          init_slice=None, seed=None, mass_effect=True):
-        rng = np.random.default_rng(seed)
-        dura_map = self.get_dura_map()
+                          seed=None, mass_effect=True):
+
         HU_volume = self.get_CT_number_phantom()
-
-        init_slice = init_slice or rng.choice(
-            np.where(dura_map.mean(axis=(1, 2)) > 0.015)[0])
-
         lesion_vol, HU_volume = insert_dural_3D(phantom=self,
                                                 desired_volume=volume,
-                                                init_slice=init_slice,
                                                 hematoma_type=lesion_type,
                                                 mass_effect=mass_effect,
                                                 seed=seed)

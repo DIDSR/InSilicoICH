@@ -61,8 +61,9 @@ def elliptical_lesion(shape: tuple | list,
     return np.where(lesion_only > 0, True, False)
 
 
-def insert_dural_3D(phantom, desired_volume, init_slice, hematoma_type,
+def insert_dural_3D(phantom, desired_volume, hematoma_type,
                     mass_effect, seed=None):
+    'desired_volume in mL'
 
     random = np.random.default_rng(seed)
 
@@ -71,7 +72,9 @@ def insert_dural_3D(phantom, desired_volume, init_slice, hematoma_type,
                                       slice_thickness=phantom.dz)
     ab = (desired_volume*2000)/(num_slices * phantom.dz)
     # using ABC/2 formula (although /2000 for mL and mm)
-    # print('AB: ' + str(ab))
+    # print('AB: ' + str(ab)) # units of mm^2
+    pixel_area_mm = phantom.dx*phantom.dy
+    ab_voxels = ab / pixel_area_mm  # desired area in voxels^2
     if hematoma_type == 'epidural':
         desired_distance = math.sqrt(4*ab)
         # assume that length of epidural hemorrhage is about 4 times the width
@@ -79,17 +82,18 @@ def insert_dural_3D(phantom, desired_volume, init_slice, hematoma_type,
         desired_distance = math.sqrt(10*ab)
 
     HU_array = phantom.get_CT_number_phantom()
-    dura_map = phantom.get_dura_map()
-    skull_map = phantom.get_skull_map()
-    brain_mask = (HU_array > -1000) & (~skull_map.astype(bool))
-
-    all_slices = np.arange(brain_mask.shape[0])
-    brain_slices = all_slices[brain_mask.sum(axis=(1, 2)) > 0]
-    init_slice = random.choice(brain_slices)
+    dura_map = phantom.get_dura_map().astype(bool)
+    skull_map = phantom.get_skull_map().astype(bool)
+    all_slices = np.arange(phantom.shape[0])
+    candidate_slices = all_slices[(skull_map).sum(axis=(1, 2)) > ab_voxels]
+    candidate_slices = candidate_slices[candidate_slices > num_slices//2]
+    candidate_slices = candidate_slices[candidate_slices <
+                                        (phantom.shape[0] - num_slices//2)]
+    init_slice = random.choice(candidate_slices)
 
     new_volume = np.copy(HU_array)
 
-    boundary = dura_map
+    boundary = dura_map.astype(bool)
     distances = [(desired_distance-5)/phantom.spacings[2],
                  (desired_distance+5)/phantom.spacings[2]]
 

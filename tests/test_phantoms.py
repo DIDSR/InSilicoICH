@@ -114,3 +114,59 @@ def test_failing_mass_effect():
     mass_effect = 0.9
     mass_effect_flag = mass_effect_works(failing_seed, mass_effect)
     assert mass_effect_flag == 0
+
+
+def test_big_epidural_lesion():
+    intensity = 100
+    seed = 41
+    age = 9
+    desired_volume = 100
+    phantom = load_phantom(age)
+    phantom.insert_lesion('epidural', volume=desired_volume,
+                          intensity=intensity, seed=seed)
+    measured_volume = phantom._lesion[0].sum() *\
+        (phantom.dx*phantom.dy*phantom.dz)/1000
+    rel_vol_error = (desired_volume - measured_volume)/desired_volume*100
+    assert abs(rel_vol_error) < 20
+
+
+def test_big_subdural_lesion():
+    intensity = 100
+    seed = 41
+    age = 9
+    desired_volume = 100
+    phantom = load_phantom(age)
+    phantom.insert_lesion('subdural', volume=desired_volume,
+                          intensity=intensity, seed=seed)
+    measured_volume = phantom._lesion[0].sum() *\
+        (phantom.dx*phantom.dy*phantom.dz)/1000
+    rel_vol_error = (desired_volume - measured_volume)/desired_volume*100
+    assert abs(rel_vol_error) < 20
+
+
+def test_big_round_lesion():
+    intensity = 100
+    seed = 41
+    age = 9
+    desired_volume = 6  # mL
+    phantom = load_phantom(age)
+    phantom.insert_lesion('round', volume=desired_volume,
+                          intensity=intensity, seed=seed)
+    measured_volume = phantom._lesion[0].sum() *\
+        (phantom.dx*phantom.dy*phantom.dz)/1000
+    rel_vol_error = (desired_volume - measured_volume)/desired_volume*100
+    assert abs(rel_vol_error) < 20
+
+
+def test_volume_accuracy_reduced_phantom_matrix():
+    intensity = 100
+    seed = 41
+    age = 9
+    desired_volume = 6  # mL
+    phantom = load_phantom(age, shape=(128, 128, 128))
+    phantom.insert_lesion('round', volume=desired_volume,
+                          intensity=intensity, seed=seed)
+    measured_volume = phantom._lesion[0].sum() *\
+        (phantom.dx*phantom.dy*phantom.dz)/1000
+    rel_vol_error = (desired_volume - measured_volume)/desired_volume*100
+    assert abs(rel_vol_error) < 30

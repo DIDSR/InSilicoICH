@@ -43,6 +43,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     zspan = args.zspan
+    if isinstance(zspan[0], str) and (zspan != 'dynamic'):
+        zspan = zspan[0].split(' ')
     if isinstance(zspan, list):
         zspan = list(map(int, zspan))
     output_directory = Path(args.output_directory)
