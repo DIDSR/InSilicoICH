@@ -4,6 +4,7 @@ module for working with phantoms
 
 from pathlib import Path
 import os
+from warnings import warn
 
 import numpy as np
 import nibabel as nib
@@ -188,28 +189,36 @@ def load_phantom(age=38, shape=(480, 480, 350), name='default'):
     '''
     load_dotenv()
     if 'PHANTOM_DIRECTORY' in os.environ:
-        root_dir = Path(os.environ['PHANTOM_DIRECTORY'])
+        phantom_dir = Path(os.environ['PHANTOM_DIRECTORY'])
     else:
-        root_dir = Path(__file__).parents[2]
-        Warning(f'''`PHANTOM_DIRECTORY` environment variable not set,
-        please add to `.env` or export PHANTOM_DIRECTORY /path/to_phantoms
+        phantom_dir = Path(__file__).parents[2]
+        warn(f'''
+The environment variable `PHANTOM_DIRECTORY` has not been set, this is needed
+to locate stored base phantom files for the NIHPD and MIDA head phantoms.
 
-        Currently downloading NIHPD phantoms to: {root_dir.absolute()}''')
+If these phantom files cannot be located, NIHPD phantoms will be downloaded to
+your working directory: {phantom_dir}
 
-    nihpd_dir = root_dir / 'NIHPD_Head_Phantom'
-    mida_dir = root_dir / 'MIDA_Head_Phantom'
+MIDA phantom files need to be downloaded manually and added to this directory,
+see `MIDA_Head_Phantom` for details.
 
-    if not nihpd_dir.exists():
-        url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
-        download_and_extract_archive(url, nihpd_dir)
+Please do one of the following:
+
+1. create a file called `.env` in this project's working directory and add:
+
+`PHANTOM_DIRECTORY=/path/to/phantoms`
+
+or
+
+2. in your terminal `export PHANTOM_DIRECTORY=/path/to_phantoms`
+''')
+
     mida_age = 38
     if age == mida_age:
-        if not mida_dir.exists():
-            Warning(f'MIDA head phantom not found in {mida_dir}, skipping...')
-            return None
-        phantom = MIDA_Head(mida_dir, shape=shape)
+        phantom = MIDA_Head(phantom_dir / 'MIDA_Head_Phantom', shape=shape)
     else:
-        phantom = NIHPD_Head(nihpd_dir, age=age, shape=shape)
+        phantom = NIHPD_Head(phantom_dir / 'NIHPD_Head_Phantom',
+                             age=age, shape=shape)
 
     phantom.patient_name = name
     phantom.age = age
@@ -311,7 +320,7 @@ class HeadPhantom(Phantom):
             see associated methods `add_round_lesion`, `_add_dural_lesion`
         :param volume: in mL, volume of the lesion
         :param intensity: lesion CT number in HU
-        :param meass_effect: optional, bool whether to apply mass effect
+        :param mass_effect: optional, bool whether to apply mass effect
             processing to displace brain tissue following lesion insertion
         :param edema: optional, bool or int. whether to add a ring of low
             contrast, 10 HU, edema around the lesion, currently only
@@ -367,7 +376,7 @@ class HeadPhantom(Phantom):
                          complexity: int = 3,
                          seed: int | None = None) -> tuple:
         '''
-        adds ronud lesion to img in random location within mask of size radius
+        adds round lesion to img in random location within mask of size radius
         and intensity level intensity
 
         See parameter descriptions below for further modifications that can
@@ -387,7 +396,7 @@ class HeadPhantom(Phantom):
             effect strength where 1 is a large degree of mass effect warping
             and 0.2 is a smaller amount of warping, see
             `insert_with_mass_effect` for more details
-        :param edema: bool or int, refering to the number of pixels thick of
+        :param edema: bool or int, referring to the number of pixels thick of
             an edema layer to add around the lesion
         :param complexity: int, number of ellipses to aid with
             random jiggle, 1 gives a single ellipsoid, increasing to 2 or 3
@@ -472,6 +481,15 @@ class HeadPhantom(Phantom):
 class MIDA_Head(HeadPhantom):
     def __init__(self, phantom_dir, csf_HU=10, gm_HU=40, wm_HU=30,
                  skull_HU=1000, shape=None):
+        if not phantom_dir.exists():
+            raise FileNotFoundError(f'''
+MIDA head phantom files not found in {phantom_dir}
+
+To use MIDA head phantoms, please download them from:
+ <https://cdrh-rst.fda.gov/mida-multimodal-imaging-based-model-human-head-and-neck>
+
+and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
+''')
         super().__init__(phantom_dir)
         self.age = 38  # median american age
         self.csf_HU = csf_HU
@@ -558,6 +576,17 @@ class NIHPD_Head(HeadPhantom):
     '''
     def __init__(self, phantom_dir, age: float, symmetric=False, csf_HU=10,
                  gm_HU=40, wm_HU=30, skull_HU=1000, shape=None):
+        phantom_dir = Path(phantom_dir)
+        if not phantom_dir.exists():
+            url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
+            print(f'''
+`PHANTOM_DIRECTORY` {phantom_dir} not found, now downloading NIHPD phantoms
+from {url}
+
+If you have already downloaded NIHPD and MIDA head phantoms, please see
+`load_phantom` for details on how to add their locations.
+''')
+            download_and_extract_archive(url, phantom_dir)
         super().__init__(phantom_dir)
         self.age = age
         self.csf_HU = csf_HU
@@ -571,7 +600,7 @@ class NIHPD_Head(HeadPhantom):
         ages = {get_mean_age(o): o for o in age_ranges}
 
         if age not in ages:
-            raise ValueError(f'age {age} not in {sorted(ages.keys())}')
+            raise ValueError(f'age {age} not in {sorted(ages.keys())} from {self.phantom_dir}')
         age_range = ages[age]
 
         base_dir = self.phantom_dir
