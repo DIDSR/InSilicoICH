@@ -507,7 +507,7 @@ class Scanner():
 
         ds.PixelSpacing = [self.xcist.cfg.recon.fov/self.xcist.cfg.recon.imageSize,
                            self.xcist.cfg.recon.fov/self.xcist.cfg.recon.imageSize]
-        ds.SliceThickness = ds.PixelSpacing[0]
+        ds.SliceThickness = ds.SliceThickness
 
         ds.KVP = self.kVp
         ds.StudyID = str(self.studyid)
