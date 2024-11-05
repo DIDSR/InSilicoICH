@@ -210,7 +210,7 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
             slice_counter += 1
             if slice_counter == num_slices:
                 iter_flag = False
-    return hemorrhage_mask, new_volume
+    return hemorrhage_mask.astype(bool), new_volume
 
 
 def connect_points(start, end, boundary, hematoma_type):
