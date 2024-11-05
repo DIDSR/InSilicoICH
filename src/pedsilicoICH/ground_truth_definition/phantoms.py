@@ -71,7 +71,6 @@ def get_semi_major_axes(eccentricity, seed=None):
     eccentricity_dict = get_eccentricity_dict()
     key = get_closest_key(eccentricity, eccentricity_dict)
     foci = eccentricity_dict[key]
-
     rng = np.random.default_rng(seed)
     rng.shuffle(foci)
     return np.array(foci)
