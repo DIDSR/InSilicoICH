@@ -18,13 +18,13 @@ from pedsilicoICH.ground_truth_definition.phantoms import (MIDA_Head,
 nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
 
 load_dotenv()
-if 'PHANTOM_DIRECTORY' not in os.environ:
+if 'PHANTOM_DIRECTORY' in os.environ:
+    phantom_dir = Path(os.environ['PHANTOM_DIRECTORY'])
+else:
     print('''
 Please `export PHANTOM_DIRECTORY=/path/to/phantoms` or add your `.env`
 file with PHANTOM_DIRECTORY=/path/to/phantoms
 ''')
-    phantom_dir = Path(os.environ['PHANTOM_DIRECTORY'])
-else:
     phantom_dir = Path(__file__).parent.absolute()
 
 nihpd_dir = phantom_dir / 'NIHPD_Head_Phantom'
