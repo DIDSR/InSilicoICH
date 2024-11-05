@@ -67,7 +67,7 @@ def get_eccentricity_dict():
     return {c: eccentricity_dict[c] for c in sorted(eccentricity_dict)}
 
 
-def get_semimajor_axes(eccentricity, seed=None):
+def get_semi_major_axes(eccentricity, seed=None):
     eccentricity_dict = get_eccentricity_dict()
     key = get_closest_key(eccentricity, eccentricity_dict)
     foci = eccentricity_dict[key]
@@ -310,7 +310,7 @@ class HeadPhantom(Phantom):
     def spacings(self):
         return self.dz, self.dx, self.dy
 
-    def insert_lesion(self, lesion_type, volume=10, intensity=50,
+    def insert_lesion(self, lesion_type, volume=5, intensity=50,
                       mass_effect=False, seed=None, **kwargs):
         '''
         inserts lesion of `lesion_type` into phantom array
@@ -414,7 +414,7 @@ class HeadPhantom(Phantom):
         mask = self.get_material_mask(material).astype(int)
 
         lesion_vol = np.zeros_like(img)
-        valid_points = distance_transform_edt(mask) > (r * 0.9)  # allows for some overlap
+        valid_points = distance_transform_edt(mask) > (r * 0.9)
         if not valid_points.any():
             raise RuntimeError(f'Requested volume: {volume} mL too\
                                 large, try smaller volume')
@@ -423,15 +423,16 @@ class HeadPhantom(Phantom):
                                             valid_points.sum())]
 
         lesion_vol = np.full(img.shape, fill_value=-1000)
+        transform = RandAffine(prob=1, translate_range=[r, r])
+        transform.set_random_state(seed)
+
         for _ in range(complexity):
-            axes = get_semimajor_axes(eccentricity, seed)
+            lesion_seed = rng.integers(0, 1e6)
+            axes = get_semi_major_axes(eccentricity, lesion_seed)
             foci = r * axes
-            random_rotate = seed or True
             sphere = elliptical_lesion(img.shape, center=(z, x, y),
                                        radius=foci,
-                                       random_rotate=random_rotate)
-            transform = RandAffine(prob=1, translate_range=[r, r])
-            transform.set_random_state(seed)
+                                       random_rotate=lesion_seed)
             sphere = transform(sphere).astype(bool)
             lesion_vol[sphere] = intensity
         lesion_mask = lesion_vol > -1000
