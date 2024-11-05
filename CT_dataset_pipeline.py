@@ -24,13 +24,13 @@ import os
 
 import numpy as np
 import pandas as pd
-import random
 
 from pedsilicoICH.pipeline import run_study
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser(description='Runs XCIST CT simulations of ICH models')
+    parser = ArgumentParser(
+        description='Runs XCIST CT simulations of ICH models')
     parser.add_argument('--output_directory', type=str, default="",
                         help='output directory to save simulation results')
     parser.add_argument('--views', type=int, default=1000,
@@ -39,9 +39,12 @@ if __name__ == "__main__":
                         help='number of simulations to run')
     parser.add_argument('--zspan', nargs='+', default='dynamic',
                         help='z range of scans [mm], defaults to dynamic')
+    parser.add_argument('--seed', type=int, help='seed to reproduce a dataset')
     args = parser.parse_args()
 
     zspan = args.zspan
+    if isinstance(zspan[0], str) and (zspan != 'dynamic'):
+        zspan = zspan[0].split(' ')
     if isinstance(zspan, list):
         zspan = list(map(int, zspan))
     output_directory = Path(args.output_directory)
@@ -51,16 +54,26 @@ if __name__ == "__main__":
     # load volume and HU distributions
     try:
         print(os.getcwd())
-        df_volume = pd.read_csv('src/pedsilicoICH/distributions/BHSD_volume_distributions.csv')
-        df_HU = pd.read_csv('src/pedsilicoICH/distributions/BHSD_HU_distributions.csv')
+        df_volume = pd.read_csv(
+            'src/pedsilicoICH/distributions/BHSD_volume_distributions.csv')
+        df_volume['EDH_weight'] /= df_volume['EDH_weight'].sum()
+        df_volume['SDH_weight'] /= df_volume['SDH_weight'].sum()
+        df_volume['IPH_weight'] /= df_volume['IPH_weight'].sum()
+
+        df_HU = pd.read_csv(
+            'src/pedsilicoICH/distributions/BHSD_HU_distributions.csv')
+        df_HU['EDH_weight'] /= df_HU['EDH_weight'].sum()
+        df_HU['SDH_weight'] /= df_HU['SDH_weight'].sum()
+        df_HU['IPH_weight'] /= df_HU['IPH_weight'].sum()
         print('Successfully loaded volume and HU distributions')
-    except:
-        min_vol, max_vol = 1, 60  # applied only to spheres [units of voxels, TODO convert to mL or mm^3]
+    except FileNotFoundError:
+        min_vol, max_vol = 1, 60
         volume_list = np.linspace(min_vol, max_vol, 20)
         min_intensity, max_intensity = 20, 200
         intensity_list = np.arange(20, 200)
 
-    recon_kernel = 'soft'  # options include ['standard', 'soft', 'bone', 'R-L', 'S-L']
+    recon_kernel = 'soft'
+    # options include ['standard', 'soft', 'bone', 'R-L', 'S-L']
     slice_thickness = 5  # in mm
     nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
     mida_age = 38  # median US adult age to represent MIDA
@@ -69,6 +82,8 @@ if __name__ == "__main__":
     mA_list = list(range(300, 400, 50))
     lesion_types = [None, 'round', 'epidural', 'subdural']
     mass_effect = np.linspace(0, 1, 10)
+    random = np.random.default_rng(args.seed)
+    seed = random.integers(0, 1e6)
     l_parameter_comb = []
 
     for case_idx in range(args.desired_cases):
@@ -77,16 +92,20 @@ if __name__ == "__main__":
             vol = 0
             intensity = 0
         elif lesion_id == 'epidural':
-            vol = random.choices(df_volume['EDH_volume'],
-                                 weights=df_volume['EDH_weight'])[0]
-            intensity = random.choices(df_HU['EDH_HU'],
-                         weights=df_HU['EDH_weight'])[0]
+            vol = random.choice(df_volume['EDH_volume'],
+                                p=df_volume['EDH_weight'])
+            intensity = random.choice(df_HU['EDH_HU'],
+                                      p=df_HU['EDH_weight'])
         elif lesion_id == 'subdural':
-            vol = random.choices(df_volume['SDH_volume'], weights=df_volume['SDH_weight'])[0]
-            intensity = random.choices(df_HU['SDH_HU'], weights=df_HU['SDH_weight'])[0]
-        elif lesion_id == 'sphere':
-            vol = random.choices(df_volume['IPH_volume'], weights=df_volume['IPH_weight'])[0]
-            intensity = random.choices(df_HU['IPH_HU'], weights=df_HU['IPH_weight'])[0]
+            vol = random.choice(df_volume['SDH_volume'],
+                                p=df_volume['SDH_weight'])
+            intensity = random.choice(df_HU['SDH_HU'],
+                                      p=df_HU['SDH_weight'])
+        elif lesion_id == 'round':
+            vol = random.choice(df_volume['IPH_volume'],
+                                p=df_volume['IPH_weight'])
+            intensity = random.choice(df_HU['IPH_HU'],
+                                      p=df_HU['IPH_weight'])
 
         l_parameter_comb.append([
             random.choice(possible_ages),  # age
@@ -102,7 +121,7 @@ if __name__ == "__main__":
 
     try:
         patientids = [int(os.environ['SLURM_ARRAY_TASK_ID']) - 1]
-    except:
+    except KeyError:
         print('SLURM_ARRAY_TASK_ID not set, running in serial')
         patientids = list(range(n_params))
 
@@ -119,7 +138,9 @@ if __name__ == "__main__":
                           lesion_type=lesion_type,
                           mass_effect=mass_effect,
                           views=args.views, zspan=args.zspan,
-                          kernel=recon_kernel, slice_thickness=slice_thickness)
+                          kernel=recon_kernel,
+                          slice_thickness=slice_thickness,
+                          seed=seed)
         study.metadata.to_csv(output_directory / patient_name /
                               f'metadata_{patientid}.csv',
                               index=False)

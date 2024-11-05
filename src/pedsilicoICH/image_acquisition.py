@@ -421,7 +421,8 @@ class Scanner():
             print(self.xcist.recon.mu)
             print(self.xcist.physics.monochromatic)
             if self.xcist.physics.monochromatic != -1:
-                self.xcist.recon.mu = xc.GetMu('water', self.xcist.physics.monochromatic)[0]/10
+                self.xcist.recon.mu = xc.GetMu(
+                    'water', self.xcist.physics.monochromatic)[0]/10
             else:
                 print(self.xcist.recon.mu)
         if not sliceCount:
@@ -488,7 +489,8 @@ class Scanner():
         del ds.PatientWeight
         del ds.ContrastBolusRoute
         del ds.ContrastBolusAgent
-        ds.ImageComments = f"effctive diameter [cm]: {self.patient_diameter/10}"
+        ds.ImageComments =\
+            f"effctive diameter [cm]: {self.patient_diameter/10}"
         ds.ScanOptions = self.xcist.cfg.protocol.scanTrajectory.upper()
         ds.ReconstructionDiameter = self.xcist.cfg.recon.fov
         ds.ConvolutionKernel = self.xcist.cfg.recon.kernelType
