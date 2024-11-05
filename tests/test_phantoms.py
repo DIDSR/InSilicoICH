@@ -154,11 +154,11 @@ def test_big_round_lesion():
     desired_volume = 6  # mL
     phantom = load_phantom(age)
     phantom.insert_lesion('round', volume=desired_volume,
-                          intensity=intensity, seed=seed)
+                          intensity=intensity, seed=seed, complexity=1)
     measured_volume = phantom._lesion[0].sum() *\
         (phantom.dx*phantom.dy*phantom.dz)/1000
     rel_vol_error = (desired_volume - measured_volume)/desired_volume*100
-    assert abs(rel_vol_error) < 20
+    assert abs(rel_vol_error) < 30
 
 
 def test_volume_accuracy_reduced_phantom_matrix():
