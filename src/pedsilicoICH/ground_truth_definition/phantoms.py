@@ -415,8 +415,8 @@ class HeadPhantom(Phantom):
         lesion_vol = np.zeros_like(img)
         valid_points = distance_transform_edt(mask) > (r * 0.9)
         if not valid_points.any():
-            raise RuntimeError(f'Requested volume: {volume} mL too\
-                                large, try smaller volume')
+            raise RuntimeError(f'Requested volume: {volume} mL too \
+large, try smaller volume')
         # lower distance threshold `r` to allow overlap
         z, x, y = np.argwhere(valid_points)[rng.integers(0,
                                             valid_points.sum())]
