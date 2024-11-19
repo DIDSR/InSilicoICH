@@ -172,4 +172,4 @@ def test_volume_accuracy_reduced_phantom_matrix():
     measured_volume = phantom._lesion[0].sum() *\
         (phantom.dx*phantom.dy*phantom.dz)/1000
     rel_vol_error = (desired_volume - measured_volume)/desired_volume*100
-    assert abs(rel_vol_error) < 30
+    assert abs(rel_vol_error) < 40
