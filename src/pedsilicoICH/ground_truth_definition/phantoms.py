@@ -660,6 +660,7 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
         phantom = self.csf*self.csf_HU + self.gm*self.gm_HU +\
             self.wm*self.wm_HU + self.skull*self.skull_HU
         phantom[phantom <= 0] = self.air_HU
+        phantom[self.get_dura_map()] = 50  # HU same as MIDA
         return phantom
 
     def get_material_mask(self, material):
