@@ -66,11 +66,10 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
                                       hematoma_type=hematoma_type,
                                       slice_thickness=phantom.dz)
     ab = (desired_volume*2000)/(num_slices * phantom.dz)  # using ABC/2 formula (although /2000 for mL and mm)
-    # print('AB: ' + str(ab))
     if hematoma_type == 'epidural':
         desired_distance = math.sqrt(4*ab)  # assume that length of epidural hemorrhage is about 4 times the width
     elif hematoma_type == 'subdural':
-        desired_distance = math.sqrt(10*ab)
+        desired_distance = math.sqrt(8*ab)
 
     HU_array = phantom.get_CT_number_phantom()
 
@@ -138,10 +137,11 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
                                boundary=temp_boundary,
                                hematoma_type=hematoma_type)
 
+            mass_effect = True
             if mass_effect:
                 try:
-                    warped_slice = warp_slice(HU_array[init_slice],
-                                              skull_map[init_slice],
+                    warped_slice = warp_slice(HU_array[init_slice, :],
+                                              skull_map[init_slice, :],
                                               boundary_coords, connect_coords)
                 except ValueError:
                     Warning(f'Failed to perform mass effect insertion for\
@@ -149,9 +149,9 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
                           effect to 0')
                     new_volume[init_slice] = HU_array[init_slice]
                     phantom.mass_effect = 0
-                new_volume[init_slice] = warped_slice
+                new_volume[init_slice, :, :] = warped_slice
 
-            hemorrhage_mask[init_slice] = filled_array
+            hemorrhage_mask[init_slice, :, :] = filled_array
 
             slice_counter += 1
 
@@ -187,8 +187,8 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
                                hematoma_type=hematoma_type)
             if mass_effect:
                 try:
-                    warped_slice = warp_slice(HU_array[init_slice-slice_idx],
-                                              skull_map[init_slice],
+                    warped_slice = warp_slice(HU_array[init_slice-slice_idx, :],
+                                              skull_map[init_slice-slice_idx, :],
                                               boundary_coords, connect_coords)
                     new_volume[init_slice-slice_idx] = warped_slice
                 except ValueError:
@@ -210,6 +210,7 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
             slice_counter += 1
             if slice_counter == num_slices:
                 iter_flag = False
+                
     return hemorrhage_mask.astype(bool), new_volume
 
 
@@ -233,7 +234,7 @@ def connect_points(start, end, boundary, hematoma_type):
         bezier_weight = 0.14  # weight should probably be below 0.2 to avoid ballooning too much, but line breaks if below 0.04....
         bezier_middle = (int(rows/2), int(cols/2))  # center of the image, should probably randomize it somewhere along center later
     elif hematoma_type == 'subdural':
-        bezier_weight = 2
+        bezier_weight = 0.5
         bezier_middle = boundary_coords[round(len(boundary_coords)/2)]  # use the middle point of the dura line
     else:
         bezier_weight = 0.0
@@ -264,26 +265,42 @@ def connect_points(start, end, boundary, hematoma_type):
 def warp_slice(axial_slice, skull_slice, src, dst):
     '''perform warp of 2D slice according to hematoma boundary coordinates'''
     # to simulate mass effect, transform will need some skull coordinates to NOT move
-    skull_slice = skull_slice.astype(bool)
-    skull_idx = np.argwhere(skull_slice)
-    skull_sample = np.round(np.linspace(0, len(skull_idx)-1, 1000)).astype(int)  # increase from 1000 as memory allows
+    #skull_slice = skull_slice.astype(bool)
+
+    flood_mask = ski.segmentation.flood(skull_slice, seed_point=(0, 0))
+    skull_slice[flood_mask] = 1
+
+    # using the entire inner boundary of the skull mask seems to work great as anchor points
+    skull_boundary = ski.segmentation.find_boundaries(skull_slice, mode='inner', background=0)
+
+    skull_sample = np.argwhere(skull_boundary != 0)
 
     # initialize warp source and destination with skull indices in both (shouldn't move!)
-    warp_src = skull_idx[skull_sample]
-    warp_dst = skull_idx[skull_sample]
+    warp_src = warp_dst = skull_sample
 
     src_subset = src[np.round(np.linspace(0, len(src)-1, 5)).astype(int)]
     dst_subset = dst[np.round(np.linspace(0, len(dst)-1, 5)).astype(int)]
+
     warp_src = np.insert(warp_src, 0, src_subset, axis=0)
     warp_dst = np.insert(warp_dst, 0, dst_subset, axis=0)
+
+    warp_src = np.insert(warp_src, 0, [[0, 0],[0, axial_slice.shape[1]],[axial_slice.shape[0], 0],[axial_slice.shape[0], axial_slice.shape[1]]], axis=0)
+    warp_dst = np.insert(warp_dst, 0, [[0, 0],[0, axial_slice.shape[1]],[axial_slice.shape[0], 0],[axial_slice.shape[0], axial_slice.shape[1]]], axis=0)
 
     tps = ski.transform.ThinPlateSplineTransform()
     tps.estimate(np.flip(warp_dst), np.flip(warp_src))
     warped_slice = ski.transform.warp(axial_slice, tps,
-                                      preserve_range=False, order=0)
-    brain_mask = (~skull_slice) & (axial_slice > -100)
-    error_map = (warped_slice - axial_slice) > axial_slice[brain_mask].mean()
-    warped_slice[error_map] = axial_slice[error_map]
+                                      preserve_range=True, order=1)
+    
+    # new code to try to "fix" skull warping into brain
+    problem_voxels = np.argwhere((skull_slice != 1) & (warped_slice > 59))
+    for index in problem_voxels:
+        warped_slice[index[0], index[1]] = 50
+
+    # brain_mask = (~skull_slice) & (axial_slice > -100)
+    # error_map = (warped_slice - axial_slice) > axial_slice[brain_mask].mean()
+    # warped_slice[error_map] = axial_slice[error_map]
+
     return warped_slice
 
 
