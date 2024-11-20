@@ -82,12 +82,14 @@ if __name__ == "__main__":
     mA_list = list(range(300, 400, 50))
     lesion_types = [None, 'round', 'epidural', 'subdural']
     mass_effect = np.linspace(0, 1, 10)
+    edema_list = list(range(15))  # IPH only
     random = np.random.default_rng(args.seed)
     seed = random.integers(0, 1e6)
     l_parameter_comb = []
 
     for case_idx in range(args.desired_cases):
         lesion_id = random.choice(lesion_types)  # select a random lesion type
+        edema = None
         if lesion_id is None:
             vol = 0
             intensity = 0
@@ -106,6 +108,7 @@ if __name__ == "__main__":
                                 p=df_volume['IPH_weight'])
             intensity = random.choice(df_HU['IPH_HU'],
                                       p=df_HU['IPH_weight'])
+            edema = random.choice(edema_list)
 
         l_parameter_comb.append([
             random.choice(possible_ages),  # age
@@ -140,7 +143,9 @@ if __name__ == "__main__":
                           views=args.views, zspan=args.zspan,
                           kernel=recon_kernel,
                           slice_thickness=slice_thickness,
+                          edema=edema,
                           seed=seed)
+        study.metadata['edema'] = edema
         study.metadata.to_csv(output_directory / patient_name /
                               f'metadata_{patientid}.csv',
                               index=False)
