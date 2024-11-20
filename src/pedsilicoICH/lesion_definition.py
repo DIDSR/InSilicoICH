@@ -66,7 +66,6 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
                                       hematoma_type=hematoma_type,
                                       slice_thickness=phantom.dz)
     ab = (desired_volume*2000)/(num_slices * phantom.dz)  # using ABC/2 formula (although /2000 for mL and mm)
-    # print('AB: ' + str(ab))
     if hematoma_type == 'epidural':
         desired_distance = math.sqrt(4*ab)  # assume that length of epidural hemorrhage is about 4 times the width
     elif hematoma_type == 'subdural':
@@ -211,11 +210,6 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
             slice_counter += 1
             if slice_counter == num_slices:
                 iter_flag = False
-    
-    print('total nonzero voxels in hemorrhage mask: ' + str(np.count_nonzero(hemorrhage_mask)))
-    print(phantom.dx)
-    print(phantom.dy)
-    print(phantom.dz)
                 
     return hemorrhage_mask.astype(bool), new_volume
 
