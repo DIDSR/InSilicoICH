@@ -138,78 +138,94 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
                                boundary=temp_boundary,
                                hematoma_type=hematoma_type)
 
+            mass_effect = True
             if mass_effect:
                 try:
-                    warped_slice = warp_slice(HU_array[init_slice],
-                                              skull_map[init_slice],
-                                              boundary_coords, connect_coords)
+                    warped_slice = warp_slice(HU_array[init_slice, :],
+                                              skull_map[init_slice, :],
+                                              boundary_coords, connect_coords, filled_array)
                 except ValueError:
                     Warning(f'Failed to perform mass effect insertion for\
                           volume: {desired_volume}, now inserting with mass\
                           effect to 0')
                     new_volume[init_slice] = HU_array[init_slice]
                     phantom.mass_effect = 0
-                new_volume[init_slice] = warped_slice
+                new_volume[init_slice, :, :] = warped_slice
 
-            hemorrhage_mask[init_slice] = filled_array
+            hemorrhage_mask[init_slice, :, :] = filled_array
 
+            print(init_slice)
             slice_counter += 1
+            iter_flag = False
 
-        # this is a bit messy but it will work for intended purpose:
-        # starting from hemorrhage origin, move down while shrinking distance between start/end point
-        # then, move up from hemorrhage origin while doing the same
-        if slice_counter <= (num_slices-1)/2:  # move down from hemorrhage origin
-            slice_idx = slice_counter
-        elif slice_counter > (num_slices-1)/2:  # start moving up from hemorrhage origin
-            slice_idx = -1*(slice_counter - int((num_slices-1)/2))
+            import matplotlib.pyplot as plt
+            plt.figure()
+            plt.imshow(warped_slice, vmin=-40, vmax=120)
+            plt.title('warped slice (no hematoma)')
+            plt.show()
 
-        temp_boundary = boundary[init_slice-slice_idx]
+            plt.figure()
+            plt.imshow(filled_array)
+            plt.title('hematoma mask')
+            plt.show()
 
-        dura_idx = np.argwhere(temp_boundary == 1.0)
+        # # this is a bit messy but it will work for intended purpose:
+        # # starting from hemorrhage origin, move down while shrinking distance between start/end point
+        # # then, move up from hemorrhage origin while doing the same
+        # if slice_counter <= (num_slices-1)/2:  # move down from hemorrhage origin
+        #     slice_idx = slice_counter
+        # elif slice_counter > (num_slices-1)/2:  # start moving up from hemorrhage origin
+        #     slice_idx = -1*(slice_counter - int((num_slices-1)/2))
 
-        if len(dura_idx) != 0:  # need to check that we didn't land on a slice with no remaining dura
-            # find closest boundary point to previous start
-            distance_idx = np.zeros((len(dura_idx), 2))
+        # temp_boundary = boundary[init_slice-slice_idx]
 
-            distance_from_start = np.zeros(len(dura_idx))
-            distance_from_end = np.zeros(len(dura_idx))
-            for i in range(len(dura_idx)):
-                distance_from_start[i] = math.sqrt((orig_start[0] - dura_idx[i][0])**2 + (orig_start[1] - dura_idx[i][1])**2)
-                distance_from_end[i] = math.sqrt((orig_end[0] - dura_idx[i][0])**2 + (orig_end[1] - dura_idx[i][1])**2)
+        # dura_idx = np.argwhere(temp_boundary == 1.0)
 
-            new_start = dura_idx[np.argmin(distance_from_start)]
-            new_end = dura_idx[np.argmin(distance_from_end)]
+        # if len(dura_idx) != 0:  # need to check that we didn't land on a slice with no remaining dura
+        #     # find closest boundary point to previous start
+        #     distance_idx = np.zeros((len(dura_idx), 2))
 
-            filled_array, boundary_coords, connect_coords =\
-                connect_points(start=new_start,
-                               end=new_end,
-                               boundary=temp_boundary,
-                               hematoma_type=hematoma_type)
-            if mass_effect:
-                try:
-                    warped_slice = warp_slice(HU_array[init_slice-slice_idx],
-                                              skull_map[init_slice],
-                                              boundary_coords, connect_coords)
-                    new_volume[init_slice-slice_idx] = warped_slice
-                except ValueError:
-                    Warning(f'Failed to perform mass effect insertion for\
-                          volume: {desired_volume}, now inserting with mass\
-                          effect to 0')
-                    new_volume[init_slice-slice_idx] =\
-                        HU_array[init_slice-slice_idx]
-                    phantom.mass_effect = 0
+        #     distance_from_start = np.zeros(len(dura_idx))
+        #     distance_from_end = np.zeros(len(dura_idx))
+        #     for i in range(len(dura_idx)):
+        #         distance_from_start[i] = math.sqrt((orig_start[0] - dura_idx[i][0])**2 + (orig_start[1] - dura_idx[i][1])**2)
+        #         distance_from_end[i] = math.sqrt((orig_end[0] - dura_idx[i][0])**2 + (orig_end[1] - dura_idx[i][1])**2)
 
-            hemorrhage_mask[init_slice-slice_idx] = filled_array
+        #     new_start = dura_idx[np.argmin(distance_from_start)]
+        #     new_end = dura_idx[np.argmin(distance_from_end)]
 
-            slice_counter += 1
+        #     filled_array, boundary_coords, connect_coords =\
+        #         connect_points(start=new_start,
+        #                        end=new_end,
+        #                        boundary=temp_boundary,
+        #                        hematoma_type=hematoma_type)
+        #     if mass_effect:
+        #         print('WARPING ' + str(init_slice-slice_idx))
+        #         try:
+        #             warped_slice = warp_slice(HU_array[init_slice-slice_idx, :],
+        #                                       skull_map[init_slice-slice_idx, :],
+        #                                       boundary_coords, connect_coords, filled_array)
+        #             new_volume[init_slice-slice_idx] = warped_slice
+        #         except ValueError:
+        #             Warning(f'Failed to perform mass effect insertion for\
+        #                   volume: {desired_volume}, now inserting with mass\
+        #                   effect to 0')
+        #             new_volume[init_slice-slice_idx] =\
+        #                 HU_array[init_slice-slice_idx]
+        #             phantom.mass_effect = 0
 
-            if slice_counter == num_slices:
-                iter_flag = False
+        #     hemorrhage_mask[init_slice-slice_idx] = filled_array
 
-        else:
-            slice_counter += 1
-            if slice_counter == num_slices:
-                iter_flag = False
+        #     slice_counter += 1
+
+        #     if slice_counter == num_slices:
+        #         iter_flag = False
+
+        # else:
+        #     slice_counter += 1
+        #     if slice_counter == num_slices:
+        #         iter_flag = False
+                
     return hemorrhage_mask.astype(bool), new_volume
 
 
@@ -261,29 +277,92 @@ def connect_points(start, end, boundary, hematoma_type):
     return filled_array, boundary_coords, connect_coords
 
 
-def warp_slice(axial_slice, skull_slice, src, dst):
+def warp_slice(axial_slice, skull_slice, src, dst, filled_boundary):
     '''perform warp of 2D slice according to hematoma boundary coordinates'''
     # to simulate mass effect, transform will need some skull coordinates to NOT move
-    skull_slice = skull_slice.astype(bool)
-    skull_idx = np.argwhere(skull_slice)
-    skull_sample = np.round(np.linspace(0, len(skull_idx)-1, 1000)).astype(int)  # increase from 1000 as memory allows
+    #skull_slice = skull_slice.astype(bool)
+
+    import matplotlib.pyplot as plt
+    import sys
+
+    # plt.figure()
+    # plt.imshow(skull_slice)
+    # plt.title('skull_mask')
+    # plt.show()
+    flood_mask = ski.segmentation.flood(skull_slice, seed_point=(0, 0))
+
+    plt.figure()
+    plt.imshow(flood_mask)
+    plt.title('flood mask')
+    plt.show()
+
+    skull_slice[flood_mask] = 1
+
+    plt.figure()
+    plt.imshow(skull_slice)
+    plt.title('new skull slice')
+    plt.show()
+
+    brain_voxels = np.where(skull_slice != 1)
+    print(brain_voxels)
+
+    skull_idx = np.argwhere(skull_slice == 1.0)
+    skull_boundary = ski.segmentation.find_boundaries(skull_slice, mode='inner', background=0)
+    # plt.figure()
+    # plt.imshow(skull_slice)
+    # plt.title('flooded skull mask')
+    # plt.show()
+    # plt.figure()
+    # plt.imshow(skull_boundary)
+    # plt.show()
+    # sys.exit()
+
+    #skull_sample = np.round(np.linspace(0, len(skull_idx)-1, 500)).astype(int)  # increase from 1000 as memory allows
+    skull_sample = np.argwhere(skull_boundary != 0)
 
     # initialize warp source and destination with skull indices in both (shouldn't move!)
-    warp_src = skull_idx[skull_sample]
-    warp_dst = skull_idx[skull_sample]
+    warp_src = warp_dst = skull_sample
+    #warp_src = skull_idx[skull_sample]
+    #warp_dst = skull_idx[skull_sample]
 
-    src_subset = src[np.round(np.linspace(0, len(src)-1, 5)).astype(int)]
-    dst_subset = dst[np.round(np.linspace(0, len(dst)-1, 5)).astype(int)]
+    # points_to_use = round(min(len(src), len(dst))/2)
+    # print(points_to_use)
+    src_subset = src[np.round(np.linspace(0, len(src)-1, 20)).astype(int)]
+    dst_subset = dst[np.round(np.linspace(0, len(dst)-1, 20)).astype(int)]
+
+    import matplotlib.pyplot as plt
+    test = np.zeros_like(axial_slice)
+    plt.imshow(filled_boundary)
+    for index in src_subset:
+        plt.scatter(x=index[1], y=index[0], marker='x', color='green', s=1)
+    for index in dst_subset:
+        plt.scatter(x=index[1], y=index[0], marker='x', color='red', s=1)
+    for index in warp_src:
+        plt.scatter(x=index[1], y=index[0], marker='x', color='yellow', s=1)
+    plt.show()
+
+    # sys.exit()
+
     warp_src = np.insert(warp_src, 0, src_subset, axis=0)
     warp_dst = np.insert(warp_dst, 0, dst_subset, axis=0)
 
     tps = ski.transform.ThinPlateSplineTransform()
     tps.estimate(np.flip(warp_dst), np.flip(warp_src))
     warped_slice = ski.transform.warp(axial_slice, tps,
-                                      preserve_range=False, order=0)
-    brain_mask = (~skull_slice) & (axial_slice > -100)
-    error_map = (warped_slice - axial_slice) > axial_slice[brain_mask].mean()
-    warped_slice[error_map] = axial_slice[error_map]
+                                      preserve_range=True, order=1)
+    
+    # new code to try to "fix" skull warping into brain
+    problem_voxels = np.where((flood_mask != 1) & (warped_slice > 400))
+    print('problem voxels:')
+    print(len(problem_voxels[0]))
+    print(len(problem_voxels[1]))
+
+    #for index in problem_voxels:
+
+    # brain_mask = (~skull_slice) & (axial_slice > -100)
+    # error_map = (warped_slice - axial_slice) > axial_slice[brain_mask].mean()
+    # warped_slice[error_map] = axial_slice[error_map]
+
     return warped_slice
 
 
