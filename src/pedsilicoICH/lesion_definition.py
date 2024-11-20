@@ -70,7 +70,7 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
     if hematoma_type == 'epidural':
         desired_distance = math.sqrt(4*ab)  # assume that length of epidural hemorrhage is about 4 times the width
     elif hematoma_type == 'subdural':
-        desired_distance = math.sqrt(10*ab)
+        desired_distance = math.sqrt(8*ab)
 
     HU_array = phantom.get_CT_number_phantom()
 
@@ -143,7 +143,7 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
                 try:
                     warped_slice = warp_slice(HU_array[init_slice, :],
                                               skull_map[init_slice, :],
-                                              boundary_coords, connect_coords, filled_array)
+                                              boundary_coords, connect_coords)
                 except ValueError:
                     Warning(f'Failed to perform mass effect insertion for\
                           volume: {desired_volume}, now inserting with mass\
@@ -190,7 +190,7 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
                 try:
                     warped_slice = warp_slice(HU_array[init_slice-slice_idx, :],
                                               skull_map[init_slice-slice_idx, :],
-                                              boundary_coords, connect_coords, filled_array)
+                                              boundary_coords, connect_coords)
                     new_volume[init_slice-slice_idx] = warped_slice
                 except ValueError:
                     Warning(f'Failed to perform mass effect insertion for\
@@ -240,7 +240,7 @@ def connect_points(start, end, boundary, hematoma_type):
         bezier_weight = 0.14  # weight should probably be below 0.2 to avoid ballooning too much, but line breaks if below 0.04....
         bezier_middle = (int(rows/2), int(cols/2))  # center of the image, should probably randomize it somewhere along center later
     elif hematoma_type == 'subdural':
-        bezier_weight = 2
+        bezier_weight = 0.5
         bezier_middle = boundary_coords[round(len(boundary_coords)/2)]  # use the middle point of the dura line
     else:
         bezier_weight = 0.0
@@ -268,7 +268,7 @@ def connect_points(start, end, boundary, hematoma_type):
     return filled_array, boundary_coords, connect_coords
 
 
-def warp_slice(axial_slice, skull_slice, src, dst, filled_boundary):
+def warp_slice(axial_slice, skull_slice, src, dst):
     '''perform warp of 2D slice according to hematoma boundary coordinates'''
     # to simulate mass effect, transform will need some skull coordinates to NOT move
     #skull_slice = skull_slice.astype(bool)
@@ -284,11 +284,14 @@ def warp_slice(axial_slice, skull_slice, src, dst, filled_boundary):
     # initialize warp source and destination with skull indices in both (shouldn't move!)
     warp_src = warp_dst = skull_sample
 
-    src_subset = src[np.round(np.linspace(0, len(src)-1, 20)).astype(int)]
-    dst_subset = dst[np.round(np.linspace(0, len(dst)-1, 20)).astype(int)]
+    src_subset = src[np.round(np.linspace(0, len(src)-1, 5)).astype(int)]
+    dst_subset = dst[np.round(np.linspace(0, len(dst)-1, 5)).astype(int)]
 
     warp_src = np.insert(warp_src, 0, src_subset, axis=0)
     warp_dst = np.insert(warp_dst, 0, dst_subset, axis=0)
+
+    warp_src = np.insert(warp_src, 0, [[0, 0],[0, axial_slice.shape[1]],[axial_slice.shape[0], 0],[axial_slice.shape[0], axial_slice.shape[1]]], axis=0)
+    warp_dst = np.insert(warp_dst, 0, [[0, 0],[0, axial_slice.shape[1]],[axial_slice.shape[0], 0],[axial_slice.shape[0], axial_slice.shape[1]]], axis=0)
 
     tps = ski.transform.ThinPlateSplineTransform()
     tps.estimate(np.flip(warp_dst), np.flip(warp_src))
