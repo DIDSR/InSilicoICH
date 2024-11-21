@@ -13,8 +13,7 @@ else:
     startZ = 0
     endZ = 10
 
-# lesion_types = ['round', 'epidural', 'subdural']
-lesion_types = ['epidural', 'subdural']
+lesion_types = ['epidural', 'subdural', 'round']
 mass_effect = 1.0
 
 outdir = Path('experiments/lesions')
@@ -28,7 +27,7 @@ for lesion_type in lesion_types:
 
     for intensity, volume in zip(intensities, volumes):
         print(f'{intensity} HU, {volume} mL')
-        phantom = load_phantom(age, name=lesion_type)
+        phantom = load_phantom(age, name=lesion_type, shape=None)
         phantom.insert_lesion(lesion_type=lesion_type, volume=volume,
                               intensity=intensity,
                               mass_effect=mass_effect, seed=336)
