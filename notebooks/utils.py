@@ -57,6 +57,7 @@ def show_lesions(phantom):
         axs[1, idx].imshow(lesion[coords[0]], cmap='Reds', alpha=0.1)
         axs[1, idx].set_title(f'{phantom.lesion_type[idx]}')
 
+
 def hematoma_phase(contrast):
     if contrast > 60:
         return 'acute'
@@ -69,6 +70,7 @@ def hematoma_phase(contrast):
     else:
         return None
 
+
 def get_effective_diameter(ground_truth_mu, pixel_width_mm):
     '''
     effective diameter defined in AAPM TG204:
@@ -76,6 +78,7 @@ def get_effective_diameter(ground_truth_mu, pixel_width_mm):
     '''
     A = np.sum(ground_truth_mu > -1000)*pixel_width_mm**2
     return 2*np.sqrt(A/np.pi)
+
 
 # https://radiopaedia.org/articles/windowing-ct?lang=us
 display_settings = {
@@ -91,7 +94,7 @@ display_settings = {
 
 def ctshow(img, window='soft tissues', fig=None, ax=None):
     if fig is None or ax is None:
-        fig, ax=plt.subplots()
+        fig, ax = plt.subplots()
     # Define some specific window settings here
     if isinstance(window, str):
         if window not in display_settings:
@@ -104,7 +107,8 @@ def ctshow(img, window='soft tissues', fig=None, ax=None):
         ww = 6.0 * img.std()
         wl = img.mean()
 
-    if img.ndim == 3: img = img[0].copy()
+    if img.ndim == 3:
+        img = img[0].copy()
 
     ax.imshow(img, cmap='gray', vmin=wl-ww/2, vmax=wl+ww/2)
     ax.set_xticks([])

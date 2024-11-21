@@ -1,0 +1,5 @@
+python experiments/lesion_characteristics.py
+
+python experiments/image_acquisition_comparison.py
+
+python experiments/patient_characteristics.py
