@@ -142,7 +142,7 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
                 try:
                     warped_slice = warp_slice(HU_array[init_slice, :],
                                               skull_map[init_slice, :],
-                                              boundary_coords, connect_coords)
+                                              boundary_coords, connect_coords, hematoma_type)
                 except ValueError:
                     Warning(f'Failed to perform mass effect insertion for\
                           volume: {desired_volume}, now inserting with mass\
@@ -189,7 +189,7 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
                 try:
                     warped_slice = warp_slice(HU_array[init_slice-slice_idx, :],
                                               skull_map[init_slice-slice_idx, :],
-                                              boundary_coords, connect_coords)
+                                              boundary_coords, connect_coords, hematoma_type)
                     new_volume[init_slice-slice_idx] = warped_slice
                 except ValueError:
                     Warning(f'Failed to perform mass effect insertion for\
@@ -262,7 +262,7 @@ def connect_points(start, end, boundary, hematoma_type):
     return filled_array, boundary_coords, connect_coords
 
 
-def warp_slice(axial_slice, skull_slice, src, dst):
+def warp_slice(axial_slice, skull_slice, src, dst, hematoma_type):
     '''perform warp of 2D slice according to hematoma boundary coordinates'''
     # to simulate mass effect, transform will need some skull coordinates to NOT move
     #skull_slice = skull_slice.astype(bool)
@@ -270,6 +270,7 @@ def warp_slice(axial_slice, skull_slice, src, dst):
     flood_mask = ski.segmentation.flood(skull_slice, seed_point=(0, 0))
     skull_slice[flood_mask] = 1
 
+    brain_mask = np.where(skull_slice == 1, 0, 1)
     # using the entire inner boundary of the skull mask seems to work great as anchor points
     skull_boundary = ski.segmentation.find_boundaries(skull_slice, mode='inner', background=0)
 
@@ -292,14 +293,14 @@ def warp_slice(axial_slice, skull_slice, src, dst):
     warped_slice = ski.transform.warp(axial_slice, tps,
                                       preserve_range=True, order=1)
     
+    axial_slice = axial_slice*brain_mask
     # new code to try to "fix" skull warping into brain
-    problem_voxels = np.argwhere((skull_slice != 1) & (warped_slice > 59))
+    problem_voxels = np.argwhere((skull_slice != 1) & (warped_slice > 50))
     for index in problem_voxels:
-        warped_slice[index[0], index[1]] = 50
-
-    # brain_mask = (~skull_slice) & (axial_slice > -100)
-    # error_map = (warped_slice - axial_slice) > axial_slice[brain_mask].mean()
-    # warped_slice[error_map] = axial_slice[error_map]
+        if hematoma_type == 'epidural' or 'subdural':
+            warped_slice[index[0], index[1]] = 50 # HU value of dura mater
+        elif hematoma_type == 'round':
+            warped_slice[index[0], index[1]] = axial_slice[axial_slice!=0].mean()
 
     return warped_slice
 
