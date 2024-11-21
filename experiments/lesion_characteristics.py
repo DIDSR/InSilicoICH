@@ -38,7 +38,7 @@ for lesion_type in lesion_types:
 
         scanner = Scanner(phantom, output_dir=outdir)
         scanner.run_scan(startZ=center-width//2, endZ=center+width//2,
-                         views=1000)
+                         views=100)
         scanner.run_recon(kernel=kernel)
         ctshow(center_crop(scanner.recon[1:-1].mean(axis=0)), 'brain')
         plt.savefig(outdir / f'{volume}mL_{intensity}HU_{lesion_type}.png',

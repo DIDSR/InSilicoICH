@@ -551,7 +551,9 @@ and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
         '''obtains partial skull map using mida atlas,
          ignoring facial bones (for now)'''
         skull_map = np.zeros_like(self._phantom)
+        skull_map[np.where(self._phantom == 52)] = 1.0
         skull_map[np.where(self._phantom == 53)] = 1.0  # skull outer table
+        skull_map[np.where(self._phantom == 54)] = 1.0  # skull outer table
         skull_map[np.where(self._phantom == 40)] = 1.0  # skull/facial bone
         skull_map[np.where(self._phantom == 1000)] = 1.0  # other bone voxels
         return skull_map
