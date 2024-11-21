@@ -24,9 +24,10 @@ outdir.mkdir(exist_ok=True, parents=True)
 for lesion_type in lesion_types:
     volumes = np.linspace(0.1, 8, 3) if lesion_type == 'round'\
         else np.linspace(1, 20, 3)
-    intensities = np.linspace(100, 50, 3)
+    intensities = np.linspace(70, 50, 3)
 
     for intensity, volume in zip(intensities, volumes):
+        print(f'{intensity} HU, {volume} mL')
         phantom = load_phantom(age, name=lesion_type)
         phantom.insert_lesion(lesion_type=lesion_type, volume=volume,
                               intensity=intensity,

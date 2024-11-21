@@ -72,10 +72,10 @@ def test_sphere_augmented_position_study():
 #                     views=100)
 #     measured_lesion_signal = study.images[study.lesion.astype(bool)].mean()
 #     assert measured_lesion_signal > 38
-
+shape = 3*[128]
 
 def test_epidural_augmented_position_study():
-    phantom = load_phantom(age)
+    phantom = load_phantom(age, shape=shape)
     phantom.insert_lesion('epidural', volume=5, intensity=300, seed=336)
     phantom.apply_transform(transform, seed=42)
     lesion_level_mm = (phantom.get_CT_number_phantom().shape[0]/2 -
@@ -109,7 +109,7 @@ def test_epidural_augmented_position_study():
 
 
 def test_subdural_augmented_position_study():
-    phantom = load_phantom(age)
+    phantom = load_phantom(age, shape=shape)
     phantom.insert_lesion('subdural', volume=5, intensity=300, seed=336)
     phantom.apply_transform(transform, seed=42)
     lesion_level_mm = (phantom.get_CT_number_phantom().shape[0]/2 -

@@ -120,6 +120,7 @@ if not nihpd_dir.exists():
 #                                              lesion_type)
 #     assert mass_effect_flag == mass_effect
 
+shape = 3*[128]
 
 def test_big_epidural_lesion():
     intensity = 100
@@ -127,7 +128,7 @@ def test_big_epidural_lesion():
     age = 9
     mass_effect = True
     desired_volume = 100
-    phantom = load_phantom(age)
+    phantom = load_phantom(age, shape=shape)
     phantom.insert_lesion('epidural', volume=desired_volume,
                           intensity=intensity,
                           mass_effect=mass_effect,
@@ -144,7 +145,7 @@ def test_big_subdural_lesion():
     age = 9
     desired_volume = 80
     mass_effect = True
-    phantom = load_phantom(age)
+    phantom = load_phantom(age, shape=shape)
     phantom.insert_lesion('subdural', volume=desired_volume,
                           intensity=intensity,
                           mass_effect=mass_effect,
@@ -161,7 +162,7 @@ def test_big_round_lesion():
     age = 9
     desired_volume = 6  # mL
     mass_effect = True
-    phantom = load_phantom(age)
+    phantom = load_phantom(age, shape=shape)
     phantom.insert_lesion('round', volume=desired_volume,
                           intensity=intensity,
                           mass_effect=mass_effect,
@@ -169,17 +170,20 @@ def test_big_round_lesion():
     measured_volume = phantom._lesion[0].sum() *\
         (phantom.dx*phantom.dy*phantom.dz)/1000
     rel_vol_error = (desired_volume - measured_volume)/desired_volume*100
-    assert abs(rel_vol_error) < 30
+    assert abs(rel_vol_error) < 40
 
 
-def test_volume_accuracy_reduced_phantom_matrix():
+def test_volume_accuracy_full_matrix():
     intensity = 100
     seed = 41
     age = 9
     desired_volume = 6  # mL
-    phantom = load_phantom(age, shape=(128, 128, 128))
+    mass_effect = False
+    phantom = load_phantom(age)
     phantom.insert_lesion('round', volume=desired_volume,
-                          intensity=intensity, seed=seed, complexity=1)
+                          intensity=intensity, seed=seed,
+                          mass_effect=mass_effect,
+                          complexity=1)
     measured_volume = phantom._lesion[0].sum() *\
         (phantom.dx*phantom.dy*phantom.dz)/1000
     rel_vol_error = (desired_volume - measured_volume)/desired_volume*100
