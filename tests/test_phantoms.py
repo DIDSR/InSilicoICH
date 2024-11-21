@@ -102,12 +102,12 @@ def test_transforms_on_phantoms(seed=885):
                                                seed=seed)
 
 
-def mass_effect_works(seed, mass_effect):
+def mass_effect_works(seed, mass_effect, lesion_type='subdural'):
     intensity = 100
     age = 9
     volume = 40
     phantom = load_phantom(age)
-    phantom.insert_lesion('subdural', volume=volume, intensity=intensity,
+    phantom.insert_lesion(lesion_type, volume=volume, intensity=intensity,
                           mass_effect=mass_effect, seed=seed)
     return phantom.mass_effect
 
@@ -115,7 +115,9 @@ def mass_effect_works(seed, mass_effect):
 def test_passing_mass_effect():
     passing_seed = 242
     mass_effect = 0.9
-    mass_effect_flag = mass_effect_works(passing_seed, mass_effect)
+    for lesion_type in ['epidural', 'subdural']:
+        mass_effect_flag = mass_effect_works(passing_seed, mass_effect,
+                                             lesion_type)
     assert mass_effect_flag == mass_effect
 
 
