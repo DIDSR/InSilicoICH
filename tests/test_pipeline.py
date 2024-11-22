@@ -95,7 +95,7 @@ if __name__ == "__main__":
     parser.add_argument('-v', '--views', type=int, default=100,
                         help='number of views to generate per series')
     parser.add_argument('-n', '--name', type=str,
-                        help='filename to save report', default='lesion.png')
+                        help='filename to save report', default='lesions.png')
     parser.add_argument('-a', '--age', type=float, default=15.75,
                         help='phantom age to use')
     args = parser.parse_args()
