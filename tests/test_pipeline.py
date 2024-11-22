@@ -50,7 +50,7 @@ def center_crop(img, thresh=-800):
     return cropped
 
 
-def test_lesion_characteristics(age=15.75, views=100, name='lesion.png'):
+def test_lesion_characteristics(age=15.75, views=100, name='lesions.png'):
     lesion_types = ['epidural', 'subdural', 'round']
     mass_effect = True
 
