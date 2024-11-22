@@ -50,7 +50,7 @@ def center_crop(img, thresh=-800):
     return cropped
 
 
-def test_lesion_characteristics(age=15.75, views=100, fname='lesion.png'):
+def test_lesion_characteristics(age=15.75, views=100, name='lesion.png'):
     lesion_types = ['epidural', 'subdural', 'round']
     mass_effect = True
 
@@ -86,7 +86,7 @@ def test_lesion_characteristics(age=15.75, views=100, fname='lesion.png'):
     for ax, img in zip(axs.flatten(), imgs):
         ctshow(center_crop(img), 'brain', fig=f, ax=ax)
     f.suptitle(' | '.join(lesion_types))
-    f.savefig(fname, dpi=600, bbox_inches='tight')
+    f.savefig(name, dpi=600, bbox_inches='tight')
 
 
 if __name__ == "__main__":
@@ -99,4 +99,4 @@ if __name__ == "__main__":
     parser.add_argument('-a', '--age', type=float, default=15.75,
                         help='phantom age to use')
     args = parser.parse_args()
-    test_lesion_characteristics(**args)
+    test_lesion_characteristics(age=args.age, views=args.views, name=args.name)
