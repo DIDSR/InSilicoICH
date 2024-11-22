@@ -174,7 +174,7 @@ phantom.overwrite = True  # Flag to overwrite existing files without warning.
     dicom_to_voxelized_phantom.run_from_config(dicom_to_voxel_cfg)
 
 
-def load_phantom(age=38, shape=(480, 480, 350), name='default'):
+def load_phantom(age=38, shape=None, name='default'):
     '''
     Loads appropriate phantom based on age as a keyword
 
@@ -415,8 +415,8 @@ class HeadPhantom(Phantom):
         lesion_vol = np.zeros_like(img)
         valid_points = distance_transform_edt(mask) > (r * 0.9)
         if not valid_points.any():
-            raise RuntimeError(f'Requested volume: {volume} mL too\
-                                large, try smaller volume')
+            raise RuntimeError(f'Requested volume: {volume} mL too \
+large, try smaller volume')
         # lower distance threshold `r` to allow overlap
         z, x, y = np.argwhere(valid_points)[rng.integers(0,
                                             valid_points.sum())]
