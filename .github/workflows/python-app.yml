@@ -38,3 +38,8 @@ jobs:
       run: |
         cd ..
         pytest
+    - name: Save test result
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-result
+        path: lesions.png

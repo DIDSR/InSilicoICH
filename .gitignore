@@ -30,3 +30,4 @@ __pycache__
 src/PedSilicoICH.egg-info
 .env
 experiments/*/*.png
+lesions.png
