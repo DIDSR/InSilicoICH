@@ -86,6 +86,8 @@ def test_lesion_characteristics(age=15.75, views=100, name='tests/lesions.png'):
     for ax, img in zip(axs.flatten(), imgs):
         ctshow(center_crop(img), 'brain', fig=f, ax=ax)
     f.suptitle(' | '.join(lesion_types))
+    name = Path(name)
+    name.parent.mkdir(parents=True, exist_ok=True)
     f.savefig(name, dpi=600, bbox_inches='tight')
 
 
