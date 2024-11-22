@@ -1,4 +1,3 @@
-# %%
 from pathlib import Path
 from argparse import ArgumentParser
 
@@ -50,14 +49,30 @@ def center_crop(img, thresh=-800):
     return cropped
 
 
-def test_lesion_characteristics(age=15.75, views=100, name='tests/lesions.png'):
+def plot_montage(imgs, fname):
+    f, axs = plt.subplots(3, 3, figsize=(6.9, 8),
+                          gridspec_kw=dict(wspace=0, hspace=0))
+    axs = axs.T
+    for ax, img in zip(axs.flatten(), imgs):
+        ctshow(center_crop(img), 'brain', fig=f, ax=ax)
+        ax.set_aspect('equal')
+    f.savefig(fname, dpi=600, bbox_inches='tight')
+
+
+def test_lesion_characteristics(age=15.75, views=100,
+                                name='tests/images.png'):
+
     lesion_types = ['epidural', 'subdural', 'round']
     mass_effect = True
 
-    outdir = Path('experiments/lesions')
+    name = Path(name)
+    name.parent.mkdir(parents=True, exist_ok=True)
+
+    outdir = name.parent / 'lesions'
     kernel = 'soft'
     outdir.mkdir(exist_ok=True, parents=True)
 
+    phantoms = []
     imgs = []
     for lesion_type in lesion_types:
         volumes = np.linspace(0.1, 8, 3) if lesion_type == 'round'\
@@ -70,25 +85,22 @@ def test_lesion_characteristics(age=15.75, views=100, name='tests/lesions.png'):
             phantom.insert_lesion(lesion_type=lesion_type, volume=volume,
                                   intensity=intensity,
                                   mass_effect=mass_effect, seed=336)
+            phantoms.append(phantom.get_CT_number_phantom()[
+                phantom._lesion_coords[0][0]])
             lesion_level_mm = (phantom.get_CT_number_phantom().shape[0]/2 -
                                phantom._lesion_coords[0][0])*phantom.dz
             center = lesion_level_mm
-            width = 8
+            width = 7
 
             scanner = Scanner(phantom, output_dir=outdir)
-            scanner.run_scan(startZ=center-width//2, endZ=center+width//2,
+            scanner.run_scan(startZ=center-width/2, endZ=center+width/2,
                              views=views)
             scanner.run_recon(kernel=kernel)
             imgs.append(scanner.recon[1:-1].mean(axis=0))
 
-    f, axs = plt.subplots(3, 3, tight_layout=True)
-    axs = axs.T
-    for ax, img in zip(axs.flatten(), imgs):
-        ctshow(center_crop(img), 'brain', fig=f, ax=ax)
-    f.suptitle(' | '.join(lesion_types))
-    name = Path(name)
-    name.parent.mkdir(parents=True, exist_ok=True)
-    f.savefig(name, dpi=600, bbox_inches='tight')
+    plot_montage(imgs, name)
+
+    plot_montage(phantoms, name.parent / 'phantoms.png')
 
 
 if __name__ == "__main__":
@@ -97,7 +109,7 @@ if __name__ == "__main__":
     parser.add_argument('-v', '--views', type=int, default=100,
                         help='number of views to generate per series')
     parser.add_argument('-n', '--name', type=str,
-                        help='filename to save report', default='lesions.png')
+                        help='filename to save report', default='images.png')
     parser.add_argument('-a', '--age', type=float, default=15.75,
                         help='phantom age to use')
     args = parser.parse_args()
