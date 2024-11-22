@@ -137,12 +137,12 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
                                boundary=temp_boundary,
                                hematoma_type=hematoma_type)
 
-            mass_effect = True
             if mass_effect:
                 try:
                     warped_slice = warp_slice(HU_array[init_slice, :],
                                               skull_map[init_slice, :],
-                                              boundary_coords, connect_coords, hematoma_type)
+                                              boundary_coords, connect_coords,
+                                              hematoma_type)
                 except ValueError:
                     Warning(f'Failed to perform mass effect insertion for\
                           volume: {desired_volume}, now inserting with mass\
