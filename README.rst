@@ -64,6 +64,11 @@ Repository Contents
 
 - `CT_dataset_pipeline.py <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/CT_dataset_pipeline.py>`_: used for generating the in silico dataset
 
+Contributing
+------------
+
+Our current practice is developing locally by cloning the git repo to your local machine or personal directory and accessing a common dataset. Commits are encouraged to be regularly synced between the local and remote repo. Contributions are welcome from all, though developing on your own branch may be best to avoid merge conflicts, then we can decide on what to merge to the main branch (see `software carpentry on collaborating with git <https://swcarpentry.github.io/git-novice/08-collab.html>`_ for details).
+
 Useful Links
 ------------
 

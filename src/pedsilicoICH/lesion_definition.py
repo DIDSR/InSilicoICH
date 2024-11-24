@@ -7,8 +7,6 @@ import numpy as np
 import skimage as ski
 import scipy
 from monai.transforms import RandAffine
-from scipy.ndimage import (binary_erosion,
-                           distance_transform_edt)
 
 
 def get_perimeter(lesion):
@@ -40,10 +38,8 @@ def elliptical_lesion(shape: tuple | list,
         radius = 3*[radius]
     ell = ski.draw.ellipsoid(*radius)
     if random_rotate:
-        transform = RandAffine(prob=1,
-                               rotate_range=[np.pi/2, np.pi/2, np.pi/2],
-                               scale_range=[0.1, 0.1, 0.1],
-                               padding_mode="zeros")
+        transform = RandAffine(prob=1, rotate_range=[np.pi/2, np.pi/2, np.pi/2],
+                               scale_range=[0.1, 0.1, 0.1], padding_mode="zeros")
         if isinstance(random_rotate, int):
             transform.set_random_state(seed=random_rotate)
 
@@ -61,7 +57,7 @@ def elliptical_lesion(shape: tuple | list,
     return np.where(lesion_only > 0, True, False)
 
 
-def insert_dural_3D(phantom, desired_volume, init_slice, hematoma_type,
+def insert_dural_3D(phantom, desired_volume, hematoma_type,
                     mass_effect, seed=None):
 
     random = np.random.default_rng(seed)
@@ -69,36 +65,30 @@ def insert_dural_3D(phantom, desired_volume, init_slice, hematoma_type,
     num_slices = coverage_from_volume(volume=desired_volume,
                                       hematoma_type=hematoma_type,
                                       slice_thickness=phantom.dz)
-    ab = (desired_volume*2000)/(num_slices * phantom.dz)
-    # using ABC/2 formula (although /2000 for mL and mm)
-    # print('AB: ' + str(ab))
+    ab = (desired_volume*2000)/(num_slices * phantom.dz)  # using ABC/2 formula (although /2000 for mL and mm)
     if hematoma_type == 'epidural':
-        desired_distance = math.sqrt(4*ab)
-        # assume that length of epidural hemorrhage is about 4 times the width
+        desired_distance = math.sqrt(4*ab)  # assume that length of epidural hemorrhage is about 4 times the width
     elif hematoma_type == 'subdural':
-        desired_distance = math.sqrt(10*ab)
+        desired_distance = math.sqrt(8*ab)
 
     HU_array = phantom.get_CT_number_phantom()
+
+    # TODO: better logic for hemorrhage starting slice
+    init_slice = int(random.choice(np.linspace(0, int(HU_array.shape[0]/3), int(HU_array.shape[0]/3) + 1)))
+
     dura_map = phantom.get_dura_map()
     skull_map = phantom.get_skull_map()
-    brain_mask = (HU_array > -1000) & (~skull_map.astype(bool))
-
-    all_slices = np.arange(brain_mask.shape[0])
-    brain_slices = all_slices[brain_mask.sum(axis=(1, 2)) > 0]
-    init_slice = random.choice(brain_slices)
 
     new_volume = np.copy(HU_array)
 
     boundary = dura_map
-    distances = [(desired_distance-5)/phantom.spacings[2],
-                 (desired_distance+5)/phantom.spacings[2]]
+    distances = [(desired_distance-5)/phantom.spacings[2], (desired_distance+5)/phantom.spacings[2]]
 
     slice_counter = slice_idx = 0  # will iterate on this
     iter_flag = True
 
     # desired_thickness = 0.5 # slice thickness in mm
-    hemisphere = random.choice(['left', 'right'])
-    # can either be random or pre-defined
+    hemisphere = random.choice(['left', 'right'])  # can either be random or pre-defined
 
     if hemisphere == 'left':
         boundary[:, :, (int(HU_array.shape[2]/2) - 10):None] = 0.0
@@ -107,92 +97,85 @@ def insert_dural_3D(phantom, desired_volume, init_slice, hematoma_type,
 
     hemorrhage_mask = np.zeros_like(boundary)
     while iter_flag:
-        if slice_counter == 0:
-            # need to do the slice in the middle of the hemorrhage,
-            # same as before
-            # choose a random start point, and calculate distance
-            # from all available boundary voxels to start point
-            temp_boundary = boundary[init_slice]
-            start_point = random.choice(np.argwhere(temp_boundary))
+        if slice_counter == 0:  # need to do the slice in the middle of the hemorrhage, same as before
 
-            distance_from_start = np.ones_like(HU_array[init_slice],
-                                               dtype=bool)
-            distance_from_start[start_point[0], start_point[1]] = False
-            distance_from_start = distance_transform_edt(distance_from_start)
-            valid_points = (distance_from_start > distances[0]) &\
-                           (distance_from_start < distances[1]) & temp_boundary
-            if not valid_points.any():
-                raise RuntimeError(f'Requested volume: {desired_volume} mL too\
-                                    large, try smaller volume')
+            tol = 2000
+            count = 0
+            failure_occured = False
+            while count < tol:
+                temp_boundary = boundary[init_slice]
+                dura_idx = np.argwhere(temp_boundary == 1.0)
 
-            end_point = random.choice(np.argwhere(valid_points))
+                try:
+                    # choose a random start point, and calculate distance from all available boundary voxels to start point
+                    start_point = dura_idx[random.choice(range(len(dura_idx)))]
 
-            orig_start = start_point
-            orig_end = end_point
-            # now that the two starting points for the hemorrhage have been
-            # defined, need to connect them.
-            # process should be the same on any given slice, and this function
-            # can be updated with new connection options
+                    distance_idx = np.zeros(len(dura_idx))
+                    for i in range(len(dura_idx)):
+                        distance_idx[i] = math.sqrt((start_point[0] - dura_idx[i][0])**2 + (start_point[1] - dura_idx[i][1])**2)
+
+                    # create list of possible end points and choose one at random
+                    close_voxel_list = np.where(np.logical_and(distance_idx > distances[0], distance_idx < distances[1]))
+                    end_point = dura_idx[random.choice(close_voxel_list[0])]
+
+                    orig_start = start_point
+                    orig_end = end_point
+                except:
+                    count += 1
+                    init_slice = int(random.choice(np.linspace(0, int(HU_array.shape[0]/3), int(HU_array.shape[0]/3) + 1)))
+                    if count == tol:
+                        failure_occured = True
+                else:
+                    count = tol
+            if failure_occured:
+                raise RuntimeError(f'lesion insertion failed with requested volume: {desired_volume} mL, try a smaller volume')
+            # now that the two starting points for the hemorrhage have been defined, need to connect them
+            # process should be the same on any given slice, and this function can be updated with new connection options
             filled_array, boundary_coords, connect_coords =\
                 connect_points(start=orig_start,
                                end=orig_end,
                                boundary=temp_boundary,
                                hematoma_type=hematoma_type)
+
             if mass_effect:
-                if mass_effect is True:
-                    mass_effect = 0.5
-                connect_coords = np.argwhere(get_perimeter(filled_array))
-                strength = int(mass_effect *
-                               distance_transform_edt(filled_array).max())
-                if strength:
-                    boundary_coords = np.argwhere(
-                        get_perimeter(binary_erosion(filled_array,
-                                      np.ones(2*[strength]))))
                 try:
-                    warped_slice = warp_slice(HU_array[init_slice],
-                                              skull_map[init_slice],
-                                              boundary_coords, connect_coords)
+                    warped_slice = warp_slice(HU_array[init_slice, :],
+                                              skull_map[init_slice, :],
+                                              boundary_coords, connect_coords,
+                                              hematoma_type)
                 except ValueError:
                     Warning(f'Failed to perform mass effect insertion for\
                           volume: {desired_volume}, now inserting with mass\
                           effect to 0')
                     new_volume[init_slice] = HU_array[init_slice]
                     phantom.mass_effect = 0
-                new_volume[init_slice] = warped_slice
+                new_volume[init_slice, :, :] = warped_slice
 
-            hemorrhage_mask[init_slice] = filled_array
+            hemorrhage_mask[init_slice, :, :] = filled_array
 
             slice_counter += 1
 
         # this is a bit messy but it will work for intended purpose:
-        # starting from hemorrhage origin, move down while shrinking distance
-        # between start/end point then, move up from hemorrhage origin while
-        # doing the same
-        if slice_counter <= (num_slices-1)/2:
-            # move down from hemorrhage origin
+        # starting from hemorrhage origin, move down while shrinking distance between start/end point
+        # then, move up from hemorrhage origin while doing the same
+        if slice_counter <= (num_slices-1)/2:  # move down from hemorrhage origin
             slice_idx = slice_counter
-        elif slice_counter > (num_slices-1)/2:
-            # start moving up from hemorrhage origin
+        elif slice_counter > (num_slices-1)/2:  # start moving up from hemorrhage origin
             slice_idx = -1*(slice_counter - int((num_slices-1)/2))
 
         temp_boundary = boundary[init_slice-slice_idx]
 
-        dura_idx = np.argwhere(temp_boundary)
+        dura_idx = np.argwhere(temp_boundary == 1.0)
 
-        if len(dura_idx) != 0:  # need to check that we didn't land on a slice
-            # with no remaining dura
+        if len(dura_idx) != 0:  # need to check that we didn't land on a slice with no remaining dura
             # find closest boundary point to previous start
-            # distance_idx = np.zeros((len(dura_idx), 2))
+            distance_idx = np.zeros((len(dura_idx), 2))
+
             distance_from_start = np.zeros(len(dura_idx))
             distance_from_end = np.zeros(len(dura_idx))
             for i in range(len(dura_idx)):
-                distance_from_start[i] = math.sqrt(
-                    (orig_start[0] - dura_idx[i][0])**2 +
-                    (orig_start[1] - dura_idx[i][1])**2)
-
-                distance_from_end[i] = math.sqrt(
-                    (orig_end[0] - dura_idx[i][0])**2 +
-                    (orig_end[1] - dura_idx[i][1])**2)
+                distance_from_start[i] = math.sqrt((orig_start[0] - dura_idx[i][0])**2 + (orig_start[1] - dura_idx[i][1])**2)
+                distance_from_end[i] = math.sqrt((orig_end[0] - dura_idx[i][0])**2 + (orig_end[1] - dura_idx[i][1])**2)
 
             new_start = dura_idx[np.argmin(distance_from_start)]
             new_end = dura_idx[np.argmin(distance_from_end)]
@@ -203,19 +186,10 @@ def insert_dural_3D(phantom, desired_volume, init_slice, hematoma_type,
                                boundary=temp_boundary,
                                hematoma_type=hematoma_type)
             if mass_effect:
-                if mass_effect is True:
-                    mass_effect = 0.5
-                connect_coords = np.argwhere(get_perimeter(filled_array))
-                strength = int(mass_effect *
-                               distance_transform_edt(filled_array).max())
-                if strength:
-                    boundary_coords = np.argwhere(
-                        get_perimeter(binary_erosion(filled_array,
-                                      np.ones(2*[strength]))))
                 try:
-                    warped_slice = warp_slice(HU_array[init_slice-slice_idx],
-                                              skull_map[init_slice-slice_idx],
-                                              boundary_coords, connect_coords)
+                    warped_slice = warp_slice(HU_array[init_slice-slice_idx, :],
+                                              skull_map[init_slice-slice_idx, :],
+                                              boundary_coords, connect_coords, hematoma_type)
                     new_volume[init_slice-slice_idx] = warped_slice
                 except ValueError:
                     Warning(f'Failed to perform mass effect insertion for\
@@ -236,42 +210,32 @@ def insert_dural_3D(phantom, desired_volume, init_slice, hematoma_type,
             slice_counter += 1
             if slice_counter == num_slices:
                 iter_flag = False
-    return hemorrhage_mask, new_volume
+                
+    return hemorrhage_mask.astype(bool), new_volume
 
 
 def connect_points(start, end, boundary, hematoma_type):
-    '''
-    draw a line connecting start and end points
-    but following existing dura
-    '''
+    '''draw a line connecting start and end points but following existing dura'''
     rows, cols = boundary.shape
     costs = np.where(boundary, 0, 10000)
-    path, _ = ski.graph.route_through_array(costs, start=(start[0], start[1]),
-                                            end=(end[0], end[1]),
-                                            fully_connected=False)
+    path, _ = ski.graph.route_through_array(costs, start=(start[0], start[1]), end=(end[0], end[1]), fully_connected=False)
 
     indices = np.stack(path, axis=-1)
     boundary_route = np.zeros_like(boundary)
     boundary_route[indices[0], indices[1]] = 1.0
 
-    boundary_coords = np.zeros((len(path), 2))
-    # we want to take the boundary path and save to numpy array for later
+    boundary_coords = np.zeros((len(path), 2))  # we want to take the boundary path and save to numpy array for later
     for idx, coord in enumerate(path):
         boundary_coords[idx, :] = np.array(coord)
 
     # START Bezier curve (could change this to separate function
     # if we add more methods to connect points)
     if hematoma_type == 'epidural':
-        bezier_weight = 0.14
-        # weight should probably be below 0.2 to avoid ballooning too much,
-        # but line breaks if below 0.04....
-        bezier_middle = (int(rows/2), int(cols/2))
-        # center of the image,
-        # should probably randomize it somewhere along center later
+        bezier_weight = 0.14  # weight should probably be below 0.2 to avoid ballooning too much, but line breaks if below 0.04....
+        bezier_middle = (int(rows/2), int(cols/2))  # center of the image, should probably randomize it somewhere along center later
     elif hematoma_type == 'subdural':
-        bezier_weight = 2
-        bezier_middle = boundary_coords[round(len(boundary_coords)/2)]
-        # use the middle point of the dura line
+        bezier_weight = 0.5
+        bezier_middle = boundary_coords[round(len(boundary_coords)/2)]  # use the middle point of the dura line
     else:
         bezier_weight = 0.0
         bezier_middle = (int(rows/2), int(cols/2))
@@ -287,59 +251,67 @@ def connect_points(start, end, boundary, hematoma_type):
     connect_coords = np.stack((rr, cc), axis=-1)
 
     # returned coordinate list isn't ordered from start point to end point
-    # below is rudimentary but should order from start point
-    # to end point as long as weight < 1
+    # below is rudimentary but should order from start point to end point as long as weight < 1
     connect_coords = connect_coords.tolist()
     connect_coords.sort(key=lambda p: math.dist(p, [start[0], start[1]]))
     connect_coords = np.array(connect_coords)
     # END Bezier curve
 
-    filled_array = scipy.ndimage.binary_fill_holes(
-        np.where(np.add(connecting_route, boundary_route) > 0, 1.0, 0)
-        ).astype(int)
+    filled_array = scipy.ndimage.binary_fill_holes(np.where(np.add(connecting_route, boundary_route) > 0, 1.0, 0)).astype(int)
 
     return filled_array, boundary_coords, connect_coords
 
 
-def warp_slice(axial_slice, skull_slice, src, dst):
+def warp_slice(axial_slice, skull_slice, src, dst, hematoma_type):
     '''perform warp of 2D slice according to hematoma boundary coordinates'''
-    # to simulate mass effect, transform will need some
-    # skull coordinates to NOT move
-    skull_slice = skull_slice.astype(bool)
-    skull_idx = np.argwhere(skull_slice)
-    skull_sample = np.round(
-        np.linspace(0, len(skull_idx)-1, 1000)).astype(int)
-    # increase from 1000 as memory allows
+    # to simulate mass effect, transform will need some skull coordinates to NOT move
+    #skull_slice = skull_slice.astype(bool)
 
-    # initialize warp source and destination with skull
-    # indices in both (shouldn't move!)
-    warp_src = skull_idx[skull_sample]
-    warp_dst = skull_idx[skull_sample]
+    flood_mask = ski.segmentation.flood(skull_slice, seed_point=(0, 0))
+    skull_slice[flood_mask] = 1
+
+    brain_mask = np.where(skull_slice == 1, 0, 1)
+    # using the entire inner boundary of the skull mask seems to work great as anchor points
+    skull_boundary = ski.segmentation.find_boundaries(skull_slice, mode='inner', background=0)
+
+    skull_sample = np.argwhere(skull_boundary != 0)
+
+    # initialize warp source and destination with skull indices in both (shouldn't move!)
+    warp_src = warp_dst = skull_sample
 
     src_subset = src[np.round(np.linspace(0, len(src)-1, 5)).astype(int)]
     dst_subset = dst[np.round(np.linspace(0, len(dst)-1, 5)).astype(int)]
+
     warp_src = np.insert(warp_src, 0, src_subset, axis=0)
     warp_dst = np.insert(warp_dst, 0, dst_subset, axis=0)
+
+    warp_src = np.insert(warp_src, 0, [[0, 0],[0, axial_slice.shape[1]],[axial_slice.shape[0], 0],[axial_slice.shape[0], axial_slice.shape[1]]], axis=0)
+    warp_dst = np.insert(warp_dst, 0, [[0, 0],[0, axial_slice.shape[1]],[axial_slice.shape[0], 0],[axial_slice.shape[0], axial_slice.shape[1]]], axis=0)
 
     tps = ski.transform.ThinPlateSplineTransform()
     tps.estimate(np.flip(warp_dst), np.flip(warp_src))
     warped_slice = ski.transform.warp(axial_slice, tps,
-                                      preserve_range=False, order=0)
-    brain_mask = (~skull_slice) & (axial_slice > -100)
-    error_map = (warped_slice - axial_slice) > axial_slice[brain_mask].mean()
-    warped_slice[error_map] = axial_slice[error_map]
+                                      preserve_range=True, order=1)
+    
+    axial_slice = axial_slice*brain_mask
+    # new code to try to "fix" skull warping into brain
+    problem_voxels = np.argwhere((skull_slice != 1) & (warped_slice > 50))
+    for index in problem_voxels:
+        if hematoma_type == 'epidural' or 'subdural':
+            warped_slice[index[0], index[1]] = 50 # HU value of dura mater
+        elif hematoma_type == 'round':
+            warped_slice[index[0], index[1]] = axial_slice[axial_slice!=0].mean()
+
     return warped_slice
 
 
-def coverage_from_volume(volume, hematoma_type, slice_thickness):
-    # see RSNA_BHDS_explore.ipynb for logarithmic fit
+def coverage_from_volume(volume, hematoma_type, slice_thickness):  # see RSNA_BHDS_explore.ipynb for logarithmic fit
     if hematoma_type == 'epidural':
         slice_coverage = 13.942*math.log(volume) + 13.449
     elif hematoma_type == 'subdural':
         slice_coverage = 17.739*math.log(volume) + 17.314
-    elif hematoma_type == 'round':
-        slice_coverage = 8.7064*math.log(volume) + 18.148
-        # for now, this is intraparenchymal
+    elif hematoma_type == 'sphere':
+        slice_coverage = 8.7064*math.log(volume) + 18.148  # for now, this is intraparenchymal
     # unused
     elif hematoma_type == 'subarachnoid':
         slice_coverage = 17.181*math.log(volume) + 27.42

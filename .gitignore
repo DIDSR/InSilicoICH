@@ -4,15 +4,10 @@ notebooks/__pycache__
 .vscode
 .PedSilicoICH
 .PedsilicoICH
-notebooks/default
-notebooks/test
+.pytest_cache
 notebooks/*/*.png
 build
 
-octave-workspace
-MIDA Head Phantom
-MIDA_Head_Phantom
-NIHPD_Head_Phantom
 *.raw
 *.air
 *.offset
@@ -22,9 +17,11 @@ NIHPD_Head_Phantom
 *.scan
 *.json
 *.csv
-default
 *.cfg
 __pycache__
 *.nrrd
 *.nii
 src/PedSilicoICH.egg-info
+.env
+tests/*.png
+lesions.png
