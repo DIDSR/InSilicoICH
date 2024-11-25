@@ -22,8 +22,8 @@
 21,0.890196,0.356863,0.505882,Hypothalamus,9999,
 22,0.72549,0.807843,1,Commissura (Anterior),8888,
 23,0.85098,0,0.247059,Commissura (Posterior),8888,
-24,1,0,0,Blood Arteries,37,
-25,0,0,1,Blood Veins,37,
+24,1,0,0,Blood Arteries,150,
+25,0,0,1,Blood Veins,150,
 26,0,0,0,Air Internal - Ethmoidal Sinus,-1000,Hounsfield unit | Radiology Reference Article | Radiopaedia.org
 27,0,0,0,Air Internal - Frontal Sinus,-1000,Hounsfield unit | Radiology Reference Article | Radiopaedia.org
 28,0,0,0,Air Internal - Maxillary Sinus,-1000,Hounsfield unit | Radiology Reference Article | Radiopaedia.org

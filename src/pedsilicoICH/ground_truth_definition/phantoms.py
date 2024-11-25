@@ -535,6 +535,16 @@ and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
 
         return HU_phantom
 
+    def get_artery_map(self):
+        return self._phantom == self.material_lut[
+            self.material_lut.MIDA_material == 'Blood Arteries'
+            ].MIDA_ID.item()
+
+    def get_vein_map(self):
+        return self._phantom == self.material_lut[
+            self.material_lut.MIDA_material == 'Blood Veins'
+            ].MIDA_ID.item()
+
     def get_material_mask(self, material):
         if material not in self.materials:
             raise ValueError(f'{material} not in {self.materials.keys()}')
