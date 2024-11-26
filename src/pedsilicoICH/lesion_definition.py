@@ -60,7 +60,9 @@ def elliptical_lesion(shape: tuple | list,
 def insert_dural_3D(phantom, desired_volume, hematoma_type,
                     mass_effect, seed=None):
 
+    seed = 926
     random = np.random.default_rng(seed)
+    print('seed: ' + str(seed))
 
     num_slices = coverage_from_volume(volume=desired_volume,
                                       hematoma_type=hematoma_type,
@@ -75,6 +77,8 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
 
     # TODO: better logic for hemorrhage starting slice
     init_slice = int(random.choice(np.linspace(0, int(HU_array.shape[0]/3), int(HU_array.shape[0]/3) + 1)))
+
+    #init_slice=178
 
     dura_map = phantom.get_dura_map()
     skull_map = phantom.get_skull_map()
@@ -123,6 +127,7 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
                 except:
                     count += 1
                     init_slice = int(random.choice(np.linspace(0, int(HU_array.shape[0]/3), int(HU_array.shape[0]/3) + 1)))
+                    #init_slice = 178
                     if count == tol:
                         failure_occured = True
                 else:
@@ -154,6 +159,7 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
             hemorrhage_mask[init_slice, :, :] = filled_array
 
             slice_counter += 1
+            #iter_flag = False
 
         # this is a bit messy but it will work for intended purpose:
         # starting from hemorrhage origin, move down while shrinking distance between start/end point
@@ -291,7 +297,7 @@ def warp_slice(axial_slice, skull_slice, src, dst, hematoma_type):
     tps = ski.transform.ThinPlateSplineTransform()
     tps.estimate(np.flip(warp_dst), np.flip(warp_src))
     warped_slice = ski.transform.warp(axial_slice, tps,
-                                      preserve_range=True, order=1)
+                                      preserve_range=True, order=0)
     
     axial_slice = axial_slice*brain_mask
     # new code to try to "fix" skull warping into brain
