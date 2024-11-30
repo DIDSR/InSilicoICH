@@ -60,11 +60,11 @@ Repository Contents
 
 *Tutorials*
 
-- `notebooks/tutorials/01_phantoms.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/01_phantoms.ipynb>`_: introduce working with phantoms and lesion insertion to generate inputs for CT simulations.
+- `notebooks/tutorials/01_phantoms.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/tutorials/01_phantoms.ipynb>`_: introduce working with phantoms and lesion insertion to generate inputs for CT simulations.
 
-- `notebooks/tutorials/02_scanners.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/02_scanners.ipynb>`_: introduce working with virtual CT scanner for CT imaging simulations.
+- `notebooks/tutorials/02_scanners.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/tutorials/02_scanners.ipynb>`_: introduce working with virtual CT scanner for CT imaging simulations.
 
-- `notebooks/tutorials/03_studies.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/03_studies.ipynb>`_: integrates phantoms and scanners to run virtual imaging studies.
+- `notebooks/tutorials/03_studies.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/tutorials/03_studies.ipynb>`_: integrates phantoms and scanners to run virtual imaging studies.
 
 *Project Aims*
 
