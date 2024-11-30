@@ -58,8 +58,17 @@ Repository Contents
 
 **notebooks**: for introducing concepts, developing methods, scratch work, and running experiments
 
+*Tutorials*
+
+- `notebooks/tutorials/01_phantoms.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/01_phantoms.ipynb>`_: introduce working with phantoms and lesion insertion to generate inputs for CT simulations.
+
+- `notebooks/tutorials/02_scanners.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/02_scanners.ipynb>`_: introduce working with virtual CT scanner for CT imaging simulations.
+
+- `notebooks/tutorials/03_studies.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/03_studies.ipynb>`_: integrates phantoms and scanners to run virtual imaging studies.
+
+*Project Aims*
+
 - `notebooks/00_basic_eda.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/00_basic_eda.ipynb>`_: exploratory data analysis of the Hssayeni et 2020 dataset [Aim 1.1]
-- `notebooks/01_ct_head_simulations.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/01_ct_head_simulations.ipynb>`_: introduce CT simulation pipeline concepts with MIDA head phantom and NIHPD brain atlases [Aim 1.2]
 - `notebooks/03_epidural_subdural_demo.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/03_epidural_subdural_demo.ipynb>`_: expand simulated lesions to subdural and epidural ICH [Aim 1.2]
 - `notebooks/viewing_simulation_results.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/viewing_simulation_results.ipynb>`_: for viewing the simulation results from CT_dataset_pipeline.py
 - `notebooks/IQ_evaluations.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/IQ_evaluations.ipynb>`_: basic evaluations for quality assurance of XCIST simulations and phantoms
