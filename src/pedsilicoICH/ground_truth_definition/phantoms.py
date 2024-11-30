@@ -478,6 +478,10 @@ large, try smaller volume')
         return img_w_lesion, lesion_vol, (int(z), int(x), int(y))
 
 
+mida_age = 38  # add 38 as the median US adult age to represent MIDA, consider
+#  other identifiers when adding more patients
+
+
 class MIDA_Head(HeadPhantom):
     def __init__(self, phantom_dir, csf_HU=10, gm_HU=40, wm_HU=30,
                  skull_HU=1000, shape=None):
@@ -559,6 +563,11 @@ and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
         return skull_map
 
 
+url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
+nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
+possible_ages = nihpd_ages + [mida_age]
+
+
 class NIHPD_Head(HeadPhantom):
     '''
     loads MR brain atlas of mean `age`, downloaded from
@@ -580,7 +589,6 @@ class NIHPD_Head(HeadPhantom):
                  gm_HU=40, wm_HU=30, skull_HU=1000, shape=None):
         phantom_dir = Path(phantom_dir)
         if not phantom_dir.exists():
-            url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
             print(f'''
 `PHANTOM_DIRECTORY` {phantom_dir} not found, now downloading NIHPD phantoms
 from {url}
@@ -602,7 +610,8 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
         ages = {get_mean_age(o): o for o in age_ranges}
 
         if age not in ages:
-            raise ValueError(f'age {age} not in {sorted(ages.keys())} from {self.phantom_dir}')
+            raise ValueError(f'age {age} not in {sorted(ages.keys())} from\
+{self.phantom_dir}')
         age_range = ages[age]
 
         base_dir = self.phantom_dir

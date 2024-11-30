@@ -3,7 +3,7 @@ CT Imaging Datasets for Pediatric Device Assessment of Intracranial Hemorrhage
 
 |tests|
 
-.. image:: project_aims.png
+.. image:: assets/project_aims.png
         :width: 800
         :align: center
 
@@ -28,7 +28,11 @@ Dr. Elena Sizikova also built a `pipeline for comparative evaluation of digital 
 
 **Imaging Parameters (CT)**: Radiation dose (MA, KV voltage), slice thickness, reconstruction kernels, reconstruction field of view (FoV).
 
-.. image:: summary_figure.png
+.. image:: assets/montage.png
+        :width: 800
+        :align: center
+
+.. image:: assets/summary_figure.png
         :width: 800
         :align: center
 
@@ -45,7 +49,7 @@ Tested on python 3.11.3
 Module Layout
 -------------
 
-.. image:: pedsilico_class_diagram.png
+.. image:: assets/pedsilico_class_diagram.png
         :width: 800
         :align: center
 

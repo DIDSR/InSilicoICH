@@ -181,8 +181,7 @@ def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
               views=1000, zspan='dynamic', kernel='standard',
               slice_thickness=1, keep_raw=False, seed=None) -> Study:
 
-    mida_shape = (480, 480, 350)  # default shape of MIDA
-    phantom = load_phantom(age=age, shape=mida_shape, name=patient_name)
+    phantom = load_phantom(age=age, name=patient_name)
 
     if lesion_type and (volume > 0):
         phantom.insert_lesion(lesion_type,

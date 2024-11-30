@@ -55,7 +55,7 @@ def show_lesions(phantom, display='brain'):
         ctshow(phantom.get_CT_number_phantom()[coords[0]], display, ax=axs[0, idx], fig=f)
         axs[0, idx].set_title(f'slice {coords[0]}')
         ctshow(phantom.get_CT_number_phantom()[coords[0]], display, ax=axs[1, idx], fig=f)
-        axs[1, idx].imshow(lesion[coords[0]], cmap='Reds', alpha=0.1)
+        axs[1, idx].imshow(lesion[coords[0]], cmap='Reds', alpha=0.3)
         axs[1, idx].set_title(f'{phantom.lesion_type[idx]}')
 
 
