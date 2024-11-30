@@ -54,7 +54,7 @@ class Study:
 
     def run_study(self, output_directory=None, kVp=120, mA=200, views=1000,
                   fov=250, zspan='dynamic',
-                  kernel='standard', slice_thickness=1):
+                  kernel='standard', slice_thickness=1, **kwargs):
         patient_name = self.phantom.patient_name
         age = self.phantom.age
         lesion_type = self.phantom.lesion_type

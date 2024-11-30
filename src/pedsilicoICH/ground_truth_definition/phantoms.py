@@ -321,13 +321,10 @@ class HeadPhantom(Phantom):
         :param intensity: lesion CT number in HU
         :param mass_effect: optional, bool whether to apply mass effect
             processing to displace brain tissue following lesion insertion
-        :param edema: optional, bool or int. whether to add a ring of low
-            contrast, 10 HU, edema around the lesion, currently only
-            implemented for sphere
         :param seed: optional, int specify seed for reproducible lesion
             insertion, otherwise random
 
-        return img_w_lesion, lesion_image, lesion_coords
+        :return: img_w_lesion, lesion_image, lesion_coords
         '''
         if volume <= 0:
             return self
@@ -402,7 +399,7 @@ class HeadPhantom(Phantom):
         :param seed: optional, defaults to None, set seed for reproducible
             lesion insertion
 
-        :returns: img_w_lesion, lesion_vol, (z, x, y)
+        :return: img_w_lesion, lesion_vol, (z, x, y)
         '''
         rng = np.random.default_rng(seed)
 
