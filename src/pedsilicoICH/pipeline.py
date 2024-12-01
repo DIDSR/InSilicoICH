@@ -54,7 +54,7 @@ class Study:
 
     def run_study(self, output_directory=None, kVp=120, mA=200, views=1000,
                   fov=250, zspan='dynamic',
-                  kernel='standard', slice_thickness=1):
+                  kernel='standard', slice_thickness=1, **kwargs):
         patient_name = self.phantom.patient_name
         age = self.phantom.age
         lesion_type = self.phantom.lesion_type
@@ -85,7 +85,7 @@ class Study:
         if lesion_type:
             lesion_only = ct
             mask = ct.get_lesion_mask(startZ=startZ, endZ=endZ,
-                                      slice_thickness=slice_thickness)
+                                      slice_thickness=slice_thickness, fov=fov)
 
             lesion_only.recon = mask
             dicom_path = output_directory / 'lesion_masks'
