@@ -85,7 +85,7 @@ class Study:
         if lesion_type:
             lesion_only = ct
             mask = ct.get_lesion_mask(startZ=startZ, endZ=endZ,
-                                      slice_thickness=slice_thickness)
+                                      slice_thickness=slice_thickness, fov=fov)
 
             lesion_only.recon = mask
             dicom_path = output_directory / 'lesion_masks'
