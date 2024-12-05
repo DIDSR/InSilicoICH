@@ -3,7 +3,7 @@ CT Imaging Datasets for Pediatric Device Assessment of Intracranial Hemorrhage
 
 |tests|
 
-.. image:: project_aims.png
+.. image:: assets/project_aims.png
         :width: 800
         :align: center
 
@@ -28,7 +28,11 @@ Dr. Elena Sizikova also built a `pipeline for comparative evaluation of digital 
 
 **Imaging Parameters (CT)**: Radiation dose (MA, KV voltage), slice thickness, reconstruction kernels, reconstruction field of view (FoV).
 
-.. image:: summary_figure.png
+.. image:: assets/montage.png
+        :width: 800
+        :align: center
+
+.. image:: assets/summary_figure.png
         :width: 800
         :align: center
 
@@ -45,7 +49,7 @@ Tested on python 3.11.3
 Module Layout
 -------------
 
-.. image:: pedsilico_class_diagram.png
+.. image:: assets/pedsilico_class_diagram.png
         :width: 800
         :align: center
 
@@ -54,15 +58,24 @@ Repository Contents
 
 **notebooks**: for introducing concepts, developing methods, scratch work, and running experiments
 
-- `notebooks/00_basic_eda.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/00_basic_eda.ipynb>`_: exploratory data analysis of the Hssayeni et 2020 dataset [Aim 1.1]
-- `notebooks/01_ct_head_simulations.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/01_ct_head_simulations.ipynb>`_: introduce CT simulation pipeline concepts with MIDA head phantom and NIHPD brain atlases [Aim 1.2]
-- `notebooks/03_epidural_subdural_demo.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/03_epidural_subdural_demo.ipynb>`_: expand simulated lesions to subdural and epidural ICH [Aim 1.2]
-- `notebooks/viewing_simulation_results.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/viewing_simulation_results.ipynb>`_: for viewing the simulation results from CT_dataset_pipeline.py
-- `notebooks/IQ_evaluations.ipynb <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/notebooks/IQ_evaluations.ipynb>`_: basic evaluations for quality assurance of XCIST simulations and phantoms
+*Tutorials*
+
+- `notebooks/tutorials/01_phantoms.ipynb <notebooks/tutorials/01_phantoms.ipynb>`_: introduce working with phantoms and lesion insertion to generate inputs for CT simulations.
+
+- `notebooks/tutorials/02_scanners.ipynb <notebooks/tutorials/02_scanners.ipynb>`_: introduce working with virtual CT scanner for CT imaging simulations.
+
+- `notebooks/tutorials/03_studies.ipynb <notebooks/tutorials/03_studies.ipynb>`_: integrates phantoms and scanners to run virtual imaging studies.
+
+*Project Aims*
+
+- `notebooks/00_basic_eda.ipynb <notebooks/00_basic_eda.ipynb>`_: exploratory data analysis of the Hssayeni et 2020 dataset [Aim 1.1]
+- `notebooks/03_epidural_subdural_demo.ipynb <notebooks/03_epidural_subdural_demo.ipynb>`_: expand simulated lesions to subdural and epidural ICH [Aim 1.2]
+- `notebooks/viewing_simulation_results.ipynb <notebooks/viewing_simulation_results.ipynb>`_: for viewing the simulation results from CT_dataset_pipeline.py
+- `notebooks/IQ_evaluations.ipynb <notebooks/IQ_evaluations.ipynb>`_: basic evaluations for quality assurance of XCIST simulations and phantoms
 
 **scripts**: for generating data sets and more production ready
 
-- `CT_dataset_pipeline.py <https://github.com/brandonjnelsonFDA/PedSilicoICH/blob/master/CT_dataset_pipeline.py>`_: used for generating the in silico dataset
+- `CT_dataset_pipeline.py <CT_dataset_pipeline.py>`_: used for generating the in silico dataset
 
 Contributing
 ------------
@@ -74,3 +87,9 @@ Useful Links
 
 - `REALYSM_PedCT: pedsilico-pilot.ipynb <https://github.com/bnel1201/REALYSM_PedCT/blob/PedSilicoICH-Pilot/pedsilico-pilot.ipynb>`_: CT simulation pipeline that we aim to build off of for this project, in particular this notebook was used to make the pilot data images shown in `Methods`)
 - `pediatricIQphantoms: running_simulations.ipynb <https://github.com/bnel1201/pediatricIQphantoms/blob/main/examples/running_simulations.ipynb>`_: examples of using a Python wrapper around the `Michigan Image Reconstruction Toolbox (MIRT) <https://github.com/JeffFessler/mirt>`_ for simple, faster CT simulations
+
+See Also
+--------
+
+- `PedSilicoAbdomen <https://github.com/DIDSR/PedSilicoAbdomen>`_ for generating synthetic abdominal non contrast CT datasets
+- `PedSilicoLVO <https://github.com/brandonjnelsonFDA/PedSilicoLVO>`_ for generating synthetic large vessel occlusion (LVO) non contrast CT datasets

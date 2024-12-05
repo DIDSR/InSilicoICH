@@ -11,7 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pydicom
 import gecatsim as xc
-import monai
+from monai.data import MetaTensor
 
 from gecatsim.reconstruction.pyfiles import recon
 from .ground_truth_definition.phantoms import (voxelize_ground_truth,
@@ -154,9 +154,8 @@ class Scanner():
         output_dir.mkdir(exist_ok=True, parents=True)
         self.output_dir = output_dir
 
-        #img = phantom.get_CT_number_phantom()
         img = phantom._phantom
-        if isinstance(img, monai.data.meta_tensor.MetaTensor):
+        if isinstance(img, MetaTensor):
             img = img.numpy()
 
         self.phantom = phantom
@@ -222,7 +221,8 @@ class Scanner():
 
     def get_lesion_mask(self, startZ: int | None = None,
                         endZ: int | None = None,
-                        slice_thickness=1) -> np.ndarray[bool]:
+                        fov: float | None = None,
+                        slice_thickness=1, **kwargs) -> np.ndarray[bool]:
         '''takes lesion in object space and returns a mask in CT image space
         for the given imaging system'''
         if not self.phantom._lesion:
@@ -242,7 +242,7 @@ class Scanner():
         lesion_only.xcist.cfg.physics.enableElectronicNoise = 0
         lesion_only.xcist.cfg.physics.enableQuantumNoise = 0
         lesion_only.run_scan(mA=500, views=100, startZ=startZ, endZ=endZ)
-        lesion_only.run_recon(sliceThickness=slice_thickness)
+        lesion_only.run_recon(sliceThickness=slice_thickness, fov=fov)
         rmtree(lesion_dir)
         return (lesion_only.recon > -950) & (self.recon > -300)
 

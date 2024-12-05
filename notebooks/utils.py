@@ -27,7 +27,8 @@ def make_and_display_lesion(phantom, lesion_type='round', volume=2,
     if mass_effect > 0:
         warped = warp_slice(img[z],
                             boundary[z],
-                            src_coords, dst_coords)
+                            src_coords, dst_coords,
+                            hematoma_type=lesion_type)
         warped[lesion_vol[z]] = img_w_lesion[z][lesion_vol[z]].copy()
     else:
         warped = img_w_lesion[z].copy()
@@ -45,17 +46,18 @@ def make_and_display_lesion(phantom, lesion_type='round', volume=2,
     f.show()
 
 
-def show_lesions(phantom):
+def show_lesions(phantom, display='brain'):
     n_lesions = len(phantom._lesion_coords)
     f, axs = plt.subplots(2, n_lesions, dpi=150, tight_layout=True)
     if n_lesions < 2:
         axs = axs[:, None]
     for idx, (lesion, coords) in enumerate(zip(phantom._lesion, phantom._lesion_coords)):
-        ctshow(phantom.get_CT_number_phantom()[coords[0]], ax=axs[0, idx], fig=f)
+        ctshow(phantom.get_CT_number_phantom()[coords[0]], display, ax=axs[0, idx], fig=f)
         axs[0, idx].set_title(f'slice {coords[0]}')
-        ctshow(phantom.get_CT_number_phantom()[coords[0]], ax=axs[1, idx], fig=f)
+        ctshow(phantom.get_CT_number_phantom()[coords[0]], display, ax=axs[1, idx], fig=f)
         axs[1, idx].imshow(lesion[coords[0]], cmap='Reds', alpha=0.1)
         axs[1, idx].set_title(f'{phantom.lesion_type[idx]}')
+
 
 def hematoma_phase(contrast):
     if contrast > 60:
@@ -69,6 +71,7 @@ def hematoma_phase(contrast):
     else:
         return None
 
+
 def get_effective_diameter(ground_truth_mu, pixel_width_mm):
     '''
     effective diameter defined in AAPM TG204:
@@ -76,6 +79,7 @@ def get_effective_diameter(ground_truth_mu, pixel_width_mm):
     '''
     A = np.sum(ground_truth_mu > -1000)*pixel_width_mm**2
     return 2*np.sqrt(A/np.pi)
+
 
 # https://radiopaedia.org/articles/windowing-ct?lang=us
 display_settings = {
@@ -91,7 +95,7 @@ display_settings = {
 
 def ctshow(img, window='soft tissues', fig=None, ax=None):
     if fig is None or ax is None:
-        fig, ax=plt.subplots()
+        fig, ax = plt.subplots()
     # Define some specific window settings here
     if isinstance(window, str):
         if window not in display_settings:
@@ -104,7 +108,8 @@ def ctshow(img, window='soft tissues', fig=None, ax=None):
         ww = 6.0 * img.std()
         wl = img.mean()
 
-    if img.ndim == 3: img = img[0].copy()
+    if img.ndim == 3:
+        img = img[0].copy()
 
     ax.imshow(img, cmap='gray', vmin=wl-ww/2, vmax=wl+ww/2)
     ax.set_xticks([])
