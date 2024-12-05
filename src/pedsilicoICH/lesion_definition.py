@@ -6,6 +6,7 @@ import math
 import numpy as np
 import skimage as ski
 import scipy
+import sys
 from monai.transforms import RandAffine
 
 
@@ -60,9 +61,7 @@ def elliptical_lesion(shape: tuple | list,
 def insert_dural_3D(phantom, desired_volume, hematoma_type,
                     mass_effect, seed=None):
 
-    #seed = 926
     random = np.random.default_rng(seed)
-    print('seed: ' + str(seed))
 
     num_slices = coverage_from_volume(volume=desired_volume,
                                       hematoma_type=hematoma_type,
@@ -78,13 +77,11 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
     # TODO: better logic for hemorrhage starting slice
     init_slice = int(random.choice(np.linspace(0, int(HU_array.shape[0]/3), int(HU_array.shape[0]/3) + 1)))
 
-    #init_slice=178
-
     dura_map = phantom.get_dura_map()
     skull_map = phantom.get_skull_map()
 
     new_volume = np.copy(HU_array)
-    difference_volume = np.ones_like(HU_array)
+    #difference_volume = np.ones_like(HU_array)
 
     boundary = dura_map
     distances = [(desired_distance-5)/phantom.spacings[2], (desired_distance+5)/phantom.spacings[2]]
@@ -128,7 +125,6 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
                 except:
                     count += 1
                     init_slice = int(random.choice(np.linspace(0, int(HU_array.shape[0]/3), int(HU_array.shape[0]/3) + 1)))
-                    #init_slice = 178
                     if count == tol:
                         failure_occured = True
                 else:
@@ -136,22 +132,20 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
             if failure_occured:
                 raise RuntimeError(f'lesion insertion failed with requested volume: {desired_volume} mL, try a smaller volume')
             
-            debug = False
             # now that the two starting points for the hemorrhage have been defined, need to connect them
             # process should be the same on any given slice, and this function can be updated with new connection options
-            print('slice: ' + str(init_slice))
             filled_array, boundary_coords, connect_coords =\
                 connect_points(start=orig_start,
                                end=orig_end,
                                boundary=temp_boundary,
-                               hematoma_type=hematoma_type, debug=debug)
+                               hematoma_type=hematoma_type)
 
             mass_effect = True
             if mass_effect:
                 try:
                     warped_slice = warp_slice(HU_array[init_slice, :],
                                               skull_map[init_slice, :],
-                                              boundary_coords, connect_coords, hematoma_type, debug)
+                                              boundary_coords, connect_coords, hematoma_type)
                 except ValueError:
                     Warning(f'Failed to perform mass effect insertion for\
                           volume: {desired_volume}, now inserting with mass\
@@ -160,12 +154,11 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
                     phantom.mass_effect = 0
 
                 new_volume[init_slice, :, :] = warped_slice
-                difference_volume[init_slice, :, :] = np.subtract(HU_array[init_slice, :, :], warped_slice)
+                #difference_volume[init_slice, :, :] = np.subtract(HU_array[init_slice, :, :], warped_slice)
 
             hemorrhage_mask[init_slice, :, :] = filled_array
 
             slice_counter += 1
-            #iter_flag = False
 
         # this is a bit messy but it will work for intended purpose:
         # starting from hemorrhage origin, move down while shrinking distance between start/end point
@@ -174,15 +167,6 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
             slice_idx = slice_counter
         elif slice_counter > (num_slices-1)/2:  # start moving up from hemorrhage origin
             slice_idx = -1*(slice_counter - int((num_slices-1)/2))
-
-        # if init_slice-slice_idx == 76:
-        #     debug = True
-
-        # if init_slice-slice_idx == 75:
-        #     iter_flag = False
-        #     debug = False
-
-        print('slice: ' + str(init_slice-slice_idx))
 
         temp_boundary = boundary[init_slice-slice_idx]
 
@@ -205,22 +189,15 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
                 connect_points(start=new_start,
                                end=new_end,
                                boundary=temp_boundary,
-                               hematoma_type=hematoma_type, debug=debug)
-            
-            if init_slice-slice_idx == 76:
-                import matplotlib.pyplot as plt
-                plt.figure()
-                plt.imshow(filled_array)
-                plt.title('slice 98 hematoma mask')
-                plt.show()
+                               hematoma_type=hematoma_type)
         
             if mass_effect:
                 try:
                     warped_slice = warp_slice(HU_array[init_slice-slice_idx, :],
                                               skull_map[init_slice-slice_idx, :],
-                                              boundary_coords, connect_coords, hematoma_type, debug)
+                                              boundary_coords, connect_coords, hematoma_type)
                     new_volume[init_slice-slice_idx] = warped_slice
-                    difference_volume[init_slice-slice_idx, :, :] = np.subtract(HU_array[init_slice-slice_idx, :, :], warped_slice)
+                    #difference_volume[init_slice-slice_idx, :, :] = np.subtract(HU_array[init_slice-slice_idx, :, :], warped_slice)
                 except ValueError:
                     Warning(f'Failed to perform mass effect insertion for\
                           volume: {desired_volume}, now inserting with mass\
@@ -240,16 +217,11 @@ def insert_dural_3D(phantom, desired_volume, hematoma_type,
             slice_counter += 1
             if slice_counter == num_slices:
                 iter_flag = False
-                
-    import nibabel as nib
-    nib.save(nib.Nifti1Image(difference_volume, np.eye(4)), 'difference_image.nii.gz')
-    nib.save(nib.Nifti1Image(new_volume, np.eye(4)), 'new_volume.nii.gz')
-    nib.save(nib.Nifti1Image(HU_array, np.eye(4)), 'original_HU.nii.gz')
     
     return hemorrhage_mask.astype(bool), new_volume
 
 
-def connect_points(start, end, boundary, hematoma_type, debug):
+def connect_points(start, end, boundary, hematoma_type):
     '''draw a line connecting start and end points but following existing dura'''
     rows, cols = boundary.shape
     costs = np.where(boundary, 0, 10000)
@@ -259,21 +231,11 @@ def connect_points(start, end, boundary, hematoma_type, debug):
     boundary_route = np.zeros_like(boundary)
     boundary_route[indices[0], indices[1]] = 1.0
 
-    if debug:
-        import matplotlib.pyplot as plt
-        plt.figure()
-        plt.imshow(boundary_route)
-        plt.scatter(start[1], start[0], c='green', marker='x')
-        plt.scatter(end[1], end[0], c='red', marker='x')
-        plt.title('A-B Dura Path')
-        plt.show()
-
     boundary_coords = np.zeros((len(path), 2))  # we want to take the boundary path and save to numpy array for later
     for idx, coord in enumerate(path):
         boundary_coords[idx, :] = np.array(coord)
 
-    # START Bezier curve (could change this to separate function
-    # if we add more methods to connect points)
+    # START Bezier curve (could change this to separate function if we add more methods to connect points)
 
     successful_bezier = False
     # init bezier parameters:
@@ -298,50 +260,32 @@ def connect_points(start, end, boundary, hematoma_type, debug):
         connecting_route[rr, cc] = 1.0
         connect_coords = np.stack((rr, cc), axis=-1)
 
-        if debug:
-            array = boundary_route + connecting_route
-            plt.figure()
-            plt.scatter(start[1], start[0], c='green', marker='x')
-            plt.scatter(end[1], end[0], c='red', marker='x')
-            plt.imshow(array)
-            #plt.imshow(connecting_route)
-            plt.title('A-B Bezier Path')
-            plt.show()
-
         # check if connecting route includes start and end:
         if (connecting_route[start[0], start[1]] == 1) & (connecting_route[end[0], end[1]] == 1):
-            print('connecting route has both start and end points')
+            #print('connecting route has both start and end points')
             successful_bezier = True
         else:
-            print('connecting route missing points, removing curve')
-            bezier_weight = 0
-
-
+            #print('connecting route missing points, removing curve')
+            if bezier_weight != 0: # if bezier curve was unsuccessful with a nonzero weight, try with 0:
+                bezier_weight = 0
+            else:
+                sys.exit('Unable to create bezier curve with weight=0')
 
     # returned coordinate list isn't ordered from start point to end point
     # below is rudimentary but should order from start point to end point as long as weight < 1
     connect_coords = connect_coords.tolist()
     connect_coords.sort(key=lambda p: math.dist(p, [start[0], start[1]]))
     connect_coords = np.array(connect_coords)
-    # END Bezier curve
 
     filled_array = scipy.ndimage.binary_fill_holes(np.where(np.add(connecting_route, boundary_route) > 0, 1.0, 0)).astype(int)
 
     return filled_array, boundary_coords, connect_coords
 
 
-def warp_slice(axial_slice, skull_slice, src, dst, hematoma_type, debug):
+def warp_slice(axial_slice, skull_slice, src, dst, hematoma_type):
     '''perform warp of 2D slice according to hematoma boundary coordinates'''
     # to simulate mass effect, transform will need some skull coordinates to NOT move
     #skull_slice = skull_slice.astype(bool)
-
-    if debug:
-        import matplotlib.pyplot as plt
-        plt.figure()
-        plt.imshow(axial_slice, vmin=-40, vmax=120)
-        plt.title('axial slice: pre-warp')
-        plt.show()
-
 
     flood_mask = ski.segmentation.flood(skull_slice, seed_point=(0, 0))
     skull_slice[flood_mask] = 1
@@ -372,13 +316,11 @@ def warp_slice(axial_slice, skull_slice, src, dst, hematoma_type, debug):
     warped_slice = ski.transform.warp(axial_slice, tps,
                                       preserve_range=True, order=0)
 
-    print('mean HU of warped slice:' + str(np.mean(warped_slice)))
     # trying to warp around small subdural hematomas on superior brain slices may result
     # in a warp artifact where the image just becomes all (or mostly). if this happens, skip
     # mass effect and just use original brain slice
     # TODO: find more elegant methods for fixing warping artifacts 
     if (np.mean(warped_slice) > -10) & (np.mean(warped_slice) < 10):
-        print('REPLACING')
         warped_slice = axial_slice
     else: # if warp was successful, check for spurious hyperdense voxels from warp and replace 
         masked_axial = axial_slice*brain_mask
@@ -392,12 +334,6 @@ def warp_slice(axial_slice, skull_slice, src, dst, hematoma_type, debug):
 
         # finally, replace all voxels outside brain with original voxels
         warped_slice = np.where(brain_mask==1, warped_slice, axial_slice)
-
-    if debug:
-        plt.figure()
-        plt.imshow(warped_slice, vmin=-40, vmax=120)
-        plt.title('axial slice: post-warp')
-        plt.show()
 
     return warped_slice
 
