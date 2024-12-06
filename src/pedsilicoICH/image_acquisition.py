@@ -154,7 +154,7 @@ class Scanner():
         output_dir.mkdir(exist_ok=True, parents=True)
         self.output_dir = output_dir
 
-        img = phantom._phantom
+        img = phantom.get_CT_number_phantom()
         if isinstance(img, MetaTensor):
             img = img.numpy()
 
