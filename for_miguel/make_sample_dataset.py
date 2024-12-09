@@ -103,8 +103,9 @@ recons = [dict(kernel=k, sliceThickness=s) for k in kernels for s in slice_t]
 # %% prep results
 outdir = Path(__file__).parent / 'images'
 outdir.mkdir(exist_ok=True)
-results = dict(uid=[], age=[], lesion_type=[], volume=[], attenuation=[],
-               kVp=[], mA=[], kernel=[], slice_thickness=[], file=[], seed=[])
+results = dict(uid=[], age_yrs=[], lesion_type=[], volume_mL=[], attenuation=[],
+               kVp=[], mA=[], kernel=[], slice_thickness_mm=[],
+               slice_location_mm=[], file=[], seed=[])
 # %% loop
 desired_iph = desired_control = desired_edh = desired_sdh = 25
 n_control = n_iph = n_sdh = n_edh = 0
@@ -126,8 +127,10 @@ while not desired_counts_reached:
             phantom.insert_lesion(**lesion, seed=scan_seed)
         scanner = Scanner(phantom)
         if lesion['lesion_type'] is None:
-            center = rng.choice(scanner.calculate_start_positions()[1:-1],
-                                size=1)[0]
+            gm = phantom.get_material_mask('gray matter')
+            slices = phantom.shape[0]/2 - np.argwhere(
+                gm.mean(axis=(1, 2)) > 0.15)
+            center = rng.choice(slices)[0]
         else:
             center = (phantom.get_CT_number_phantom().shape[0]/2 -
                       phantom._lesion_coords[0][0])*phantom.dz
@@ -144,18 +147,19 @@ while not desired_counts_reached:
         plt.savefig(fname, dpi=600, bbox_inches='tight')
         # update metadata
         results['uid'].append(uid)
-        results['age'].append(age)
+        results['age_yrs'].append(age)
         if lesion['lesion_type'] == 'round':
             results['lesion_type'].append('intraparenchymal')
         else:
             results['lesion_type'].append(lesion['lesion_type'])
-        results['volume'].append(np.round(lesion['volume'], decimals=1))
+        results['volume_mL'].append(np.round(lesion['volume'], decimals=1))
         results['attenuation'].append(np.round(lesion['intensity'],
                                                decimals=1))
         results['kVp'].append(scan['kVp'])
         results['mA'].append(scan['mA'])
         results['kernel'].append(recon['kernel'])
-        results['slice_thickness'].append(recon['sliceThickness'])
+        results['slice_thickness_mm'].append(recon['sliceThickness'])
+        results['slice_location_mm'].append(center)
         results['file'] = fname.relative_to(outdir.parent)
         results['seed'].append(scan_seed)
         pd.DataFrame(results).to_csv(outdir.parent / 'metadata.csv',
