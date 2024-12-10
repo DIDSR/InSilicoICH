@@ -6,8 +6,8 @@ import numpy as np
 from monai.transforms import RandAffine
 
 from pedsilicoICH.pipeline import Study
-from pedsilicoICH.ground_truth_definition.phantoms import load_phantom
-from pedsilicoICH.image_acquisition import Scanner
+from pedsilicoICH.phantoms import load_phantom
+from VITools import Scanner
 
 age = 6.5
 transform = RandAffine(prob=0.5,

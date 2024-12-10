@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 from torchvision.datasets.utils import download_and_extract_archive
 
-from pedsilicoICH.ground_truth_definition.phantoms import load_phantom
+from pedsilicoICH.phantoms import load_phantom
 
 nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
 

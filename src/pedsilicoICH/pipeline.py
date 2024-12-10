@@ -12,8 +12,8 @@ import pandas as pd
 from scipy.ndimage import center_of_mass
 from monai.transforms import RandAffine
 
-from .image_acquisition import Scanner, read_dicom
-from .ground_truth_definition.phantoms import load_phantom
+from VITools import Scanner, read_dicom
+from .phantoms import load_phantom
 
 
 def load_vol(file_list):

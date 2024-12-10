@@ -6,8 +6,7 @@ from shutil import rmtree
 
 import numpy as np
 
-from pedsilicoICH.ground_truth_definition.phantoms import Phantom
-from pedsilicoICH.image_acquisition import read_dicom, Scanner
+from VITools import Phantom, read_dicom, Scanner
 
 
 def get_effective_diameter(ground_truth_mu, pixel_width_mm):
