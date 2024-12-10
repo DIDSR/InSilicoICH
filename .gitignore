@@ -15,8 +15,8 @@ build
 *.nii
 *.prep
 *.scan
-*.json
-*.csv
+**/phantoms/*/*.json
+notebooks/*.csv
 *.cfg
 __pycache__
 *.nrrd
@@ -25,3 +25,4 @@ src/PedSilicoICH.egg-info
 .env
 tests/*.png
 lesions.png
+*.log
