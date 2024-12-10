@@ -14,5 +14,5 @@ for idx, row in df.iterrows():
     data['images'].append(row.to_dict())
 
 with open("metadata.json", "w") as outfile:
-    json.dump(data, outfile)
+    json.dump(data, outfile, indent=True)
 # %%
