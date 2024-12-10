@@ -160,7 +160,7 @@ while not desired_counts_reached:
         results['kernel'].append(recon['kernel'])
         results['slice_thickness_mm'].append(recon['sliceThickness'])
         results['slice_location_mm'].append(center)
-        results['file'] = fname.relative_to(outdir.parent)
+        results['file'].append(fname.relative_to(outdir.parent))
         results['seed'].append(scan_seed)
         pd.DataFrame(results).to_csv(outdir.parent / 'metadata.csv',
                                      index=False)
