@@ -321,13 +321,10 @@ class HeadPhantom(Phantom):
         :param intensity: lesion CT number in HU
         :param mass_effect: optional, bool whether to apply mass effect
             processing to displace brain tissue following lesion insertion
-        :param edema: optional, bool or int. whether to add a ring of low
-            contrast, 10 HU, edema around the lesion, currently only
-            implemented for sphere
         :param seed: optional, int specify seed for reproducible lesion
             insertion, otherwise random
 
-        return img_w_lesion, lesion_image, lesion_coords
+        :return: img_w_lesion, lesion_image, lesion_coords
         '''
         if volume <= 0:
             return self
@@ -402,7 +399,7 @@ class HeadPhantom(Phantom):
         :param seed: optional, defaults to None, set seed for reproducible
             lesion insertion
 
-        :returns: img_w_lesion, lesion_vol, (z, x, y)
+        :return: img_w_lesion, lesion_vol, (z, x, y)
         '''
         rng = np.random.default_rng(seed)
 
@@ -475,6 +472,10 @@ large, try smaller volume')
         img_w_lesion[lesion_vol] = intensity
         z, x, y = center_of_mass(lesion_vol)
         return img_w_lesion, lesion_vol, (int(z), int(x), int(y))
+
+
+mida_age = 38  # add 38 as the median US adult age to represent MIDA, consider
+#  other identifiers when adding more patients
 
 
 class MIDA_Head(HeadPhantom):
@@ -558,6 +559,11 @@ and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
         return skull_map
 
 
+url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
+nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
+possible_ages = nihpd_ages + [mida_age]
+
+
 class NIHPD_Head(HeadPhantom):
     '''
     loads MR brain atlas of mean `age`, downloaded from
@@ -579,7 +585,6 @@ class NIHPD_Head(HeadPhantom):
                  gm_HU=40, wm_HU=30, skull_HU=1000, shape=None):
         phantom_dir = Path(phantom_dir)
         if not phantom_dir.exists():
-            url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
             print(f'''
 `PHANTOM_DIRECTORY` {phantom_dir} not found, now downloading NIHPD phantoms
 from {url}

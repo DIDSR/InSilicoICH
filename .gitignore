@@ -25,3 +25,5 @@ src/PedSilicoICH.egg-info
 .env
 tests/*.png
 lesions.png
+*.log
+for_miguel/images/*.png
