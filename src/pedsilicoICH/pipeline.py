@@ -54,7 +54,7 @@ class Study:
 
     def run_study(self, output_directory=None, kVp=120, mA=200, views=1000,
                   fov=250, zspan='dynamic',
-                  kernel='standard', slice_thickness=1):
+                  kernel='standard', slice_thickness=1, **kwargs):
         patient_name = self.phantom.patient_name
         age = self.phantom.age
         lesion_type = self.phantom.lesion_type
@@ -85,7 +85,7 @@ class Study:
         if lesion_type:
             lesion_only = ct
             mask = ct.get_lesion_mask(startZ=startZ, endZ=endZ,
-                                      slice_thickness=slice_thickness)
+                                      slice_thickness=slice_thickness, fov=fov)
 
             lesion_only.recon = mask
             dicom_path = output_directory / 'lesion_masks'
@@ -181,15 +181,15 @@ def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
               views=1000, zspan='dynamic', kernel='standard',
               slice_thickness=1, keep_raw=False, seed=None, **kwargs) -> Study:
 
-    mida_shape = (480, 480, 350)  # default shape of MIDA
-    phantom = load_phantom(age=age, shape=mida_shape, name=patient_name)
+    phantom = load_phantom(age=age, name=patient_name)
 
     if lesion_type and (volume > 0):
         phantom.insert_lesion(lesion_type,
                               volume=volume,
                               intensity=intensity,
                               mass_effect=mass_effect,
-                              seed=seed, **kwargs)
+                              seed=seed,
+                              **kwargs)
 
     if add_positioning_augmentation:
         transform = RandAffine(prob=0.5,
