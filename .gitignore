@@ -15,7 +15,7 @@ build
 *.nii
 *.prep
 *.scan
-*.json
+**/phantoms/*/*.json
 *.csv
 *.cfg
 __pycache__
