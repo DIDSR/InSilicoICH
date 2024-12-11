@@ -31,10 +31,25 @@ In this work, synthetic hemorrhages are inserted into head and neck phantoms bas
 
 The knowledge-based algorithm allows the following parameters to be controlled:
 
-.. csv-table:: Table Title
-   :file: assets/simulation_parameters.csv
-   :widths: 30, 70
-   :header-rows: 1
++----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
+|                            |                                                      |                                           |                                 |
+| Patient Characteristics    | Lesion Characteristics                               | Acquisition Characteristics               | Misc./Output Data               |
++============================+======================================================+===========================================+=================================+
+|                            |                                                      |                                           |                                 |
+| Identifier                 | Intensity [HU]                                       | X-ray tube current [mA]                   | Seed to reproduce               |
++----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
+|                            |                                                      |                                           |                                 |
+| Age (atlas-based)          | Hematoma volume [mL] and slice coverage              | X-ray tube peak voltage [kVp]             | Image file location             |
++----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
+|                            |                                                      |                                           |                                 |
+|                            | Hemorrhage type                                      | CT acquisition view count [views]         | Mask file directory location    |
++----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
+|                            |                                                      |                                           |                                 |
+|                            | Mass effect strength (currently   IPH/round only)    | Reconstructed field of view (FoV) [mm]    | Hemorrhage slice number(s)      |
++----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
+|                            |                                                      |                                           |                                 |
+|                            | Edema [voxels] (IPH/round only)                      | Reconstruction kernel                     |                                 |
++----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
 
 .. image:: assets/montage.png
         :width: 800
