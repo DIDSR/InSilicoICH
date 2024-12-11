@@ -31,10 +31,6 @@ We have previously combined the `pediatric and adult digital XCAT cohort of phan
         :width: 800
         :align: center
 
-.. image:: assets/summary_figure.png
-        :width: 800
-        :align: center
-
 Installation
 ------------
 
