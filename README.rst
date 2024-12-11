@@ -12,10 +12,14 @@ CT Imaging Datasets for Pediatric Device Assessment of Intracranial Hemorrhage
     :scale: 100%
     :target: https://github.com/brandonjnelsonFDA/PedSilicoICH/actions/workflows/python-app.yml
 
-**Motivation**
+Motivation
+----------
+
 Computer aided triaging (CADt) devices for intracranial hemorrhage (ICH) in the emergency room (e.g. `Rapid ICH K221456 <https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfpmn/pmn.cfm?ID=K221456>`_) is one important example where pediatric and adult cases exist in a reading queue where pediatric patients could be disadvantaged by being deprioritized for time sensitive treatment using an adult-trained AI model that extrapolates poorly to pediatric patients. While these AI/ML devices have potential to benefit pediatric patients, there is currently a lack of annotated pediatric data for evaluating the balance of risk and benefits.
 
-**Purpose**
+Purpose
+-------
+
 To address data availability challenges, we propose to supplement available pediatric patient computed tomography (CT) datasets with data generated in silico, generated using realistic computational human models and physics-based CT simulations. In silico data generation allows for creating examples with true labels with a fraction of the cost that is needed to label real patient data.
 
 Methods
@@ -23,9 +27,15 @@ Methods
 
 We have previously combined the `pediatric and adult digital XCAT cohort of phantoms <https://aapm.onlinelibrary.wiley.com/doi/10.1118/1.3480985>`_ with the `XCIST x-ray CT simulation framework <https://iopscience.iop.org/article/10.1088/1361-6560/ac9174/meta>`_ to create realistic CT exams. This preliminary work was in support of investigating the `effectiveness of deep learning denoising algorithms in pediatric patients <https://aapm.onlinelibrary.wiley.com/doi/10.1002/mp.16901>`_.
 
-**Digital model**: patient size, age, intensity b/w grey and white matter, skull hardness, thickness, and ICH morphology, texture, and location
+In this work, synthetic hemorrhages are inserted into head and neck phantoms based on MR templates and atlases. Presently, three hemorrhage subtypes are supported: intraparenchymal (IPH), epidural (EDH), and subdural (SDH). A knowledge-based algorithm is used to guide the placement and shape of the synthetic hemorrhages, using volume and attenuation parameters modeled from `real hemorrhages obtained in a segmentation dataset <https://arxiv.org/abs/2308.11298>`. Appropriate Hounsfield units can be assigned to each segmented region of the phantom, such as the gray and white matter, bone, CSF, and the hemorrhage. As with previous work, XCIST was used to create realistic simulated CT exams with included synthetic hemorrhages.
 
-**Imaging Parameters (CT)**: Radiation dose (MA, KV voltage), slice thickness, reconstruction kernels, reconstruction field of view (FoV).
+The knowledge-based algorithm allows the following parameters to be controlled:
+
+**Patient model**: head size, age, and skull thickness all depend on the brain template/atlas used. Global white and gray matter attenuation can be modified.
+
+**Pathology model**: ICH subtype, volume, and attenuation (HU). Future work: texture and specific location.
+
+**CT imaging parameters**: Radiation dose (tube current and voltage), slice thickness and interval, reconstruction kernels, reconstruction field of view (FoV).
 
 .. image:: assets/montage.png
         :width: 800
