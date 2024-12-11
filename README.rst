@@ -31,11 +31,10 @@ In this work, synthetic hemorrhages are inserted into head and neck phantoms bas
 
 The knowledge-based algorithm allows the following parameters to be controlled:
 
-**Patient model**: head size, age, and skull thickness all depend on the brain template/atlas used. Global white and gray matter attenuation can be modified.
-
-**Pathology model**: ICH subtype, volume, and attenuation (HU). Future work: texture and specific location.
-
-**CT imaging parameters**: Radiation dose (tube current and voltage), slice thickness and interval, reconstruction kernels, reconstruction field of view (FoV).
+.. csv-table:: Table Title
+   :file: assets/simulation_parameters.csv
+   :widths: 30, 70
+   :header-rows: 1
 
 .. image:: assets/montage.png
         :width: 800
