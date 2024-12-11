@@ -11,7 +11,8 @@
   "kernel",
   "slice_thickness_mm",
   "slice_location_mm",
-  "seed"
+  "seed",
+  "filename"
  ],
  "references": [
   {
