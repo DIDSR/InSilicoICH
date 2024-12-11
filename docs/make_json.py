@@ -8,7 +8,7 @@ df['filename'] = df.file.apply(lambda o: o.split('images/')[1])
 df.pop('file')
 # %%
 data = dict(title='Synthetic CT Datasets of Intracranial Hemorrhage',
-            columns=[o for o in df.columns if o not in ['filename']],
+            columns=[o for o in df.columns],
             references=[
                 dict(title="[code]", url='https://github.com/DIDSR/PedSilicoICH')
                 ],

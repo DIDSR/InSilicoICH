@@ -31,19 +31,34 @@ We have previously combined the `pediatric and adult digital XCAT cohort of phan
         :width: 800
         :align: center
 
-.. image:: assets/summary_figure.png
-        :width: 800
-        :align: center
-
 Installation
 ------------
 
 .. code-block:: bash
 
-        git clone https://github.com/brandonjnelsonFDA/PedSilicoICH
-        pip install -e ./PedSilicoICH
+        pip install git+https://github.com/DIDSR/PedSilicoICH.git
 
 Tested on python 3.11.3
+
+View a Sample Dataset (local demo)
+----------------------------------
+
+Based off of `the S-Synth Demo <https://github.com/DIDSR/ssynth-release>`_
+
+.. image:: docs/assets/demo_preview.png
+        :width: 800
+        :align: center
+
+A sample dataset is viewable as a demo, located in docs/index.html. To serve this website locally do the following:
+
+1. install the `VS Code Liver Server Extension <https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer>`_
+2. Open `index.html <docs/index.html>`_ and click the `Go Live` button at the far lower right corner of VS Code that should appear when an html file is open. 
+3. After selecting `Go`Under the `PORTS` tab of the VS Code terminal, add the port number that popped up after going live (5500 is default), then right click the forwarded address
+4. Click on the `docs` folder containing the demo and the website should load
+
+.. image:: docs/assets/live_server_help.png
+        :width: 800
+        :align: center
 
 Module Layout
 -------------
