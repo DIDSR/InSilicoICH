@@ -48,18 +48,20 @@ Tested on python 3.11.3
 View a Sample Dataset (local demo)
 ----------------------------------
 
-.. image:: assets/demo_preview.png
+Based off of `the S-Synth Demo <https://github.com/DIDSR/ssynth-release>`_
+
+.. image:: docs/assets/demo_preview.png
         :width: 800
         :align: center
 
 A sample dataset is viewable as a demo, located in docs/index.html. To serve this website locally do the following:
 
-1. install the [VS Code Liver Server Extension](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer)
-2. Open [index.html](docs/index.html) and click the `Go Live` button at the far lower right corner of VS Code that should appear when an html file is open. 
+1. install the `VS Code Liver Server Extension <https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer>`_
+2. Open `index.html <docs/index.html>`_ and click the `Go Live` button at the far lower right corner of VS Code that should appear when an html file is open. 
 3. After selecting `Go`Under the `PORTS` tab of the VS Code terminal, add the port number that popped up after going live (5500 is default), then right click the forwarded address
 4. Click on the `docs` folder containing the demo and the website should load
 
-.. image:: assets/live_server_help.png
+.. image:: docs/assets/live_server_help.png
         :width: 800
         :align: center
 
