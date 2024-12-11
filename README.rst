@@ -40,8 +40,7 @@ Installation
 
 .. code-block:: bash
 
-        git clone https://github.com/brandonjnelsonFDA/PedSilicoICH
-        pip install -e ./PedSilicoICH
+        pip install git+//github.com/DIDSR/PedSilicoICH
 
 Tested on python 3.11.3
 
