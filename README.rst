@@ -51,6 +51,8 @@ The knowledge-based algorithm allows the following parameters to be controlled:
 |                            | Edema [voxels] (IPH/round only)                      | Reconstruction kernel                     |                                 |
 +----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
 
+Below are example simulation outputs:
+
 .. image:: assets/montage.png
         :width: 800
         :align: center
