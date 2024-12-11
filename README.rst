@@ -40,7 +40,7 @@ Installation
 
 .. code-block:: bash
 
-        pip install git+//github.com/DIDSR/PedSilicoICH
+        pip install git+https://github.com/DIDSR/PedSilicoICH.git
 
 Tested on python 3.11.3
 
