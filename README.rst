@@ -12,10 +12,14 @@ CT Imaging Datasets for Pediatric Device Assessment of Intracranial Hemorrhage
     :scale: 100%
     :target: https://github.com/brandonjnelsonFDA/PedSilicoICH/actions/workflows/python-app.yml
 
-**Motivation**
+Motivation
+----------
+
 Computer aided triaging (CADt) devices for intracranial hemorrhage (ICH) in the emergency room (e.g. `Rapid ICH K221456 <https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfpmn/pmn.cfm?ID=K221456>`_) is one important example where pediatric and adult cases exist in a reading queue where pediatric patients could be disadvantaged by being deprioritized for time sensitive treatment using an adult-trained AI model that extrapolates poorly to pediatric patients. While these AI/ML devices have potential to benefit pediatric patients, there is currently a lack of annotated pediatric data for evaluating the balance of risk and benefits.
 
-**Purpose**
+Purpose
+-------
+
 To address data availability challenges, we propose to supplement available pediatric patient computed tomography (CT) datasets with data generated in silico, generated using realistic computational human models and physics-based CT simulations. In silico data generation allows for creating examples with true labels with a fraction of the cost that is needed to label real patient data.
 
 Methods
@@ -23,9 +27,31 @@ Methods
 
 We have previously combined the `pediatric and adult digital XCAT cohort of phantoms <https://aapm.onlinelibrary.wiley.com/doi/10.1118/1.3480985>`_ with the `XCIST x-ray CT simulation framework <https://iopscience.iop.org/article/10.1088/1361-6560/ac9174/meta>`_ to create realistic CT exams. This preliminary work was in support of investigating the `effectiveness of deep learning denoising algorithms in pediatric patients <https://aapm.onlinelibrary.wiley.com/doi/10.1002/mp.16901>`_.
 
-**Digital model**: patient size, age, intensity b/w grey and white matter, skull hardness, thickness, and ICH morphology, texture, and location
+In this work, synthetic hemorrhages are inserted into head and neck phantoms based on MR templates and atlases. Presently, three hemorrhage subtypes are supported: intraparenchymal (IPH), epidural (EDH), and subdural (SDH). A knowledge-based algorithm is used to guide the placement and shape of the synthetic hemorrhages, using volume and attenuation parameters modeled from `real hemorrhages obtained in a segmentation dataset <https://arxiv.org/abs/2308.11298>`_. Appropriate Hounsfield units can be assigned to each segmented region of the phantom, such as the gray and white matter, bone, CSF, and the hemorrhage. As with previous work, XCIST was used to create realistic simulated CT exams with included synthetic hemorrhages.
 
-**Imaging Parameters (CT)**: Radiation dose (MA, KV voltage), slice thickness, reconstruction kernels, reconstruction field of view (FoV).
+The knowledge-based algorithm allows the following parameters to be controlled:
+
++----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
+|                            |                                                      |                                           |                                 |
+| Patient Characteristics    | Lesion Characteristics                               | Acquisition Characteristics               | Misc./Output Data               |
++============================+======================================================+===========================================+=================================+
+|                            |                                                      |                                           |                                 |
+| Identifier                 | Intensity [HU]                                       | X-ray tube current [mA]                   | Seed to reproduce               |
++----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
+|                            |                                                      |                                           |                                 |
+| Age (atlas-based)          | Hematoma volume [mL] and slice coverage              | X-ray tube peak voltage [kVp]             | Image file location             |
++----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
+|                            |                                                      |                                           |                                 |
+|                            | Hemorrhage type                                      | CT acquisition view count [views]         | Mask file directory location    |
++----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
+|                            |                                                      |                                           |                                 |
+|                            | Mass effect strength (currently   IPH/round only)    | Reconstructed field of view (FoV) [mm]    | Hemorrhage slice number(s)      |
++----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
+|                            |                                                      |                                           |                                 |
+|                            | Edema [voxels] (IPH/round only)                      | Reconstruction kernel                     |                                 |
++----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
+
+Below are example simulation outputs:
 
 .. image:: assets/montage.png
         :width: 800
@@ -51,7 +77,7 @@ Based off of `the S-Synth Demo <https://github.com/DIDSR/ssynth-release>`_
 
 A sample dataset is viewable as a demo, located in docs/index.html. To serve this website locally do the following:
 
-1. install the `VS Code Liver Server Extension <https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer>`_
+1. install the `VS Code Live Server Extension <https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer>`_
 2. Open `index.html <docs/index.html>`_ and click the `Go Live` button at the far lower right corner of VS Code that should appear when an html file is open. 
 3. After selecting `Go`Under the `PORTS` tab of the VS Code terminal, add the port number that popped up after going live (5500 is default), then right click the forwarded address
 4. Click on the `docs` folder containing the demo and the website should load
