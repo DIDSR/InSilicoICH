@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 import matplotlib.pyplot as plt
 import numpy as np
 
-from pedsilicoICH.pipeline import Scanner, load_phantom
+from pedsilicoICH.study import Scanner, load_phantom
 
 
 # https://radiopaedia.org/articles/windowing-ct?lang=us
