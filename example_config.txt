@@ -1,0 +1,8 @@
+--output_directory
+test
+--views
+100
+--zspan
+-1 8
+--desired_cases
+1

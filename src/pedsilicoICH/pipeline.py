@@ -31,6 +31,15 @@ from pedsilicoICH.study import run_study
 def pedsilicoich(output_directory, views=1000, desired_cases=1,
                  zspan='dynamic', keep_raw=False, seed=None):
     # load volume and HU distributions
+    output_directory = Path(output_directory)
+    assert (zspan == 'dynamic') or isinstance(zspan, list)
+    if isinstance(zspan, list):
+        if len(zspan) < 2:
+            zspan = zspan[0].split(' ')
+    if isinstance(zspan, list):
+        zspan = list(map(int, zspan))
+        for o in zspan:
+            assert isinstance(o, int | float)
     try:
         print(os.getcwd())
         df_volume = pd.read_csv(
@@ -137,7 +146,8 @@ def pedsilicoich(output_directory, views=1000, desired_cases=1,
 
 def pedsilicoich_cli():
     parser = ArgumentParser(
-        description='Runs XCIST CT simulations of ICH models')
+        description='Runs XCIST CT simulations of ICH models',
+        fromfile_prefix_chars='@')
     parser.add_argument('--output_directory', type=str, default="",
                         help='output directory to save simulation results')
     parser.add_argument('--views', type=int, default=1000,
@@ -152,18 +162,8 @@ def pedsilicoich_cli():
                         storage requirements.')
     parser.add_argument('--seed', type=int, help='seed to reproduce a dataset')
     args = parser.parse_args()
+    pedsilicoich(**vars(args))
 
-    zspan = args.zspan
-    assert (zspan == 'dynamic') or isinstance(zspan, list)
-    if isinstance(zspan, list):
-        if len(zspan) < 2:
-            zspan = zspan[0].split(' ')
-    if isinstance(zspan, list):
-        zspan = list(map(int, zspan))
-        for o in zspan:
-            assert isinstance(o, int | float)
-    output_directory = Path(args.output_directory)
-    # </https://www.aapm.org/pubs/CTProtocols/documents/PediatricRoutineHeadCT.pdf>
-    pedsilicoich(output_directory, args.views, args.desired_cases, zspan,
-                 args.keep_raw, args.seed)
-# %%
+
+if __name__ == '__main__':
+    pedsilicoich_cli()
