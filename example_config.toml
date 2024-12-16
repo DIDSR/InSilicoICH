@@ -1,0 +1,25 @@
+[DEFAULT]
+output_directory="test"
+zspan='dynamic'
+desired_cases=1
+keep_raw=false
+seed=false
+
+[patient]
+age=[0, 100]  # range in yrs
+
+[lesion]
+subtypes=[false, 'round', 'epidural', 'subdural']
+mass_effect=true
+edema=[0, 15]
+volume='src/pedsilicoICH/distributions/BHSD_volume_distributions.csv'  # str or list
+attenuation='src/pedsilicoICH/distributions/BHSD_HU_distributions.csv'  # str or list
+
+[acquisition]
+views=1000
+kVp=[120]
+mA=[300, 350, 400]
+
+[recon]
+kernel='soft'
+slice_thickness=5
