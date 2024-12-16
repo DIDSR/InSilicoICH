@@ -204,11 +204,9 @@ def pedsilicoich_cli():
     cli_args = vars(args)
     cli_args = {k: v for k, v in cli_args.items() if v}
     config.update(cli_args)
+    config['subtypes'] = list(map(lambda o: o or None, config['subtypes']))
     pedsilicoich(**config)
 
 
 if __name__ == '__main__':
     pedsilicoich_cli()
-
-
-
