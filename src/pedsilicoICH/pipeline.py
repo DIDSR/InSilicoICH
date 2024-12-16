@@ -87,7 +87,7 @@ or csv filepath')
         raise ValueError(f'`attenuation` {type(attenuation)} is not a dict\
 or csv filepath')
 
-    ages = [yr for yr in possible_ages if (yr > age[0]) and (yr < age[1])]
+    ages = [yr for yr in possible_ages if (yr >= min(age)) & (yr <= max(age))]
     kVp_list = kVp if isinstance(kVp, list | tuple) else [kVp]
     mA_list = kVp if isinstance(mA, list | tuple) else [mA]
     edema_list = list(range(*edema))  # IPH only
