@@ -1,6 +1,6 @@
 [DEFAULT]
 output_directory="test"
-zspan=0 10  # scan range in mm
+zspan=[0, 10]  # scan range in mm, min max
 keep_raw=false  # keep projection data
 seed=false  # seed to reproduce dataset
 
