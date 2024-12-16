@@ -164,6 +164,12 @@ or csv filepath')
                               index=False)
 
 
+def flatten_dict(layered_dict):
+    config = dict()
+    [config.update(k) for k in layered_dict.values()]
+    return config
+
+
 def pedsilicoich_cli():
     parser = ArgumentParser(
         description='Runs XCIST CT simulations of ICH models',
@@ -186,16 +192,23 @@ def pedsilicoich_cli():
     parser.add_argument('--seed', type=int, help='seed to reproduce a dataset')
     args = parser.parse_args()
     with open(Path(__file__).parent / 'configs/default.toml', 'rb') as f:
-        defaults = tomllib.load(f)
+        config = tomllib.load(f)
+        config = flatten_dict(config)
     if args.config:
-        user_config = tomllib.load(args.config)
-        defaults.update(user_config)
-    config = dict()
-    [config.update(k) for k in defaults.values()]  # flatten the dict
-    config.update(vars(args))
-    config.pop('config')
+        with open(args.config, 'rb') as f:
+            user_config = tomllib.load(f)
+            user_config = flatten_dict(user_config)
+        args.config = None
+        config.update(user_config)
+
+    cli_args = vars(args)
+    cli_args = {k: v for k, v in cli_args.items() if v}
+    config.update(cli_args)
     pedsilicoich(**config)
 
 
 if __name__ == '__main__':
     pedsilicoich_cli()
+
+
+

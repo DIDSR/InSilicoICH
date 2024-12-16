@@ -68,6 +68,31 @@ Installation
 
 Tested on python 3.11.3
 
+Usage
+-----
+
+The synthetic data generation and image simulation tools included in this repo can be used either programmatically by importing into Python scripts as a Package or via command line interface (CLI)
+
+**Programmatic Usage**
+
+See the included `jupyter notebooks <notebooks>`_ for example programmatic usage
+
+**Command Line Usage**
+
+After `pip` installing, the `pedsilicoich` program should be available in your environment and can be used as follows
+
+.. code-block:: bash
+        pedsilicoich example_config.toml
+
+Any parameters provided in config files like `example_config.toml <example_config.toml>`_, override the `defaults <src/pedsilicoICH/configs/default.toml>`_.
+
+Additionally, command line arguments can be provided as positional or keyword arguments, see the help string for more details:
+
+.. code-block:: bash
+        pedsilicoich --help
+
+User provide command line arguments override user provided config files, which override the `default <src/pedsilicoICH/configs/default.toml>`_ configs
+
 View a Sample Dataset (local demo)
 ----------------------------------
 
