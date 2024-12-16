@@ -20,16 +20,32 @@
 
 from pathlib import Path
 from argparse import ArgumentParser
+import tomllib
 import os
 
 import numpy as np
 import pandas as pd
 
 from pedsilicoICH.study import run_study
+from pedsilicoICH.ground_truth_definition.phantoms import possible_ages
+
+LESION_TYPES = ['round', 'epidural', 'subdural']
 
 
 def pedsilicoich(output_directory, views=1000, desired_cases=1,
-                 zspan='dynamic', keep_raw=False, seed=None):
+                 zspan='dynamic', age=[0, 100],
+                 subtypes=[None] + LESION_TYPES,
+                 mass_effect=True,
+                 edema=[0, 15],
+                 volume=dict(zip(LESION_TYPES,
+                                 len(LESION_TYPES)*[[0.1, 60]])),
+                 attenuation=dict(zip(LESION_TYPES,
+                                  len(LESION_TYPES)*[[0, 90]])),
+                 kVp=[120],
+                 mA=[300],
+                 kernel='soft',
+                 slice_thickness=5,
+                 keep_raw=False, seed=None):
     # load volume and HU distributions
     output_directory = Path(output_directory)
     assert (zspan == 'dynamic') or isinstance(zspan, list)
@@ -40,43 +56,47 @@ def pedsilicoich(output_directory, views=1000, desired_cases=1,
         zspan = list(map(int, zspan))
         for o in zspan:
             assert isinstance(o, int | float)
-    try:
-        print(os.getcwd())
-        df_volume = pd.read_csv(
-            'src/pedsilicoICH/distributions/BHSD_volume_distributions.csv')
+    if isinstance(volume, dict):
+        df_volume = pd.DataFrame(volume).rename({'subdural': 'SDH_weight',
+                                                 'epidural': 'EDH_weight',
+                                                 'round': 'IPH_weight'},
+                                                axis='columns')
+    elif isinstance(volume, str | Path):
+        df_volume = pd.read_csv(volume)
         df_volume['EDH_weight'] /= df_volume['EDH_weight'].sum()
         df_volume['SDH_weight'] /= df_volume['SDH_weight'].sum()
         df_volume['IPH_weight'] /= df_volume['IPH_weight'].sum()
+    else:
+        raise ValueError(f'`volume` {type(volume)} is not a dict\
+or csv filepath')
 
-        df_HU = pd.read_csv(
-            'src/pedsilicoICH/distributions/BHSD_HU_distributions.csv')
+    if isinstance(attenuation, dict):
+        df_volume = pd.DataFrame(volume).rename({'subdural': 'SDH_weight',
+                                                 'epidural': 'EDH_weight',
+                                                 'round': 'IPH_weight'},
+                                                axis='columns')
+    elif isinstance(attenuation, str | Path):
+        df_HU = pd.read_csv(attenuation).rename({'subdural': 'SDH_weight',
+                                                 'epidural': 'EDH_weight',
+                                                 'round': 'IPH_weight'},
+                                                axis='columns')
         df_HU['EDH_weight'] /= df_HU['EDH_weight'].sum()
         df_HU['SDH_weight'] /= df_HU['SDH_weight'].sum()
         df_HU['IPH_weight'] /= df_HU['IPH_weight'].sum()
-        print('Successfully loaded volume and HU distributions')
-    except FileNotFoundError:
-        min_vol, max_vol = 1, 60
-        volume_list = np.linspace(min_vol, max_vol, 20)
-        min_intensity, max_intensity = 20, 200
-        intensity_list = np.arange(20, 200)
+    else:
+        raise ValueError(f'`attenuation` {type(attenuation)} is not a dict\
+or csv filepath')
 
-    recon_kernel = 'soft'
-    # options include ['standard', 'soft', 'bone', 'R-L', 'S-L']
-    slice_thickness = 5  # in mm
-    nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
-    mida_age = 38  # median US adult age to represent MIDA
-    possible_ages = nihpd_ages + [mida_age]
-    kVp_list = [120]
-    mA_list = list(range(300, 400, 50))
-    lesion_types = [None, 'round', 'epidural', 'subdural']
-    mass_effect = np.linspace(0, 1, 10)
-    edema_list = list(range(15))  # IPH only
+    ages = [yr for yr in possible_ages if (yr > age[0]) and (yr < age[1])]
+    kVp_list = kVp if isinstance(kVp, list | tuple) else [kVp]
+    mA_list = kVp if isinstance(mA, list | tuple) else [mA]
+    edema_list = list(range(*edema))  # IPH only
     random = np.random.default_rng(seed)
     seed = random.integers(0, 1e6)
     l_parameter_comb = []
 
     for case_idx in range(desired_cases):
-        lesion_id = random.choice(lesion_types)  # select a random lesion type
+        lesion_id = random.choice(subtypes)  # select a random lesion type
         edema = None
         if lesion_id is None:
             vol = 0
@@ -99,7 +119,7 @@ def pedsilicoich(output_directory, views=1000, desired_cases=1,
             edema = random.choice(edema_list)
 
         l_parameter_comb.append([
-            random.choice(possible_ages),  # age
+            random.choice(ages),  # age
             random.choice(kVp_list),  # kVp
             random.choice(mA_list),  # mA
             intensity,
@@ -133,7 +153,7 @@ def pedsilicoich(output_directory, views=1000, desired_cases=1,
                           mass_effect=mass_effect,
                           views=views,
                           zspan=zspan,
-                          kernel=recon_kernel,
+                          kernel=kernel,
                           slice_thickness=slice_thickness,
                           keep_raw=keep_raw,
                           edema=edema,
@@ -148,21 +168,32 @@ def pedsilicoich_cli():
     parser = ArgumentParser(
         description='Runs XCIST CT simulations of ICH models',
         fromfile_prefix_chars='@')
-    parser.add_argument('--output_directory', type=str, default="",
+    parser.add_argument('config', nargs='?', type=str,
+                        help='Config toml file')
+    parser.add_argument('--output_directory', type=str,
                         help='output directory to save simulation results')
-    parser.add_argument('--views', type=int, default=1000,
+    parser.add_argument('--views', type=int,
                         help='number of angular CT views per rotation')
-    parser.add_argument('--desired_cases', type=int, default=1000,
+    parser.add_argument('--desired_cases', type=int,
                         help='number of simulations to run')
-    parser.add_argument('--zspan', nargs='+', default='dynamic',
+    parser.add_argument('--zspan', nargs='+',
                         help='z range of scans [mm], defaults to dynamic')
-    parser.add_argument('--keep_raw', type=bool, default=False,
+    parser.add_argument('--keep_raw', type=bool,
                         help='whether to keep raw projection data and ground\
                         truth phantoms, greatly increases\
                         storage requirements.')
     parser.add_argument('--seed', type=int, help='seed to reproduce a dataset')
     args = parser.parse_args()
-    pedsilicoich(**vars(args))
+    with open(Path(__file__).parent / 'configs/default.toml', 'rb') as f:
+        defaults = tomllib.load(f)
+    if args.config:
+        user_config = tomllib.load(args.config)
+        defaults.update(user_config)
+    config = dict()
+    [config.update(k) for k in defaults.values()]  # flatten the dict
+    config.update(vars(args))
+    config.pop('config')
+    pedsilicoich(**config)
 
 
 if __name__ == '__main__':
