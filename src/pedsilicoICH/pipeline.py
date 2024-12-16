@@ -167,6 +167,7 @@ or csv filepath')
 def pedsilicoich_cli():
     parser = ArgumentParser(
         description='Runs XCIST CT simulations of ICH models',
+        epilog='arguments can be given as toml config files or command line flags, each overriding defaults',
         fromfile_prefix_chars='@')
     parser.add_argument('config', nargs='?', type=str,
                         help='Config toml file')
