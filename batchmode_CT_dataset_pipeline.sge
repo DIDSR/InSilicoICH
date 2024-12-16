@@ -4,6 +4,7 @@
 export LOG_DIR=$1
 OUTPUT=$2
 CASES=$3
+CONFIG=$4
 
 mkdir -p $LOG_DIR
 mkdir -p $OUTPUT
@@ -19,7 +20,7 @@ source /home/brandon.nelson/anaconda3/envs/pedsilicoich/bin/activate
 
 START_TIME=`date +%s`
 set -x
-(pedsilicoich --output_directory $OUTPUT --desired_cases=$CASES)
+(pedsilicoich $CONFIG --output_directory $OUTPUT --desired_cases=$CASES)
 set +x
 EXIT_STATUS=$?
 END_TIME=`date +%s`
