@@ -12,6 +12,8 @@ CT Imaging Datasets for Pediatric Device Assessment of Intracranial Hemorrhage
     :scale: 100%
     :target: https://github.com/brandonjnelsonFDA/PedSilicoICH/actions/workflows/python-app.yml
 
+This repository contains tools for generating synthetic non contrast CT datasets of intracranial hemorrhage (ICH).
+
 Motivation
 ----------
 
@@ -65,6 +67,33 @@ Installation
         pip install git+https://github.com/DIDSR/PedSilicoICH.git
 
 Tested on python 3.11.3
+
+Usage
+-----
+
+The synthetic data generation and image simulation tools included in this repo can be used either programmatically by importing into Python scripts as a Package or via command line interface (CLI)
+
+**Programmatic Usage**
+
+See the included `jupyter notebooks <notebooks>`_ for example programmatic usage
+
+**Command Line Usage**
+
+After `pip` installing, the `pedsilicoich` program should be available in your environment and can be used as follows
+
+.. code-block:: bash
+
+        pedsilicoich example_config.toml
+
+Any parameters provided in config files like `example_config.toml <example_config.toml>`_, override the `defaults <src/pedsilicoICH/configs/default.toml>`_.
+
+Additionally, command line arguments can be provided as positional or keyword arguments, see the help string for more details:
+
+.. code-block:: bash
+
+        pedsilicoich --help
+
+User provide command line arguments override user provided config files, which override the `default <src/pedsilicoICH/configs/default.toml>`_ configs
 
 View a Sample Dataset (local demo)
 ----------------------------------
@@ -122,14 +151,10 @@ Contributing
 
 Our current practice is developing locally by cloning the git repo to your local machine or personal directory and accessing a common dataset. Commits are encouraged to be regularly synced between the local and remote repo. Contributions are welcome from all, though developing on your own branch may be best to avoid merge conflicts, then we can decide on what to merge to the main branch (see `software carpentry on collaborating with git <https://swcarpentry.github.io/git-novice/08-collab.html>`_ for details).
 
-Useful Links
-------------
-
-- `REALYSM_PedCT: pedsilico-pilot.ipynb <https://github.com/bnel1201/REALYSM_PedCT/blob/PedSilicoICH-Pilot/pedsilico-pilot.ipynb>`_: CT simulation pipeline that we aim to build off of for this project, in particular this notebook was used to make the pilot data images shown in `Methods`)
-- `pediatricIQphantoms: running_simulations.ipynb <https://github.com/bnel1201/pediatricIQphantoms/blob/main/examples/running_simulations.ipynb>`_: examples of using a Python wrapper around the `Michigan Image Reconstruction Toolbox (MIRT) <https://github.com/JeffFessler/mirt>`_ for simple, faster CT simulations
-
 See Also
 --------
 
 - `PedSilicoAbdomen <https://github.com/DIDSR/PedSilicoAbdomen>`_ for generating synthetic abdominal non contrast CT datasets
 - `PedSilicoLVO <https://github.com/brandonjnelsonFDA/PedSilicoLVO>`_ for generating synthetic large vessel occlusion (LVO) non contrast CT datasets
+- `Virtual Imaging Tools (VITools) <https://github.com/DIDsr/vitools>`_ tools for running virtual imaging trials including image acquisition frameworks
+- `Wait time assessments for ICH CADt VIT <https://github.com/brandonjnelsonFDA/ICH-CADt-VIT>`_

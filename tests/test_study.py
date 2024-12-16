@@ -5,7 +5,7 @@ tests high level Study functionality
 import numpy as np
 from monai.transforms import RandAffine
 
-from pedsilicoICH.pipeline import Study
+from pedsilicoICH.study import Study
 from pedsilicoICH.ground_truth_definition.phantoms import load_phantom
 from pedsilicoICH.image_acquisition import Scanner
 

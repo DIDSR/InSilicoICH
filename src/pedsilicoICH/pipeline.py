@@ -1,216 +1,212 @@
-'''
-pipeline: this high level module organizes the healthy head phantoms,
-lesion definitions, augmentations, and CT simulation together into the final
-ct_simulation function.
-'''
+# %% [markdown]
+# # CT_dataset_pipeline
+#
+# runs CT simulations given inputs of a voxelized
+# head phantom with ICH lesion insertion and scan acquisition parameters.
+#
+# Outputs:
+#
+# 1. a directory structure with dicom images for each simulation run and
+# 2. a CSV file containing relevant simulation metadata. This metadata
+# includes:
+#  - a summary of simulation inputs such as patient identifiers (name, age),
+#    as well as lesion insertion parameters (radius and center coordinates
+#    in case of a spherical ICH)
+#  - a summary of simulation outputs such as saved file locations of the dicom
+#    images "image file" as well as lesion segmentation masks 'mask file'
+#    lesion volume [mL] is also provided based on the measured lesion volume
+#    following CT simulation - this should be similar to volume predicted by
+#    the input radius
+
 from pathlib import Path
-from shutil import rmtree
+from argparse import ArgumentParser
+import tomllib
+import os
 
 import numpy as np
-import pydicom
 import pandas as pd
-from scipy.ndimage import center_of_mass
-from monai.transforms import RandAffine
 
-from .image_acquisition import Scanner, read_dicom
-from .ground_truth_definition.phantoms import load_phantom
+from pedsilicoICH.study import run_study
+from pedsilicoICH.ground_truth_definition.phantoms import possible_ages
 
-
-def load_vol(file_list):
-    return np.stack(list(map(read_dicom, file_list)))
+LESION_TYPES = ['round', 'epidural', 'subdural']
 
 
-class Study:
-    def __init__(self, scanner: Scanner, study_name='default'):
-        self.scanner = scanner
-        self.phantom = scanner.phantom
-        self.study_name = study_name
-        self.metadata = None
-
-    def __repr__(self) -> str:
-        repr = f'''
-        study name: {self.study_name}
-        Phantom details:
-        ----------------
-        {self.scanner.phantom.__repr__()}
-
-        Scanner details:
-        ----------------
-        Scanner: {self.scanner.__repr__()}
-
-        Study details:
-        --------------
-        {self.metadata}
-        '''
-        return repr
-
-    @property
-    def shape(self):
-        return list(self.phantom._phantom.shape)
-
-    @property
-    def size(self):
-        return np.array(self.phantom.spacings)*self.phantom._phantom.shape
-
-    def run_study(self, output_directory=None, kVp=120, mA=200, views=1000,
-                  fov=250, zspan='dynamic',
-                  kernel='standard', slice_thickness=1, **kwargs):
-        patient_name = self.phantom.patient_name
-        age = self.phantom.age
-        lesion_type = self.phantom.lesion_type
-        intensity = self.phantom.lesion_intensity
-
-        ct = self.scanner
-        if zspan == 'dynamic':
-            startZ, endZ = ct.recommend_scan_range()
-        elif isinstance(zspan, tuple | list):
-            startZ, endZ = zspan
-
-        ct.run_scan(startZ=startZ, endZ=endZ, views=views,
-                    mA=mA, kVp=kVp)
-        ct.run_recon(fov=fov, kernel=kernel, sliceThickness=slice_thickness)
-        self.scanner = ct
-        self.images = ct.recon
-        if output_directory is None:
-            output_directory = self.scanner.output_dir
-        else:
-            output_directory = Path(output_directory) / patient_name
-        dicom_path = output_directory / 'dicoms'
-        dcm_files = ct.write_to_dicom(dicom_path / f'{patient_name}.dcm')
-
-        mask_files = [None]*len(dcm_files)
-        z, x, y = 3*[None]
-        vol_by_slice_mL = [0]*len(dcm_files)
-        vol_ml = 0
-        if lesion_type:
-            lesion_only = ct
-            mask = ct.get_lesion_mask(startZ=startZ, endZ=endZ,
-                                      slice_thickness=slice_thickness, fov=fov)
-
-            lesion_only.recon = mask
-            dicom_path = output_directory / 'lesion_masks'
-            mask_files = lesion_only.write_to_dicom(dicom_path /
-                                                    f'{patient_name}_mask.dcm')
-            mask = load_vol(mask_files)
-            self.lesion = mask & (self.images > self.images.mean())
-            self.scanner.recon = self.images
-
-            dcm = pydicom.read_file(mask_files[0])
-            spacings = list(map(float, [dcm.SliceThickness] +
-                            list(dcm.PixelSpacing)))
-
-            vol_ml = np.prod(spacings) * mask.sum() / 1000
-            vol_by_slice_mL = np.prod(spacings) *\
-                self.lesion.sum(axis=(1, 2)) / 1000
-            z, x, y = center_of_mass(mask)
-            self.lesion_coords = (z, x, y)
-        ages = []
-        names = []
-        files = []
-        kVps = []
-        mA_list = []
-        fovs = []
-        kernels = []
-        views_list = []
-        masks = []
-        intensity_list = []
-        lesion_type_list = []
-        mass_effect = []
-        center_x_list = []
-        center_y_list = []
-        center_z_list = []
-        lesion_volume_list = []
-
-        for f, m, vol_ml in zip(dcm_files, mask_files, vol_by_slice_mL):
-            names.append(patient_name)
-            ages.append(age)
-            files.append(f)
-            kVps.append(kVp)
-            mA_list.append(mA)
-            fovs.append(fov)
-            kernels.append(kernel)
-            views_list.append(views)
-            masks.append(m)
-
-            if vol_ml > 0:
-                slice_mass_effect = self.phantom.mass_effect
-                slice_intensity = intensity
-                slice_x = int(x)
-                slice_y = int(y)
-                slice_z = int(z)
-                slice_type = lesion_type
-            else:
-                slice_mass_effect = None
-                slice_intensity = None
-                slice_x = None
-                slice_y = None
-                slice_z = None
-                slice_type = None
-
-            intensity_list.append(slice_intensity)
-            lesion_type_list.append(slice_type)
-            mass_effect.append(slice_mass_effect)
-            center_x_list.append(slice_x)
-            center_y_list.append(slice_y)
-            center_z_list.append(slice_z)
-            lesion_volume_list.append(vol_ml)
-
-        metadata = pd.DataFrame({'name': names,
-                                 'age': ages,
-                                 'intensity': intensity_list,
-                                 'center x': center_x_list,
-                                 'center y': center_y_list,
-                                 'center z': center_z_list,
-                                 'lesion type': lesion_type_list,
-                                 'mass effect': mass_effect,
-                                 'lesion volume [mL]': lesion_volume_list,
-                                 'mA': mA_list,
-                                 'kVp': kVps,
-                                 'views': views_list,
-                                 'fov [mm]': fovs,
-                                 'kernel': kernels,
-                                 'image file': files,
-                                 'mask file': masks})
-        self.metadata = metadata
-        return self
-
-
-def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
-              mA=200, intensity=200, volume=5, lesion_type=None,
-              mass_effect=True, add_positioning_augmentation=True,
-              views=1000, zspan='dynamic', kernel='standard',
-              slice_thickness=1, keep_raw=False, seed=None, **kwargs) -> Study:
-
-    phantom = load_phantom(age=age, name=patient_name)
-
-    if lesion_type and (volume > 0):
-        phantom.insert_lesion(lesion_type,
-                              volume=volume,
-                              intensity=intensity,
-                              mass_effect=mass_effect,
-                              seed=seed,
-                              **kwargs)
-
-    if add_positioning_augmentation:
-        transform = RandAffine(prob=0.5,
-                               rotate_range=[np.pi/4, np.pi/20, np.pi/20],
-                               translate_range=[10, 10, 10],
-                               scale_range=[0.1, 0.1, 0.1],
-                               padding_mode="border")
-        phantom.apply_transform(transform, seed=seed)
-        # will call CT_number_phantom if it hasn't been called yet
+def pedsilicoich(output_directory, views=1000, desired_cases=1,
+                 zspan='dynamic', age=[0, 100],
+                 subtypes=[None] + LESION_TYPES,
+                 mass_effect=True,
+                 edema=[0, 15],
+                 volume=dict(zip(LESION_TYPES,
+                                 len(LESION_TYPES)*[[0.1, 60]])),
+                 attenuation=dict(zip(LESION_TYPES,
+                                  len(LESION_TYPES)*[[0, 90]])),
+                 kVp=[120],
+                 mA=[300],
+                 kernel='soft',
+                 slice_thickness=5,
+                 keep_raw=False, seed=None):
+    # load volume and HU distributions
+    output_directory = Path(output_directory)
+    assert (zspan == 'dynamic') or isinstance(zspan, list)
+    if isinstance(zspan, list):
+        if len(zspan) < 2:
+            zspan = zspan[0].split(' ')
+    if isinstance(zspan, list):
+        zspan = list(map(int, zspan))
+        for o in zspan:
+            assert isinstance(o, int | float)
+    if isinstance(volume, dict):
+        df_volume = pd.DataFrame(volume).rename({'subdural': 'SDH_weight',
+                                                 'epidural': 'EDH_weight',
+                                                 'round': 'IPH_weight'},
+                                                axis='columns')
+    elif isinstance(volume, str | Path):
+        df_volume = pd.read_csv(volume)
+        df_volume['EDH_weight'] /= df_volume['EDH_weight'].sum()
+        df_volume['SDH_weight'] /= df_volume['SDH_weight'].sum()
+        df_volume['IPH_weight'] /= df_volume['IPH_weight'].sum()
     else:
-        # if neither insert lesion and apply_transform have been called,
-        # need to create CT number phantom before proceeding
-        if not phantom._lesion:
-            phantom._phantom = phantom.get_CT_number_phantom()
+        raise ValueError(f'`volume` {type(volume)} is not a dict\
+or csv filepath')
 
-    scanner = Scanner(phantom, output_dir=output_directory)
-    study = Study(scanner, 'pilot')
-    study.run_study(kVp=kVp, mA=mA, views=views, zspan=zspan,
-                    kernel=kernel, slice_thickness=slice_thickness)
-    study.metadata['seed'] = seed
-    if keep_raw is False:
-        rmtree(study.scanner.output_dir / 'phantoms')
-        rmtree(study.scanner.output_dir / 'simulations')
-    return study
+    if isinstance(attenuation, dict):
+        df_volume = pd.DataFrame(volume).rename({'subdural': 'SDH_weight',
+                                                 'epidural': 'EDH_weight',
+                                                 'round': 'IPH_weight'},
+                                                axis='columns')
+    elif isinstance(attenuation, str | Path):
+        df_HU = pd.read_csv(attenuation).rename({'subdural': 'SDH_weight',
+                                                 'epidural': 'EDH_weight',
+                                                 'round': 'IPH_weight'},
+                                                axis='columns')
+        df_HU['EDH_weight'] /= df_HU['EDH_weight'].sum()
+        df_HU['SDH_weight'] /= df_HU['SDH_weight'].sum()
+        df_HU['IPH_weight'] /= df_HU['IPH_weight'].sum()
+    else:
+        raise ValueError(f'`attenuation` {type(attenuation)} is not a dict\
+or csv filepath')
+
+    ages = [yr for yr in possible_ages if (yr >= min(age)) & (yr <= max(age))]
+    kVp_list = kVp if isinstance(kVp, list | tuple) else [kVp]
+    mA_list = kVp if isinstance(mA, list | tuple) else [mA]
+    edema_list = list(range(*edema))  # IPH only
+    random = np.random.default_rng(seed)
+    seed = random.integers(0, 1e6)
+    l_parameter_comb = []
+
+    for case_idx in range(desired_cases):
+        lesion_id = random.choice(subtypes)  # select a random lesion type
+        edema = None
+        if lesion_id is None:
+            vol = 0
+            intensity = 0
+        elif lesion_id == 'epidural':
+            vol = random.choice(df_volume['EDH_volume'],
+                                p=df_volume['EDH_weight'])
+            intensity = random.choice(df_HU['EDH_HU'],
+                                      p=df_HU['EDH_weight'])
+        elif lesion_id == 'subdural':
+            vol = random.choice(df_volume['SDH_volume'],
+                                p=df_volume['SDH_weight'])
+            intensity = random.choice(df_HU['SDH_HU'],
+                                      p=df_HU['SDH_weight'])
+        elif lesion_id == 'round':
+            vol = random.choice(df_volume['IPH_volume'],
+                                p=df_volume['IPH_weight'])
+            intensity = random.choice(df_HU['IPH_HU'],
+                                      p=df_HU['IPH_weight'])
+            edema = random.choice(edema_list)
+
+        l_parameter_comb.append([
+            random.choice(ages),  # age
+            random.choice(kVp_list),  # kVp
+            random.choice(mA_list),  # mA
+            intensity,
+            vol,
+            lesion_id,
+            random.choice(mass_effect),
+        ])
+
+    n_params = len(l_parameter_comb)
+
+    try:
+        patientids = [int(os.environ['SLURM_ARRAY_TASK_ID']) - 1]
+    except KeyError:
+        print('SLURM_ARRAY_TASK_ID not set, running in serial')
+        patientids = list(range(n_params))
+
+    for patientid in patientids:
+        print(f'{patientid+1}/{n_params}')
+        age, kVp, mA, intensity, volume, lesion_type, mass_effect =\
+            l_parameter_comb[patientid]
+        print(f'{age} years, {lesion_type}, {volume} volume, {intensity} HU')
+        patient_name = f'case_{patientid:03}'
+        study = run_study(output_directory,
+                          patient_name,
+                          age=age,
+                          kVp=kVp,
+                          mA=mA,
+                          intensity=intensity,
+                          volume=volume,
+                          lesion_type=lesion_type,
+                          mass_effect=mass_effect,
+                          views=views,
+                          zspan=zspan,
+                          kernel=kernel,
+                          slice_thickness=slice_thickness,
+                          keep_raw=keep_raw,
+                          edema=edema,
+                          seed=seed)
+        study.metadata['edema'] = edema
+        study.metadata.to_csv(output_directory / patient_name /
+                              f'metadata_{patientid}.csv',
+                              index=False)
+
+
+def flatten_dict(layered_dict):
+    config = dict()
+    [config.update(k) for k in layered_dict.values()]
+    return config
+
+
+def pedsilicoich_cli():
+    parser = ArgumentParser(
+        description='Runs XCIST CT simulations of ICH models',
+        epilog='arguments can be given as toml config files or command line flags, each overriding defaults',
+        fromfile_prefix_chars='@')
+    parser.add_argument('config', nargs='?', type=str,
+                        help='Config toml file')
+    parser.add_argument('--output_directory', type=str,
+                        help='output directory to save simulation results')
+    parser.add_argument('--views', type=int,
+                        help='number of angular CT views per rotation')
+    parser.add_argument('--desired_cases', type=int,
+                        help='number of simulations to run')
+    parser.add_argument('--zspan', nargs='+',
+                        help='z range of scans [mm], defaults to dynamic')
+    parser.add_argument('--keep_raw', type=bool,
+                        help='whether to keep raw projection data and ground\
+                        truth phantoms, greatly increases\
+                        storage requirements.')
+    parser.add_argument('--seed', type=int, help='seed to reproduce a dataset')
+    args = parser.parse_args()
+    with open(Path(__file__).parent / 'configs/default.toml', 'rb') as f:
+        config = tomllib.load(f)
+        config = flatten_dict(config)
+    if args.config:
+        with open(args.config, 'rb') as f:
+            user_config = tomllib.load(f)
+            user_config = flatten_dict(user_config)
+        args.config = None
+        config.update(user_config)
+
+    cli_args = vars(args)
+    cli_args = {k: v for k, v in cli_args.items() if v}
+    config.update(cli_args)
+    config['subtypes'] = list(map(lambda o: o or None, config['subtypes']))
+    pedsilicoich(**config)
+
+
+if __name__ == '__main__':
+    pedsilicoich_cli()

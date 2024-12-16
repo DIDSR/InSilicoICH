@@ -37,3 +37,6 @@ where = ["src"]
 [project.urls]
 Homepage = "https://github.com/brandonjnelsonFDA/PedSilicoICH"
 Issues = "https://github.com/brandonjnelsonFDA/PedSilicoICH/issues"
+
+[project.scripts]
+pedsilicoich = "pedsilicoICH.pipeline:pedsilicoich_cli"

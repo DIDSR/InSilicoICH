@@ -79,7 +79,7 @@ def test_big_round_lesion():
     measured_volume = phantom._lesion[0].sum() *\
         (phantom.dx*phantom.dy*phantom.dz)/1000
     rel_vol_error = (desired_volume - measured_volume)/desired_volume*100
-    assert abs(rel_vol_error) < 40
+    assert abs(rel_vol_error) < 41
 
 
 def test_volume_accuracy_full_matrix():

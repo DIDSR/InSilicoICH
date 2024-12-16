@@ -19,7 +19,7 @@ source /home/brandon.nelson/anaconda3/envs/pedsilicoich/bin/activate
 
 START_TIME=`date +%s`
 set -x
-( python CT_dataset_pipeline.py --output_directory $OUTPUT --desired_cases=$CASES)
+(pedsilicoich --output_directory $OUTPUT --desired_cases=$CASES)
 set +x
 EXIT_STATUS=$?
 END_TIME=`date +%s`
