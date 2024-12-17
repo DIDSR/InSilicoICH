@@ -13,8 +13,8 @@ age=[0, 100]  # range in yrs
 subtypes=[false, 'round', 'epidural', 'subdural']
 mass_effect=true  # whether lesions displace brain tissue
 edema=[0, 15]  # edema width range [min, max] in pixels
-volume='src/pedsilicoICH/distributions/BHSD_volume_distributions.csv'
-attenuation='src/pedsilicoICH/distributions/BHSD_HU_distributions.csv'
+volume='distributions/BHSD_volume_distributions.csv'
+attenuation='distributions/BHSD_HU_distributions.csv'
 
 [acquisition]
 views=1000
