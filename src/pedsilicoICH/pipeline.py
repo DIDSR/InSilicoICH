@@ -173,8 +173,10 @@ def flatten_dict(layered_dict):
 def pedsilicoich_cli():
     parser = ArgumentParser(
         description='Runs XCIST CT simulations of ICH models',
-        epilog='arguments can be given as toml config files or command line\
-flags, each overriding defaults',
+        epilog='''
+        arguments can be given as toml config files or command line
+        flags, each overriding defaults
+        ''',
         fromfile_prefix_chars='@')
     parser.add_argument('config', nargs='?', type=str,
                         help='Config toml file')
@@ -187,9 +189,11 @@ flags, each overriding defaults',
     parser.add_argument('--zspan', nargs='+',
                         help='z range of scans [mm], defaults to dynamic')
     parser.add_argument('--keep_raw', type=bool,
-                        help='whether to keep raw projection data and ground\
-                        truth phantoms, greatly increases\
-                        storage requirements.')
+                        help='''
+                        whether to keep raw projection data and ground
+                        truth phantoms, greatly increases
+                        storage requirements.
+                        ''')
     parser.add_argument('--seed', type=int, help='seed to reproduce a dataset')
     args = parser.parse_args()
     pkg_dir = Path(__file__).parent
