@@ -1,5 +1,5 @@
 # This is the default configuration for PedSilicoICH simulations
-[DEFAULT]
+[general]
 output_directory="test"
 zspan='dynamic'  # scan range in mm, min max
 desired_cases=1
@@ -13,8 +13,8 @@ age=[0, 100]  # range in yrs
 subtypes=[false, 'round', 'epidural', 'subdural']
 mass_effect=true  # whether lesions displace brain tissue
 edema=[0, 15]  # edema width range [min, max] in pixels
-volume='src/pedsilicoICH/distributions/BHSD_volume_distributions.csv'
-attenuation='src/pedsilicoICH/distributions/BHSD_HU_distributions.csv'
+volume='distributions/BHSD_volume_distributions.csv'
+attenuation='distributions/BHSD_HU_distributions.csv'
 
 [acquisition]
 views=1000
