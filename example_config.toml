@@ -1,14 +1,14 @@
 # This is an example configuration for PedSilicoICH simulations
 # uncommented parameters here will override defaults
-[DEFAULT]
+[general]
 output_directory="peds_test"
 zspan=[0, 10]  # scan range in mm, min max
+desired_cases=1  # desired dataset size
 # keep_raw=false  # keep projection data
 # seed=false  # seed to reproduce dataset
 
 [patient]
 age=[0, 100]  # range in yrs [min, max]
-desired_cases=1  # desired dataset size
 
 [lesion]
 subtypes=[false, 'round', 'epidural', 'subdural']
