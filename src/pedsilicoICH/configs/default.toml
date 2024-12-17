@@ -1,5 +1,5 @@
 # This is the default configuration for PedSilicoICH simulations
-[DEFAULT]
+[general]
 output_directory="test"
 zspan='dynamic'  # scan range in mm, min max
 desired_cases=1
