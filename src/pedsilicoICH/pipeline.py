@@ -22,6 +22,7 @@ from pathlib import Path
 from argparse import ArgumentParser
 import tomllib
 import os
+import csv
 
 import numpy as np
 import pandas as pd
@@ -32,7 +33,7 @@ from pedsilicoICH.ground_truth_definition.phantoms import possible_ages
 LESION_TYPES = ['round', 'epidural', 'subdural']
 
 
-def pedsilicoich(output_directory, views=1000, desired_cases=1,
+def pedsilicoich(output_directory, input_csv, views=1000, desired_cases=1,
                  zspan='dynamic', age=[0, 100],
                  subtypes=[None] + LESION_TYPES,
                  mass_effect=True,
@@ -45,8 +46,7 @@ def pedsilicoich(output_directory, views=1000, desired_cases=1,
                  mA=[300],
                  kernel='soft',
                  slice_thickness=5,
-                 keep_raw=False, seed=None):
-    # load volume and HU distributions
+                 keep_raw=False, seed=None):     
     output_directory = Path(output_directory)
     assert (zspan == 'dynamic') or isinstance(zspan, list)
     if isinstance(zspan, list):
@@ -87,48 +87,71 @@ or csv filepath')
         raise ValueError(f'`attenuation` {type(attenuation)} is not a dict\
 or csv filepath')
 
-    ages = [yr for yr in possible_ages if (yr >= min(age)) & (yr <= max(age))]
-    kVp_list = kVp if isinstance(kVp, list | tuple) else [kVp]
-    mA_list = kVp if isinstance(mA, list | tuple) else [mA]
-    edema_list = list(range(*edema))  # IPH only
-    random = np.random.default_rng(seed)
-    seed = random.integers(0, 1e6)
-    l_parameter_comb = []
+    if isinstance(input_csv, str):
+        try: # try to load csv
+            print('loading csv')
+            with open(input_csv) as file:
+                l_parameter_comb = list(csv.reader(file))
+                n_params = len(l_parameter_comb)
+                print(l_parameter_comb)
+            load_csv = True
+        except:
+            print('csv not found, generating dataset randomly')
+            load_csv = False
 
-    for case_idx in range(desired_cases):
-        lesion_id = random.choice(subtypes)  # select a random lesion type
-        edema = None
-        if lesion_id is None:
-            vol = 0
-            intensity = 0
-        elif lesion_id == 'epidural':
-            vol = random.choice(df_volume['EDH_volume'],
-                                p=df_volume['EDH_weight'])
-            intensity = random.choice(df_HU['EDH_HU'],
-                                      p=df_HU['EDH_weight'])
-        elif lesion_id == 'subdural':
-            vol = random.choice(df_volume['SDH_volume'],
-                                p=df_volume['SDH_weight'])
-            intensity = random.choice(df_HU['SDH_HU'],
-                                      p=df_HU['SDH_weight'])
-        elif lesion_id == 'round':
-            vol = random.choice(df_volume['IPH_volume'],
-                                p=df_volume['IPH_weight'])
-            intensity = random.choice(df_HU['IPH_HU'],
-                                      p=df_HU['IPH_weight'])
-            edema = random.choice(edema_list)
+    if not load_csv:
+        ages = [yr for yr in possible_ages if (yr >= min(age)) & (yr <= max(age))]
+        print(ages)
+        kVp_list = kVp if isinstance(kVp, list | tuple) else [kVp]
+        mA_list = kVp if isinstance(mA, list | tuple) else [mA]
+        edema_list = list(range(*edema))  # IPH only
+        random = np.random.default_rng(seed)
+        seed = random.integers(0, 1e6)
+        l_parameter_comb = []
 
-        l_parameter_comb.append([
-            random.choice(ages),  # age
-            random.choice(kVp_list),  # kVp
-            random.choice(mA_list),  # mA
-            intensity,
-            vol,
-            lesion_id,
-            random.choice(mass_effect),
-        ])
+        for case_idx in range(desired_cases):
+            lesion_id = random.choice(subtypes)  # select a random lesion type
+            edema = 0
+            if lesion_id is None:
+                vol = 0
+                intensity = 0
+            elif lesion_id == 'epidural':
+                vol = random.choice(df_volume['EDH_volume'],
+                                    p=df_volume['EDH_weight'])
+                intensity = random.choice(df_HU['EDH_HU'],
+                                        p=df_HU['EDH_weight'])
+            elif lesion_id == 'subdural':
+                vol = random.choice(df_volume['SDH_volume'],
+                                    p=df_volume['SDH_weight'])
+                intensity = random.choice(df_HU['SDH_HU'],
+                                        p=df_HU['SDH_weight'])
+            elif lesion_id == 'round':
+                vol = random.choice(df_volume['IPH_volume'],
+                                    p=df_volume['IPH_weight'])
+                intensity = random.choice(df_HU['IPH_HU'],
+                                        p=df_HU['IPH_weight'])
+                edema = random.choice(edema_list)
 
-    n_params = len(l_parameter_comb)
+            l_parameter_comb.append([
+                float(random.choice(ages)),  # age
+                float(random.choice(kVp_list)),  # kVp
+                float(random.choice(mA_list)),  # mA
+                float(intensity),
+                float(vol),
+                float(edema),
+                lesion_id,
+                float(random.choice(mass_effect)),
+                seed
+            ])
+
+            # final case, save parameters to csv
+            if case_idx == desired_cases-1:
+                print('last case:')
+                with open('Tuesday_test.csv', 'w+', newline='') as file:
+                    write = csv.writer(file)
+                    write.writerows(l_parameter_comb)
+
+        n_params = len(l_parameter_comb)
 
     try:
         patientids = [int(os.environ['SLURM_ARRAY_TASK_ID']) - 1]
@@ -138,26 +161,26 @@ or csv filepath')
 
     for patientid in patientids:
         print(f'{patientid+1}/{n_params}')
-        age, kVp, mA, intensity, volume, lesion_type, mass_effect =\
-            l_parameter_comb[patientid]
+        age, kVp, mA, intensity, volume, edema, lesion_type, mass_effect, seed = l_parameter_comb[patientid]
         print(f'{age} years, {lesion_type}, {volume} volume, {intensity} HU')
+
         patient_name = f'case_{patientid:03}'
         study = run_study(output_directory,
                           patient_name,
-                          age=age,
-                          kVp=kVp,
-                          mA=mA,
-                          intensity=intensity,
-                          volume=volume,
+                          age=float(age),
+                          kVp=float(kVp),
+                          mA=float(mA),
+                          intensity=float(intensity),
+                          volume=float(volume),
                           lesion_type=lesion_type,
-                          mass_effect=mass_effect,
+                          mass_effect=float(mass_effect),
                           views=views,
                           zspan=zspan,
                           kernel=kernel,
                           slice_thickness=slice_thickness,
                           keep_raw=keep_raw,
                           edema=edema,
-                          seed=seed)
+                          seed=int(seed))
         study.metadata['edema'] = edema
         study.metadata.to_csv(output_directory / patient_name /
                               f'metadata_{patientid}.csv',
@@ -179,6 +202,8 @@ def pedsilicoich_cli():
                         help='Config toml file')
     parser.add_argument('--output_directory', type=str,
                         help='output directory to save simulation results')
+    parser.add_argument('--input_csv', type=str,
+                        help='input csv to recreate prior dataset')
     parser.add_argument('--views', type=int,
                         help='number of angular CT views per rotation')
     parser.add_argument('--desired_cases', type=int,

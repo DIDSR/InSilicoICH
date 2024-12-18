@@ -4,6 +4,7 @@
 export LOG_DIR=$1
 OUTPUT=$2
 CASES=$3
+INPUT=$4
 
 mkdir -p $LOG_DIR
 mkdir -p $OUTPUT
@@ -15,11 +16,11 @@ exec 2>> $LOG_DIR/$LOGNAME
 
 echo "==== begin job $JOB_NAME ($SLURM_ARRAY_TASK_ID) at:" `date` "on host $HOSTNAME"
 
-source /home/brandon.nelson/anaconda3/envs/pedsilicoich/bin/activate
+source /home/jayse.weaver/anaconda3/envs/pedsilicoich/bin/activate
 
 START_TIME=`date +%s`
 set -x
-(pedsilicoich --output_directory $OUTPUT --desired_cases=$CASES)
+(pedsilicoich --output_directory $OUTPUT --desired_cases=$CASES --input_csv $INPUT)
 set +x
 EXIT_STATUS=$?
 END_TIME=`date +%s`
