@@ -89,15 +89,16 @@ or csv filepath')
 
     if isinstance(input_csv, str):
         try: # try to load csv
-            print('loading csv')
             with open(input_csv) as file:
                 l_parameter_comb = list(csv.reader(file))
                 n_params = len(l_parameter_comb)
                 print(l_parameter_comb)
             load_csv = True
         except:
-            print('csv not found, generating dataset randomly')
             load_csv = False
+            print('ERROR: input csv not found or path invalid, creating new dataset')
+    else:
+        load_csv = True
 
     if not load_csv:
         ages = [yr for yr in possible_ages if (yr >= min(age)) & (yr <= max(age))]
@@ -105,13 +106,18 @@ or csv filepath')
         kVp_list = kVp if isinstance(kVp, list | tuple) else [kVp]
         mA_list = kVp if isinstance(mA, list | tuple) else [mA]
         edema_list = list(range(*edema))  # IPH only
-        random = np.random.default_rng(seed)
+        print(seed)
+        print(type(seed))
+        if isinstance(seed, int):
+            random = np.random.default_rng(seed)
+        else:
+            random = np.random.default_rng()
         seed = random.integers(0, 1e6)
+        print('seed: ' + str(seed))
         l_parameter_comb = []
 
         for case_idx in range(desired_cases):
             lesion_id = random.choice(subtypes)  # select a random lesion type
-            edema = 0
             if lesion_id is None:
                 vol = 0
                 intensity = 0
@@ -120,17 +126,20 @@ or csv filepath')
                                     p=df_volume['EDH_weight'])
                 intensity = random.choice(df_HU['EDH_HU'],
                                         p=df_HU['EDH_weight'])
+                edema = 0
             elif lesion_id == 'subdural':
                 vol = random.choice(df_volume['SDH_volume'],
                                     p=df_volume['SDH_weight'])
                 intensity = random.choice(df_HU['SDH_HU'],
                                         p=df_HU['SDH_weight'])
+                edema = 0
             elif lesion_id == 'round':
                 vol = random.choice(df_volume['IPH_volume'],
                                     p=df_volume['IPH_weight'])
                 intensity = random.choice(df_HU['IPH_HU'],
                                         p=df_HU['IPH_weight'])
                 edema = random.choice(edema_list)
+                print('edema: ' + str(edema))
 
             l_parameter_comb.append([
                 float(random.choice(ages)),  # age
@@ -146,8 +155,7 @@ or csv filepath')
 
             # final case, save parameters to csv
             if case_idx == desired_cases-1:
-                print('last case:')
-                with open('Tuesday_test.csv', 'w+', newline='') as file:
+                with open(output_directory / (str(output_directory.name) + '.csv'), 'w+', newline='') as file:
                     write = csv.writer(file)
                     write.writerows(l_parameter_comb)
 
@@ -179,7 +187,7 @@ or csv filepath')
                           kernel=kernel,
                           slice_thickness=slice_thickness,
                           keep_raw=keep_raw,
-                          edema=edema,
+                          edema=int(float(edema)),
                           seed=int(seed))
         study.metadata['edema'] = edema
         study.metadata.to_csv(output_directory / patient_name /
