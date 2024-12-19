@@ -196,7 +196,10 @@ def flatten_dict(layered_dict):
 def pedsilicoich_cli():
     parser = ArgumentParser(
         description='Runs XCIST CT simulations of ICH models',
-        epilog='arguments can be given as toml config files or command line flags, each overriding defaults',
+        epilog='''
+        arguments can be given as toml config files or command line
+        flags, each overriding defaults
+        ''',
         fromfile_prefix_chars='@')
     parser.add_argument('config', nargs='?', type=str,
                         help='Config toml file')
@@ -211,14 +214,19 @@ def pedsilicoich_cli():
     parser.add_argument('--zspan', nargs='+',
                         help='z range of scans [mm], defaults to dynamic')
     parser.add_argument('--keep_raw', type=bool,
-                        help='whether to keep raw projection data and ground\
-                        truth phantoms, greatly increases\
-                        storage requirements.')
+                        help='''
+                        whether to keep raw projection data and ground
+                        truth phantoms, greatly increases
+                        storage requirements.
+                        ''')
     parser.add_argument('--seed', type=int, help='seed to reproduce a dataset')
     args = parser.parse_args()
-    with open(Path(__file__).parent / 'configs/default.toml', 'rb') as f:
+    pkg_dir = Path(__file__).parent
+    with open(pkg_dir / 'configs/default.toml', 'rb') as f:
         config = tomllib.load(f)
         config = flatten_dict(config)
+        config['volume'] = pkg_dir / config['volume']
+        config['attenuation'] = pkg_dir / config['attenuation']
     if args.config:
         with open(args.config, 'rb') as f:
             user_config = tomllib.load(f)

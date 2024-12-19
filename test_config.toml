@@ -8,7 +8,7 @@ desired_cases=10  # desired dataset size
 # seed=false  # seed to reproduce dataset
 
 [patient]
-age=[0, 100]  # range in yrs [min, max]
+age=[0, 10]  # range in yrs [min, max]
 
 [lesion]
 subtypes=[false, 'round', 'epidural', 'subdural']
