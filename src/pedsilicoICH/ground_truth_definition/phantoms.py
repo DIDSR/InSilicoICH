@@ -5,6 +5,7 @@ module for working with phantoms
 from pathlib import Path
 import os
 from warnings import warn
+from collections import OrderedDict
 
 import numpy as np
 import nibabel as nib
@@ -23,7 +24,8 @@ from ..lesion_definition import (elliptical_lesion,
                                  get_perimeter)
 from scipy.ndimage import (center_of_mass,
                            distance_transform_edt,
-                           binary_dilation)
+                           binary_dilation,
+                           binary_erosion)
 
 
 def sphere_radius_from_volume(volume):
@@ -600,6 +602,7 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
         self.wm_HU = wm_HU
         self.skull_HU = skull_HU
         self.air_HU = -1000
+        self.scalp_dict = self.set_scalp_dict()
 
         nii_files = list(self.phantom_dir.glob('*.nii'))
         age_ranges = [o.stem.split('_')[2] for o in nii_files]
@@ -661,13 +664,44 @@ from {self.phantom_dir}')
         self.skull = skull
         self._phantom = self.get_CT_number_phantom()
 
-    def get_CT_number_phantom(self):
+    def set_scalp_dict(self):
+        params = OrderedDict()
+        params['skin'] = dict(
+                thickness=2,
+                HU=0)
+        params['fat'] = dict(
+                thickness=3,
+                HU=-30
+            )
+        params['muscle'] = dict(
+                thickness=3,
+                HU=20
+            )
+        return params
+
+    def add_scalp(self, vol):
+        binary = vol > 0
+        erosion = binary.copy()
+        params = self.scalp_dict
+        for name, param in params.items():
+            thickness = param['thickness'] / self.dx
+            t = max(int(thickness), 3)  # mm
+            struct = np.ones(binary.ndim*[t])
+            new_erosion = binary_erosion(erosion, struct)
+            mask = new_erosion ^ erosion
+            erosion = new_erosion
+            vol[mask] = param['HU']
+        return vol
+
+    def get_CT_number_phantom(self, add_scalp=True):
         if len(self._lesion_coords) > 0:
             return self._phantom
         phantom = self.csf*self.csf_HU + self.gm*self.gm_HU +\
             self.wm*self.wm_HU + self.skull*self.skull_HU
         phantom[phantom <= 0] = self.air_HU
         phantom[self.get_dura_map()] = 50  # HU same as MIDA
+        if add_scalp:
+            phantom = self.add_scalp(phantom)
         return phantom
 
     def get_material_mask(self, material):
