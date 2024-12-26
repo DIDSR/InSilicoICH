@@ -49,19 +49,33 @@ def center_crop(img, thresh=-800):
     return cropped
 
 
-def plot_montage(imgs, fname):
+def center_crop_like(img, ref, thresh=-800):
+    cropped = img[ref.mean(axis=1) > thresh, :]
+    cropped = cropped[:, ref.mean(axis=0) > thresh]
+    return cropped
+
+
+def plot_montage(imgs, params, fname):
     f, axs = plt.subplots(3, 3, figsize=(6.9, 8),
                           gridspec_kw=dict(wspace=0, hspace=0))
     axs = axs.T
-    for ax, img in zip(axs.flatten(), imgs):
-        ctshow(center_crop(img), 'brain', fig=f, ax=ax)
+    for idx, ax, img in zip(range(len(imgs)), axs.flatten(), imgs):
+        lesion_type, intensity, volume = params[idx]
+        if idx < 1:
+            disp_img = center_crop(img)
+        else:
+            disp_img = center_crop_like(img, imgs[0])
+        ctshow(disp_img, 'brain', fig=f, ax=ax)
         ax.set_aspect('equal')
+        if idx in [0, 3, 6]:
+            ax.set_title(lesion_type)
+        bbox = dict(boxstyle="round", fc="0.8")
+        ax.annotate(f'{volume} mL {intensity} HU', xy=(50, 20), bbox=bbox)
     f.savefig(fname, dpi=600, bbox_inches='tight')
 
 
 def test_lesion_characteristics(age=15.75, views=100,
                                 name='tests/images.png'):
-
     lesion_types = ['epidural', 'subdural', 'round']
     mass_effect = True
 
@@ -74,6 +88,7 @@ def test_lesion_characteristics(age=15.75, views=100,
 
     phantoms = []
     imgs = []
+    params = []
     for lesion_type in lesion_types:
         volumes = np.linspace(0.1, 8, 3) if lesion_type == 'round'\
             else np.linspace(1, 20, 3)
@@ -85,6 +100,7 @@ def test_lesion_characteristics(age=15.75, views=100,
             phantom.insert_lesion(lesion_type=lesion_type, volume=volume,
                                   intensity=intensity,
                                   mass_effect=mass_effect, seed=336)
+            params.append((lesion_type, intensity, volume))
             phantoms.append(phantom.get_CT_number_phantom()[
                 phantom._lesion_coords[0][0]])
             lesion_level_mm = (phantom.get_CT_number_phantom().shape[0]/2 -
@@ -98,9 +114,8 @@ def test_lesion_characteristics(age=15.75, views=100,
             scanner.run_recon(kernel=kernel)
             imgs.append(scanner.recon[1:-1].mean(axis=0))
 
-    plot_montage(imgs, name)
-
-    plot_montage(phantoms, name.parent / 'phantoms.png')
+    plot_montage(imgs, params, name)
+    plot_montage(phantoms, params, name.parent / 'phantoms.png')
 
 
 if __name__ == "__main__":
