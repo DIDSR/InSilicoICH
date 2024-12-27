@@ -70,6 +70,15 @@ def plot_montage(imgs, params, fname):
         if idx in [0, 3, 6]:
             ax.set_title(lesion_type)
         bbox = dict(boxstyle="round", fc="0.8")
+        if idx == 3:
+            ax.annotate('', xy=(220, 90), xytext=(170, 150),
+                        arrowprops=dict(facecolor='black', shrink=0.05))
+        if idx == 4:
+            ax.annotate('', xy=(220, 75), xytext=(170, 150),
+                        arrowprops=dict(facecolor='black', shrink=0.05))
+        if idx == 5:
+            ax.annotate('', xy=(270, 200), xytext=(190, 200),
+                        arrowprops=dict(facecolor='black', shrink=0.05))
         ax.annotate(f'{volume} mL {intensity} HU', xy=(50, 20), bbox=bbox)
     f.savefig(fname, dpi=600, bbox_inches='tight')
 
