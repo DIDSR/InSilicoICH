@@ -1,9 +1,22 @@
 Generate LabelMap from Markups
 ==============================
 
+Brain suture annotation
+-----------------------
+Brain sutures annotated for `NIHPD_Head <https://github.com/DIDSR/PedSilicoICH/blob/a8674c7446cf7ad700feb387847e11540b0c4f93/src/pedsilicoICH/ground_truth_definition/phantoms.py#L569>`_ in `markups <https://github.com/DIDSR/PedSilicoICH/tree/5640c3a5bc5a5473d373db38ef62652bb47260a7/src/pedsilicoICH/annotations/suture/NIHPD_Head_Phantom/markups>`_:
+
+- Saggital suture (``saggital``)
+- Coronal suture (``coronal_l`` and ``coronal_r``)
+- Lambdoid suture (``lambdoid_l`` and ``lambdoid_r``)
+- Squamosal suture (``squamosal_l`` and ``squamosal_r``)
+
+Brain sutures are annotated using Markups tool from 3D Slicer. Markups can be manually converted into Models followed by Segmentation/LabelMap using 3D Slicer extension `Slicer Markups to Model <https://github.com/SlicerIGT/SlicerMarkupsToModel>`_, however, to avoid manual process, LabelMap (segmentation labels) can be created with the script below.
+
 Code execution
 --------------
 Use the installed 3D Slicer executable file to run the script.
+
+Note: The NIHPD Phantom is required to be downloaded as mentioned in `NIHPD_Head <https://github.com/DIDSR/PedSilicoICH/blob/a8674c7446cf7ad700feb387847e11540b0c4f93/src/pedsilicoICH/ground_truth_definition/phantoms.py#L569>`_.
 
 .. code-block:: shell
 

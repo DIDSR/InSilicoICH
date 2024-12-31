@@ -13,15 +13,15 @@ sys.path.append(main_directory)
 
 
 def convert_multiple_markups_to_segmentation_label(
-    markup_json_dir, reference_nifti_path, output_path
+    markup_json_dir: str, reference_nifti_path: str, output_path: str
 ):
     """
     Create label (segmentation) from annotated markups for the given NIfTI image.
 
     Args:
-        markup_json_dir (_type_): Directory with created markup JSON files.
-        reference_nifti_path (_type_): Path to the reference NIfTI image.
-        output_path (_type_): Path to the output NRRD label file.
+        markup_json_dir (str): Directory with created markup JSON files.
+        reference_nifti_path (str): Path to the reference NIfTI image.
+        output_path (str): Path to the output NRRD label file.
     """
     # Load reference volume
     reference_volume = slicer.util.loadVolume(reference_nifti_path)
@@ -110,7 +110,6 @@ if __name__ == "__main__":
         "labelmap.nrrd",
     )
 
-    # Example usage
     markup_dir = os.path.join(
         main_directory, "src/pedsilicoICH/annotations/suture/NIHPD_Head_Phantom/markups"
     )
