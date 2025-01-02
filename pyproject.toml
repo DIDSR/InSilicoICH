@@ -16,6 +16,7 @@ dependencies = [
   "monai",
   "pandas",
   "numpy",
+  "pynrrd",
   "pydicom==2.4.4",
   "pytest",
   "torchvision",

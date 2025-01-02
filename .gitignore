@@ -19,7 +19,6 @@ build
 notebooks/*.csv
 *.cfg
 __pycache__
-*.nrrd
 *.nii
 src/PedSilicoICH.egg-info
 .env
