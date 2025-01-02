@@ -9,10 +9,11 @@ from collections import OrderedDict
 
 import numpy as np
 import nibabel as nib
+import nrrd
 import pandas as pd
 import skimage as ski
 from dotenv import load_dotenv
-from monai.transforms import Resize, RandAffine, Affine
+from monai.transforms import Resize, RandAffine, Affine, ResizeWithPadOrCrop
 from torchvision.datasets.utils import download_and_extract_archive
 
 from . import dicom_to_voxelized_phantom
@@ -642,27 +643,29 @@ from {self.phantom_dir}')
         self.mask = self.mask[::-1]
         self.pdw = self.pdw[::-1]
 
-        original_shape = self.csf.shape
+        self.nz, self.nx, self.ny = self.csf.shape
         if shape:
-            self.csf = resize(self.csf, shape).numpy()
-            new_shape = self.csf.shape
-            self.gm = resize(self.gm, shape).numpy()
-            self.wm = resize(self.wm, shape).numpy()
-            self.mask = resize(self.mask, shape).numpy()
-            self.pdw = resize(self.pdw, shape).numpy()
-
-            new_spacings = np.array(original_shape) / np.array(new_shape) *\
-                [self.dz, self.dx, self.dy]
-            self.dz, self.dx, self.dy = new_spacings
-        else:
-            shape = original_shape
-        self.nz, self.nx, self.ny = shape
+            self.resize(shape)
 
         skull = (self.mask == 0)*self.pdw / self.pdw.max()
         skull[skull < 0.1] = 0
         skull[skull > 1] = 1
         self.skull = skull
         self._phantom = self.get_CT_number_phantom()
+
+    def resize(self, shape=None):
+        original_shape = self.csf.shape
+        self.csf = resize(self.csf, shape).numpy()
+        new_shape = self.csf.shape
+        self.gm = resize(self.gm, shape).numpy()
+        self.wm = resize(self.wm, shape).numpy()
+        self.mask = resize(self.mask, shape).numpy()
+        self.pdw = resize(self.pdw, shape).numpy()
+
+        new_spacings = np.array(original_shape) / np.array(new_shape) *\
+            [self.dz, self.dx, self.dy]
+        self.dz, self.dx, self.dy = new_spacings
+        self.nz, self.nx, self.ny = shape
 
     def set_scalp_dict(self):
         params = OrderedDict()
@@ -680,6 +683,9 @@ from {self.phantom_dir}')
         return params
 
     def add_scalp(self, vol):
+        """
+        adds skin, fat, and muscle layers to the head `vol`
+        """
         binary = vol > 0
         erosion = binary.copy()
         params = self.scalp_dict
@@ -693,7 +699,40 @@ from {self.phantom_dir}')
             vol[mask] = param['HU']
         return vol
 
-    def get_CT_number_phantom(self, add_scalp=True):
+    def get_sutures(self, thickness=2, thresh=30):
+        """
+        returns suture mask to the self skull
+
+        :param thickness: thickness in pixels of the suture
+        :returns: boolean suture mask that can be used to set skull suture
+            values
+        """
+        src_dir = Path(__file__).parents[1]
+        data = nrrd.read(src_dir / 'annotations/suture/NIHPD_Head_Phantom/labelmap.nrrd')[0].transpose(2, 1, 0)[::-1, ::-1]
+        skull = self.get_skull_map().astype(bool)
+        dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
+        if (dx < 0) | (dy < 0) | (dz < 0):
+            resizewithcrop = ResizeWithPadOrCrop(spatial_size=skull.shape)
+            data = resizewithcrop(data[None])[0].numpy()
+            dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
+
+        dx1 = dx2 = dx//2
+        if dx % 2 == 1:
+            dx2 += 1
+        dy1 = dy2 = dy//2
+        if dy % 2 == 1:
+            dy2 += 1
+        dz1 = dz2 = dz//2
+        if dz % 2 == 1:
+            dz2 += 1
+        data = np.pad(data, ((dx1, dx2), (dy1, dy2), (dz1, dz2))) > 0
+        suture_dist = distance_transform_edt(~data)
+        sutures = skull & (suture_dist < thresh)
+        sutures = ski.morphology.skeletonize(sutures)
+        sutures = ski.morphology.dilation(sutures, np.ones(3*[thickness]))
+        return sutures
+
+    def get_CT_number_phantom(self, add_scalp=True, add_sutures=True):
         if len(self._lesion_coords) > 0:
             return self._phantom
         phantom = self.csf*self.csf_HU + self.gm*self.gm_HU +\
@@ -702,6 +741,9 @@ from {self.phantom_dir}')
         phantom[self.get_dura_map()] = 50  # HU same as MIDA
         if add_scalp:
             phantom = self.add_scalp(phantom)
+        if add_sutures:
+            sutures = self.get_sutures()
+            phantom[sutures] = 0  # assume water HU
         return phantom
 
     def get_material_mask(self, material):

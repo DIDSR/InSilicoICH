@@ -12,6 +12,8 @@ Skull sutures annotated for `NIHPD_Head <https://github.com/DIDSR/PedSilicoICH/b
 
 Skull sutures are annotated using Markups tool from 3D Slicer. Markups can be manually converted into Models followed by Segmentation/LabelMap using 3D Slicer extension `Slicer Markups to Model <https://github.com/SlicerIGT/SlicerMarkupsToModel>`_, however, to avoid manual process, LabelMap (segmentation labels) can be created with the script below.
 
+To install Markups to Model go to View/Extensions Manager then search for Markups to Model and install, then run the following:
+
 Code execution
 --------------
 Use the installed 3D Slicer executable file to run the script.

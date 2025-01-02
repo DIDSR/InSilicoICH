@@ -7,6 +7,7 @@ The script is supposed to be used with 3D Slicer as mentioned in the documentati
 import slicer
 import os
 import sys
+# from dotenv import load_dotenv
 
 main_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), *[".."] * 5))
 sys.path.append(main_directory)
@@ -101,8 +102,10 @@ def convert_multiple_markups_to_segmentation_label(
 
 
 if __name__ == "__main__":
+    # load_dotenv()
+    phantom_dir = '/gpfs_projects/brandon.nelson/pedsilicoICH/phantoms'
     reference_nifti_path = os.path.join(
-        main_directory, "src/NIHPD_Head_Phantom", "nihpd_asym_04.5-08.5_mask.nii"
+        main_directory, phantom_dir, "NIHPD_Head_Phantom", "nihpd_asym_04.5-08.5_mask.nii"
     )
     output_nifti_path = os.path.join(
         main_directory,
