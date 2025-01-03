@@ -26,6 +26,7 @@ class SkullProcess(Skull):
 
     def save_mesh(self, mesh: pv.PolyData, filepath: str):
         mesh.save(filepath)
+        print("Saved", filepath)
 
     def _get_bounding_sphere_mesh(self, mesh: pv.PolyData) -> pv.PolyData:
         """
@@ -85,6 +86,8 @@ class SkullProcess(Skull):
     def extract_skull(self) -> None:
         """
         Calculate surface normals and remove certain cells (mesh).
+
+        Polar angle for pv.cartesian_to_spherical(): https://docs.pyvista.org/api/utilities/_autosummary/pyvista.cartesian_to_spherical
         """
         mesh = self.compute_normals(self.mesh_brainmask)
 
@@ -99,7 +102,6 @@ class SkullProcess(Skull):
         # phi is the polar angle (in radians)
         # Convert to degrees for comparison
         phi_degrees = np.rad2deg(phi)
-
         threshold_degree = 100
 
         # Find cells where phi > 90 degrees
@@ -118,13 +120,17 @@ class SkullProcess(Skull):
 if __name__ == "__main__":
     path_mesh_brainmask = os.path.join(
         main_directory,
-        "src/pedsilicoICH/annotations/skull/NIHPD_Head_Phantom/temp",
-        "mesh_original.vtk",
+        "src/pedsilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
+        "mesh_brain.vtk",
     )
 
     object_skull_process = SkullProcess(path_mesh_brainmask=path_mesh_brainmask)
     object_skull_process.extract_skull()
     object_skull_process.save_mesh(
         mesh=object_skull_process.mesh_skull,
-        filepath=path_mesh_brainmask.replace("mesh_original", "mesh_skull"),
+        filepath=os.path.join(
+            main_directory,
+            "src/pedsilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
+            "mesh_skull.vtk",
+        ),
     )
