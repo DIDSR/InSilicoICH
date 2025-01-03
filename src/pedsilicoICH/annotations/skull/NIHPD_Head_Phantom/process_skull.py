@@ -104,7 +104,7 @@ class SkullProcess(Skull):
         phi_degrees = np.rad2deg(phi)
         threshold_degree = 100
 
-        # Find cells where phi > 90 degrees
+        # Find cells where phi > threshold_degree
         cells_to_remove = np.where(phi_degrees > threshold_degree)[0]
         print("Number of cells removed =", len(cells_to_remove))
 
