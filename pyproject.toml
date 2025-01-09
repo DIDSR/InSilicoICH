@@ -13,7 +13,7 @@ dependencies = [
   "nibabel",
   "scikit-image",
   "scipy",
-  "monai",
+  "monai==1.3.2",
   "pandas",
   "numpy",
   "pynrrd",
