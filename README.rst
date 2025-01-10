@@ -41,7 +41,7 @@ The knowledge-based algorithm allows the following parameters to be controlled:
 | Identifier                 | Intensity [HU]                                       | X-ray tube current [mA]                   | Seed to reproduce               |
 +----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
 |                            |                                                      |                                           |                                 |
-| Age (atlas-based)          | Hematoma volume [mL] and slice coverage              | X-ray tube peak voltage [kVp]             | Image file location             |
+| Age (atlas-based)          | Hemorrhage volume [mL] and slice coverage            | X-ray tube peak voltage [kVp]             | Image file location             |
 +----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
 |                            |                                                      |                                           |                                 |
 |                            | Hemorrhage type                                      | CT acquisition view count [views]         | Mask file directory location    |

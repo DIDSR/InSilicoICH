@@ -5,13 +5,15 @@ module for working with phantoms
 from pathlib import Path
 import os
 from warnings import warn
+from collections import OrderedDict
 
 import numpy as np
 import nibabel as nib
+import nrrd
 import pandas as pd
 import skimage as ski
 from dotenv import load_dotenv
-from monai.transforms import Resize, RandAffine, Affine
+from monai.transforms import Resize, RandAffine, Affine, ResizeWithPadOrCrop
 from torchvision.datasets.utils import download_and_extract_archive
 
 from . import dicom_to_voxelized_phantom
@@ -23,7 +25,8 @@ from ..lesion_definition import (elliptical_lesion,
                                  get_perimeter)
 from scipy.ndimage import (center_of_mass,
                            distance_transform_edt,
-                           binary_dilation)
+                           binary_dilation,
+                           binary_erosion)
 
 
 def sphere_radius_from_volume(volume):
@@ -369,6 +372,7 @@ class HeadPhantom(Phantom):
                          mass_effect: bool | float = 0.5,
                          edema: bool | int = False,
                          complexity: int = 3,
+                         overlap: float = 0.4,
                          seed: int | None = None) -> tuple:
         '''
         adds round lesion to img in random location within mask of size radius
@@ -396,6 +400,7 @@ class HeadPhantom(Phantom):
         :param complexity: int, number of ellipses to aid with
             random jiggle, 1 gives a single ellipsoid, increasing to 2 or 3
             yields overlapping ellipsoids with a more complex shape.
+        :param overlap: float, allowed overlap with the white matter mask
         :param seed: optional, defaults to None, set seed for reproducible
             lesion insertion
 
@@ -409,7 +414,7 @@ class HeadPhantom(Phantom):
         mask = self.get_material_mask(material).astype(int)
 
         lesion_vol = np.zeros_like(img)
-        valid_points = distance_transform_edt(mask) > (r * 0.9)
+        valid_points = distance_transform_edt(mask) > (r * overlap)
         if not valid_points.any():
             raise RuntimeError(f'Requested volume: {volume} mL too \
 large, try smaller volume')
@@ -600,6 +605,7 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
         self.wm_HU = wm_HU
         self.skull_HU = skull_HU
         self.air_HU = -1000
+        self.scalp_dict = self.set_scalp_dict()
 
         nii_files = list(self.phantom_dir.glob('*.nii'))
         age_ranges = [o.stem.split('_')[2] for o in nii_files]
@@ -639,21 +645,9 @@ from {self.phantom_dir}')
         self.mask = self.mask[::-1]
         self.pdw = self.pdw[::-1]
 
-        original_shape = self.csf.shape
+        self.nz, self.nx, self.ny = self.csf.shape
         if shape:
-            self.csf = resize(self.csf, shape).numpy()
-            new_shape = self.csf.shape
-            self.gm = resize(self.gm, shape).numpy()
-            self.wm = resize(self.wm, shape).numpy()
-            self.mask = resize(self.mask, shape).numpy()
-            self.pdw = resize(self.pdw, shape).numpy()
-
-            new_spacings = np.array(original_shape) / np.array(new_shape) *\
-                [self.dz, self.dx, self.dy]
-            self.dz, self.dx, self.dy = new_spacings
-        else:
-            shape = original_shape
-        self.nz, self.nx, self.ny = shape
+            self.resize(shape)
 
         skull = (self.mask == 0)*self.pdw / self.pdw.max()
         skull[skull < 0.1] = 0
@@ -661,13 +655,97 @@ from {self.phantom_dir}')
         self.skull = skull
         self._phantom = self.get_CT_number_phantom()
 
-    def get_CT_number_phantom(self):
+    def resize(self, shape=None):
+        original_shape = self.csf.shape
+        self.csf = resize(self.csf, shape).numpy()
+        new_shape = self.csf.shape
+        self.gm = resize(self.gm, shape).numpy()
+        self.wm = resize(self.wm, shape).numpy()
+        self.mask = resize(self.mask, shape).numpy()
+        self.pdw = resize(self.pdw, shape).numpy()
+
+        new_spacings = np.array(original_shape) / np.array(new_shape) *\
+            [self.dz, self.dx, self.dy]
+        self.dz, self.dx, self.dy = new_spacings
+        self.nz, self.nx, self.ny = shape
+
+    def set_scalp_dict(self):
+        params = OrderedDict()
+        params['skin'] = dict(
+                thickness=2,
+                HU=0)
+        params['fat'] = dict(
+                thickness=3,
+                HU=-30
+            )
+        params['muscle'] = dict(
+                thickness=3,
+                HU=20
+            )
+        return params
+
+    def add_scalp(self, vol):
+        """
+        adds skin, fat, and muscle layers to the head `vol`
+        """
+        binary = vol > 0
+        erosion = binary.copy()
+        params = self.scalp_dict
+        for name, param in params.items():
+            thickness = param['thickness'] / self.dx
+            t = max(int(thickness), 3)  # mm
+            struct = np.ones(binary.ndim*[t])
+            new_erosion = binary_erosion(erosion, struct)
+            mask = new_erosion ^ erosion
+            erosion = new_erosion
+            vol[mask] = param['HU']
+        return vol
+
+    def get_sutures(self, thickness=2, thresh=30):
+        """
+        returns suture mask to the self skull
+
+        :param thickness: thickness in pixels of the suture
+        :returns: boolean suture mask that can be used to set skull suture
+            values
+        """
+        src_dir = Path(__file__).parents[1]
+        data = nrrd.read(src_dir / 'annotations/suture/NIHPD_Head_Phantom/labelmap.nrrd')[0].transpose(2, 1, 0)[::-1, ::-1]
+        skull = self.get_skull_map().astype(bool)
+        dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
+        if (dx < 0) | (dy < 0) | (dz < 0):
+            resizewithcrop = ResizeWithPadOrCrop(spatial_size=skull.shape)
+            data = resizewithcrop(data[None])[0].numpy()
+            dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
+
+        dx1 = dx2 = dx//2
+        if dx % 2 == 1:
+            dx2 += 1
+        dy1 = dy2 = dy//2
+        if dy % 2 == 1:
+            dy2 += 1
+        dz1 = dz2 = dz//2
+        if dz % 2 == 1:
+            dz2 += 1
+        data = np.pad(data, ((dx1, dx2), (dy1, dy2), (dz1, dz2))) > 0
+        suture_dist = distance_transform_edt(~data)
+        sutures = skull & (suture_dist < thresh)
+        sutures = ski.morphology.skeletonize(sutures)
+        sutures = ski.morphology.dilation(sutures, np.ones(3*[thickness]))
+        return sutures
+
+    def get_CT_number_phantom(self, add_scalp=True, add_sutures=True):
         if len(self._lesion_coords) > 0:
             return self._phantom
         phantom = self.csf*self.csf_HU + self.gm*self.gm_HU +\
             self.wm*self.wm_HU + self.skull*self.skull_HU
         phantom[phantom <= 0] = self.air_HU
         phantom[self.get_dura_map()] = 50  # HU same as MIDA
+        if add_scalp:
+            phantom = self.add_scalp(phantom)
+        if add_sutures:
+            sutures = self.get_sutures()
+            phantom[sutures] = 0  # assume water HU
         return phantom
 
     def get_material_mask(self, material):
