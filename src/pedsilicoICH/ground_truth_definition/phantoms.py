@@ -372,6 +372,7 @@ class HeadPhantom(Phantom):
                          mass_effect: bool | float = 0.5,
                          edema: bool | int = False,
                          complexity: int = 3,
+                         overlap: float = 0.4,
                          seed: int | None = None) -> tuple:
         '''
         adds round lesion to img in random location within mask of size radius
@@ -399,6 +400,7 @@ class HeadPhantom(Phantom):
         :param complexity: int, number of ellipses to aid with
             random jiggle, 1 gives a single ellipsoid, increasing to 2 or 3
             yields overlapping ellipsoids with a more complex shape.
+        :param overlap: float, allowed overlap with the white matter mask
         :param seed: optional, defaults to None, set seed for reproducible
             lesion insertion
 
@@ -412,7 +414,7 @@ class HeadPhantom(Phantom):
         mask = self.get_material_mask(material).astype(int)
 
         lesion_vol = np.zeros_like(img)
-        valid_points = distance_transform_edt(mask) > (r * 0.9)
+        valid_points = distance_transform_edt(mask) > (r * overlap)
         if not valid_points.any():
             raise RuntimeError(f'Requested volume: {volume} mL too \
 large, try smaller volume')
