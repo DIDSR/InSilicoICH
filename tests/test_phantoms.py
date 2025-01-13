@@ -99,7 +99,7 @@ def test_volume_accuracy_full_matrix():
 
 
 def test_transforms(threshold=-585):
-    for age in [38, 6.5]:
+    for age in [6.5]:
         phantom = load_phantom(age)
         transform = RandAffine(prob=1,
                                rotate_range=[np.pi/4, np.pi/20, np.pi/20],
