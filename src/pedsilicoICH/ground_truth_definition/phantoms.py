@@ -356,7 +356,7 @@ class HeadPhantom(Phantom):
 
     def apply_transform(self, transform: RandAffine | Affine, seed=None):
         if not self._lesion:
-            self._phantom = transform(self.get_CT_number_phantom())
+            self._phantom = transform(self._phantom)
             return
         self._phantom, self._lesion[0] =\
             transform_image_label_pair(transform,
