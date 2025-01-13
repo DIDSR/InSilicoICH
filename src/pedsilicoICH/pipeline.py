@@ -45,7 +45,7 @@ def pedsilicoich(output_directory, input_csv, views=1000, desired_cases=1,
                  kVp=[120],
                  mA=[300],
                  kernel='soft',
-                 slice_thickness=5,
+                 slice_thickness=1,
                  keep_raw=False, seed=None):     
     output_directory = Path(output_directory)
     assert (zspan == 'dynamic') or isinstance(zspan, list)
@@ -102,18 +102,14 @@ or csv filepath')
 
     if not load_csv:
         ages = [yr for yr in possible_ages if (yr >= min(age)) & (yr <= max(age))]
-        print(ages)
         kVp_list = kVp if isinstance(kVp, list | tuple) else [kVp]
         mA_list = kVp if isinstance(mA, list | tuple) else [mA]
         edema_list = list(range(*edema))  # IPH only
-        print(seed)
-        print(type(seed))
         if isinstance(seed, int):
             random = np.random.default_rng(seed)
         else:
             random = np.random.default_rng()
         seed = random.integers(0, 1e6)
-        print('seed: ' + str(seed))
         l_parameter_comb = []
 
         for case_idx in range(desired_cases):
@@ -124,22 +120,31 @@ or csv filepath')
             elif lesion_id == 'epidural':
                 vol = random.choice(df_volume['EDH_volume'],
                                     p=df_volume['EDH_weight'])
-                intensity = random.choice(df_HU['EDH_HU'],
+                intensity = 0
+                while intensity < 45:
+                    intensity = random.choice(df_HU['EDH_HU'],
                                         p=df_HU['EDH_weight'])
                 edema = 0
             elif lesion_id == 'subdural':
                 vol = random.choice(df_volume['SDH_volume'],
                                     p=df_volume['SDH_weight'])
-                intensity = random.choice(df_HU['SDH_HU'],
+                intensity = 0
+                while intensity < 45:
+                    intensity = random.choice(df_HU['SDH_HU'],
                                         p=df_HU['SDH_weight'])
                 edema = 0
             elif lesion_id == 'round':
                 vol = random.choice(df_volume['IPH_volume'],
                                     p=df_volume['IPH_weight'])
-                intensity = random.choice(df_HU['IPH_HU'],
+                while vol > 25:
+                    vol = random.choice(df_volume['IPH_volume'],
+                                    p=df_volume['IPH_weight'])
+                intensity = 0
+                while intensity < 45:
+                    intensity = random.choice(df_HU['IPH_HU'],
                                         p=df_HU['IPH_weight'])
+
                 edema = random.choice(edema_list)
-                print('edema: ' + str(edema))
 
             l_parameter_comb.append([
                 float(random.choice(ages)),  # age
@@ -149,7 +154,7 @@ or csv filepath')
                 float(vol),
                 float(edema),
                 lesion_id,
-                float(random.choice(mass_effect)),
+                mass_effect,
                 seed
             ])
 
@@ -170,7 +175,7 @@ or csv filepath')
     for patientid in patientids:
         print(f'{patientid+1}/{n_params}')
         age, kVp, mA, intensity, volume, edema, lesion_type, mass_effect, seed = l_parameter_comb[patientid]
-        print(f'{age} years, {lesion_type}, {volume} volume, {intensity} HU')
+        print(f'{age} years, {lesion_type}, {volume} volume, {intensity} HU, mass effect: ' + str(mass_effect))
 
         patient_name = f'case_{patientid:03}'
         study = run_study(output_directory,
@@ -181,7 +186,7 @@ or csv filepath')
                           intensity=float(intensity),
                           volume=float(volume),
                           lesion_type=lesion_type,
-                          mass_effect=float(mass_effect),
+                          mass_effect=mass_effect,
                           views=views,
                           zspan=zspan,
                           kernel=kernel,
