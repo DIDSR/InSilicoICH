@@ -2,13 +2,13 @@
 # uncommented parameters here will override defaults
 [general]
 output_directory="TEST2"
-#zspan=[0, 10]  # scan range in mm, min max
-desired_cases=100  # desired dataset size
+zspan=[0, 10]  # scan range in mm, min max
+desired_cases=3  # desired dataset size
 keep_raw=false  # keep projection data
 # seed=false  # seed to reproduce dataset
 
 [patient]
-age=[38]  # range in yrs [min, max]
+age=[0, 100]  # range in yrs [min, max]
 
 [lesion]
 subtypes=[false, 'round', 'epidural', 'subdural']
@@ -18,10 +18,10 @@ volume='src/pedsilicoICH/distributions/BHSD_volume_distributions.csv'  # str or 
 attenuation='src/pedsilicoICH/distributions/BHSD_HU_distributions.csv'  # str or list
 
 [acquisition]
-views=1000
+views=[100]
 kVp=[120]
 mA=200
 
 [recon]
-kernel='soft'
+kernel=['soft']
 slice_thickness=1

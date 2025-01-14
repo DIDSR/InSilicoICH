@@ -61,11 +61,15 @@ class Study:
         intensity = self.phantom.lesion_intensity
 
         ct = self.scanner
-        if zspan == 'dynamic':
-            startZ, endZ = ct.recommend_scan_range()
+
+        if isinstance(zspan, str):
+            if zspan == 'dynamic':
+                startZ, endZ = ct.recommend_scan_range()
+            startZ = int(zspan.split(',')[0].split('[')[1])
+            endZ = int(zspan.split(',')[1].split(']')[0])
         elif isinstance(zspan, tuple | list):
             startZ, endZ = zspan
-
+        views = int(views)
         ct.run_scan(startZ=startZ, endZ=endZ, views=views,
                     mA=mA, kVp=kVp)
         ct.run_recon(fov=fov, kernel=kernel, sliceThickness=slice_thickness)
