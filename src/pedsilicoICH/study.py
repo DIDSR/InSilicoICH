@@ -202,12 +202,6 @@ def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
                                scale_range=[0.1, 0.1, 0.1],
                                padding_mode="border")
         phantom.apply_transform(transform, seed=seed)
-        # will call CT_number_phantom if it hasn't been called yet
-    else:
-        # if neither insert lesion and apply_transform have been called,
-        # need to create CT number phantom before proceeding
-        if not phantom._lesion:
-            phantom._phantom = phantom.get_CT_number_phantom()
 
     scanner = Scanner(phantom, output_dir=output_directory)
     study = Study(scanner, 'pilot')

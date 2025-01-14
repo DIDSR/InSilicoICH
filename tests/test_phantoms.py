@@ -4,6 +4,8 @@ test low level pedsilicoich phantom generation functionality
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+from monai.transforms import RandAffine
+import numpy as np
 
 from torchvision.datasets.utils import download_and_extract_archive
 
@@ -29,11 +31,11 @@ if not nihpd_dir.exists():
     download_and_extract_archive(url, nihpd_dir)
 
 shape = 3*[128]
+seed = 41
 
 
 def test_big_epidural_lesion():
     intensity = 100
-    seed = 41
     age = 9
     mass_effect = True
     desired_volume = 100
@@ -50,7 +52,6 @@ def test_big_epidural_lesion():
 
 def test_big_subdural_lesion():
     intensity = 100
-    seed = 41
     age = 9
     desired_volume = 80
     mass_effect = True
@@ -67,7 +68,6 @@ def test_big_subdural_lesion():
 
 def test_big_round_lesion():
     intensity = 100
-    seed = 41
     age = 9
     desired_volume = 6  # mL
     mass_effect = True
@@ -84,7 +84,6 @@ def test_big_round_lesion():
 
 def test_volume_accuracy_full_matrix():
     intensity = 100
-    seed = 41
     age = 9
     desired_volume = 6  # mL
     mass_effect = False
@@ -97,3 +96,17 @@ def test_volume_accuracy_full_matrix():
         (phantom.dx*phantom.dy*phantom.dz)/1000
     rel_vol_error = (desired_volume - measured_volume)/desired_volume*100
     assert abs(rel_vol_error) < 40
+
+
+def test_transforms(threshold=-585):
+    for age in [6.5]:
+        phantom = load_phantom(age)
+        transform = RandAffine(prob=1,
+                               rotate_range=[np.pi/4, np.pi/20, np.pi/20],
+                               translate_range=[10, 10, 10],
+                               scale_range=[0.1, 0.1, 0.1],
+                               padding_mode="border")
+
+        phantom.apply_transform(transform)
+        test_val = phantom.get_CT_number_phantom().mean()
+        assert test_val > threshold
