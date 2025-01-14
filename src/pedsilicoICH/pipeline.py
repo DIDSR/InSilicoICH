@@ -29,7 +29,7 @@ from pedsilicoICH.study import run_study
 LESION_TYPES = ['round', 'epidural', 'subdural']
 
 
-def pedsilicoich(input_csv, keep_raw=False):
+def pedsilicoich(input_csv, output_directory=None, keep_raw=False):
 
     params = pd.read_csv(input_csv)
     n_params = len(params)
@@ -42,10 +42,12 @@ def pedsilicoich(input_csv, keep_raw=False):
 
     for patientid in patientids:
         patient = params.iloc[patientid]
+        output_directory = output_directory or patient['output_directory']
+        output_directory = Path(output_directory)
         print(f'{patientid+1}/{n_params}')
 
         patient_name = f'case_{patientid:03}'
-        study = run_study(patient['output_directory'],
+        study = run_study(output_directory,
                           patient_name,
                           age=float(patient['age']),
                           kVp=float(patient['kVp']),
@@ -62,7 +64,7 @@ def pedsilicoich(input_csv, keep_raw=False):
                           edema=int(float(patient['edema'])),
                           seed=int(patient['seed']))
         study.metadata['edema'] = int(float(patient['edema']))
-        study.metadata.to_csv(Path(patient['output_directory']) / patient_name /
+        study.metadata.to_csv(output_directory / patient_name /
                               f'metadata_{patientid}.csv',
                               index=False)
 
@@ -83,6 +85,8 @@ def pedsilicoich_cli():
         fromfile_prefix_chars='@')
     parser.add_argument('input_csv', nargs='?', type=str,
                         help='input csv to recreate prior dataset')
+    parser.add_argument('--output_directory', type=str,
+                    help='optional save directory')
     parser.add_argument('--keep_raw', type=bool,
                         help='''
                         whether to keep raw projection data and ground
