@@ -71,11 +71,20 @@ or csv filepath')
     kVp_list = kVp if isinstance(kVp, list | tuple) else [kVp]
     mA_list = kVp if isinstance(mA, list | tuple) else [mA]
     edema_list = list(range(*edema))  # IPH only
-    if isinstance(seed, int):
+
+    if isinstance(seed, float):
+        raise ValueError('seed cannot be float, set to False or integer')
+    elif not seed & isinstance(seed, bool): # check if seed is bool and False
+        random = np.random.default_rng()
+    elif seed & isinstance(seed, bool): # check if seed is bool and True (not allowed)
+        raise ValueError('seed cannot be True, set to False or integer')
+    elif isinstance(seed, int): # if not True or False, check if int:
         random = np.random.default_rng(seed)
     else:
-        random = np.random.default_rng()
+        raise ValueError('seed must be False or integer')
+    
     seed = random.integers(0, 1e6)
+
     params = dict(age=[],
                   kVp=[],
                   mA=[],
