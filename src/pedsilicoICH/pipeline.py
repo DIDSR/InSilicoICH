@@ -20,6 +20,7 @@
 
 from argparse import ArgumentParser
 import os
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -86,7 +87,7 @@ def pedsilicoich_cli():
     parser.add_argument('input_csv', nargs='?', type=str,
                         help='input csv to recreate prior dataset')
     parser.add_argument('--output_directory', type=str,
-                    help='optional save directory')
+                        help='optional save directory')
     parser.add_argument('--keep_raw', type=bool,
                         help='''
                         whether to keep raw projection data and ground
@@ -94,7 +95,13 @@ def pedsilicoich_cli():
                         storage requirements.
                         ''')
     args = parser.parse_args()
-    pedsilicoich(args.input_csv, args.keep_raw)
+    if args.input_csv:
+        input_csv = args.input_csv
+    elif not sys.stdin.isatty():
+        input_csv = sys.stdin.read().strip()
+    else:
+        parser.print_help()
+    pedsilicoich(input_csv, args.keep_raw)
 
 
 if __name__ == '__main__':
