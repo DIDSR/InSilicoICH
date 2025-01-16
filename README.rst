@@ -106,7 +106,7 @@ Virtual patient recruitment and scanning can be chained together using the pipe 
 
         recruit example_inclusion_criteria.toml | generate
 
-Images and any hemorrhage segmentation masks will be saved in subdirectories under the selected `output_directory` specified in the study `input csv <default_study/default_study.csv>`_
+Images and any hemorrhage segmentation masks will be saved in DICOM format in subdirectories under the selected `output_directory` specified in the study `input csv <default_study/default_study.csv>`_
 
 The output `default_study/default_study.csv` can then be used to reproduce the dataset again later using `generate`
 
