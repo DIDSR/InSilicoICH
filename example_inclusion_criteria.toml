@@ -1,8 +1,10 @@
-# This is an example configuration for PedSilicoICH simulations
+# This is an example distribution file for PedSilicoICH simulations
+# All parameters are given as a list which is sampled from in the `recruit` program
+#
 # uncommented parameters here will override defaults
 [general]
-output_directory="TEST3"
-zspan=[0, 10]  # scan range in mm, min max
+output_directory="default_study"
+zspan=[0, 10]  # scan range in mm, min max, comment out to scan whole range
 desired_cases=3  # desired dataset size
 keep_raw=false  # keep projection data
 seed=false  # seed to reproduce dataset, set to false or integer

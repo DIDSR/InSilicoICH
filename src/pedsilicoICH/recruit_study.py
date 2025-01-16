@@ -165,14 +165,18 @@ def flatten_dict(layered_dict):
 
 def recruitment_cli():
     parser = ArgumentParser(
-        description='Generates full patient list to conduct study, the input csv for pedsilicoICH',
+        description='''Generates full patient list to conduct study from
+        provided distributions, the input csv for pedsilicoICH
+        ''',
         epilog='''
         arguments can be given as toml config files or command line
         flags, each overriding defaults
         ''',
         fromfile_prefix_chars='@')
     parser.add_argument('config', nargs='?', type=str,
-                        help='Config toml file')
+                        help='''Config toml file specifying distributions of
+                        parameters that will be uniformily randomly sample to
+                        generate a recruited patient list for scanning''')
     parser.add_argument('--output_directory', type=str,
                         help='output directory to save simulation results')
     parser.add_argument('--input_csv', type=str,

@@ -79,21 +79,36 @@ See the included `jupyter notebooks <notebooks>`_ for example programmatic usage
 
 **Command Line Usage**
 
-After `pip` installing, the `pedsilicoich` program should be available in your environment and can be used as follows
+After `pip` installing, 2 command line programs will be available to:
+
+1. `recruit` which creates a csv of virtual patients to be imaged when given an `inclusion_criteria.toml <example_inclusion_criteria.toml>`_ file which specifies the range and distribution of patient, disease, and acquisition parameters to sample from when recruiting a virtual imaging trial
 
 .. code-block:: bash
 
-        pedsilicoich example_config.toml
+        generate example_inclusion_criteria.toml
+        > default_study/default_study.csv
 
-Any parameters provided in config files like `example_config.toml <example_config.toml>`_, override the `defaults <src/pedsilicoICH/configs/default.toml>`_.
+The output of generate is a `csv` file, here `default_study.csv <default_study/default_study.csv>`_ which specifies explicitly which patients and scans to run, where each row is a preview of the unique scan to be performed. This file can be made manually or edited.
 
-Additionally, command line arguments can be provided as positional or keyword arguments, see the help string for more details:
+See `recruit --help` for more details on how to run the program and `example_inclusion_criteria.toml <example_inclusion_criteria.toml>`_ for more details on the choosing parameter ranges to sample.
+
+2. `generate` takes the recruited patient `.csv` list and runs the scans in the list.
 
 .. code-block:: bash
 
-        pedsilicoich --help
+        generate default_study/default_study.csv
 
-User provide command line arguments override user provided config files, which override the `default <src/pedsilicoICH/configs/default.toml>`_ configs
+See `generate --help` help for more details
+
+Virtual patient recruitment and scanning can be chained together using the pipe `|` operator like so
+
+.. code-block:: bash
+
+        recruit example_inclusion_criteria.toml | generate
+
+Images and any hemorrhage segmentation masks will be saved in subdirectories under the selected `output_directory` specified in the study `input csv <default_study/default_study.csv>`_
+
+The output `default_study/default_study.csv` can then be used to reproduce the dataset again later using `generate`
 
 View a Sample Dataset (local demo)
 ----------------------------------
