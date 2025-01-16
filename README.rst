@@ -75,7 +75,7 @@ The synthetic data generation and image simulation tools included in this repo c
 
 **Programmatic Usage**
 
-See the included `jupyter notebooks <notebooks>`_ for example programmatic usage
+See the included `jupyter notebooks <notebooks/tutorials>`_ for example programmatic usage
 
 **Command Line Usage**
 
