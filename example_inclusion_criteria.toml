@@ -13,7 +13,7 @@ seed=false  # seed to reproduce dataset, set to false or integer
 age=[0, 100]  # range in yrs [min, max]
 
 [lesion]
-subtypes=[false, 'round', 'epidural', 'subdural']
+subtypes=['round']
 mass_effect=true  # whether lesions displace brain tissue
 edema=[0, 15]  # edema width range [min, max] in pixels
 volume='src/pedsilicoICH/distributions/BHSD_volume_distributions.csv'  # str or list
