@@ -150,11 +150,6 @@ Repository Contents
 
 - `notebooks/tutorials/03_studies.ipynb <notebooks/tutorials/03_studies.ipynb>`_: integrates phantoms and scanners to run virtual imaging studies.
 
-Contributing
-------------
-
-Our current practice is developing locally by cloning the git repo to your local machine or personal directory and accessing a common dataset. Commits are encouraged to be regularly synced between the local and remote repo. Contributions are welcome from all, though developing on your own branch may be best to avoid merge conflicts, then we can decide on what to merge to the main branch (see `software carpentry on collaborating with git <https://swcarpentry.github.io/git-novice/08-collab.html>`_ for details).
-
 See Also
 --------
 
