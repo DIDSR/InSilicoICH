@@ -421,8 +421,6 @@ class Scanner():
             if self.xcist.physics.monochromatic != -1:
                 self.xcist.recon.mu = xc.GetMu(
                     'water', self.xcist.physics.monochromatic)[0]/10
-            else:
-                raise ValueError('error with mu of water, check physics and recon config')
         if not sliceCount:
             detector_width = self.xcist.scanner.detectorRowCount *\
                 self.xcist.scanner.detectorRowSize
