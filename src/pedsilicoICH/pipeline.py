@@ -85,7 +85,10 @@ def pedsilicoich_cli():
         ''',
         fromfile_prefix_chars='@')
     parser.add_argument('input_csv', nargs='?', type=str,
-                        help='input csv to recreate prior dataset')
+                        help='''
+                          input csv to recreate prior dataset,
+                          see `recruit --help` for more details
+                        ''')
     parser.add_argument('--output_directory', type=str,
                         help='optional save directory')
     parser.add_argument('--keep_raw', type=bool,
