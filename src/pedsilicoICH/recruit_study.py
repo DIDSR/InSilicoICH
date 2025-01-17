@@ -74,15 +74,15 @@ or csv filepath')
 
     if isinstance(seed, float):
         raise ValueError('seed cannot be float, set to False or integer')
-    elif not seed & isinstance(seed, bool): # check if seed is bool and False
+    elif not seed & isinstance(seed, bool):  # check if seed is bool and False
         random = np.random.default_rng()
-    elif seed & isinstance(seed, bool): # check if seed is bool and True (not allowed)
+    elif seed & isinstance(seed, bool):  # check if seed is bool and True
         raise ValueError('seed cannot be True, set to False or integer')
-    elif isinstance(seed, int): # if not True or False, check if int:
+    elif isinstance(seed, int):  # if not True or False, check if int:
         random = np.random.default_rng(seed)
     else:
         raise ValueError('seed must be False or integer')
-    
+
     global_seed = random.integers(0, 1e6)
 
     params = dict(age=[],
@@ -102,7 +102,7 @@ or csv filepath')
                   output_directory=[]
                   )
 
-    for case_idx in range(desired_cases):
+    for _ in range(desired_cases):
         lesion_id = random.choice(subtypes)  # select a random lesion type
         if lesion_id is None:
             vol = 0
@@ -153,7 +153,8 @@ or csv filepath')
         params['output_directory'].append(output_directory)
 
     df = pd.DataFrame(params)
-    save_name = save_name or output_directory / (str(output_directory.name) + '.csv')
+    save_name = save_name or output_directory / \
+        (output_directory.name + '.csv')
     save_name.parent.mkdir(exist_ok=True, parents=True)
     print(save_name)
     df.to_csv(save_name, index=False)
@@ -168,7 +169,10 @@ def flatten_dict(layered_dict):
 def recruitment_cli():
     parser = ArgumentParser(
         description='''Generates full patient list to conduct study from
-        provided distributions, the input csv for pedsilicoICH
+          provided distributions.
+
+          Output: a .csv file with scans to perform,
+          the input for the `generate` command
         ''',
         epilog='''
         arguments can be given as toml config files or command line
@@ -176,9 +180,10 @@ def recruitment_cli():
         ''',
         fromfile_prefix_chars='@')
     parser.add_argument('config', nargs='?', type=str,
-                        help='''Config toml file specifying distributions of
-                        parameters that will be uniformily randomly sample to
-                        generate a recruited patient list for scanning''')
+                        help='''Inclusion criteria config .toml file
+                        specifying ranges of parameters that will be
+                        uniformily randomly sample to generate a recruited
+                        patient list for scanning with `generate`''')
     parser.add_argument('--output_directory', type=str,
                         help='output directory to save simulation results')
     parser.add_argument('--input_csv', type=str,
