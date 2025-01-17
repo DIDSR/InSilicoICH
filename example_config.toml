@@ -1,8 +1,8 @@
 # This is an example configuration for PedSilicoICH simulations
 # uncommented parameters here will override defaults
 [general]
-output_directory="global_seed_test"
-zspan='tight'  # scan range in mm, min max
+output_directory="TEST"
+zspan='dynamic'  # scan range in mm, min max
 desired_cases=2  # desired dataset size
 keep_raw=false  # keep projection data
 seed=false  # seed to reproduce dataset, set to false or integer
