@@ -41,4 +41,5 @@ Issues = "https://github.com/brandonjnelsonFDA/PedSilicoICH/issues"
 
 [project.scripts]
 generate = "pedsilicoICH.pipeline:pedsilicoich_cli"
+pedsilicoich = "pedsilicoICH.pipeline:pedsilicoich_cli" # keeping for now for backwards compatibility
 recruit = "pedsilicoICH.recruit_study:recruitment_cli"
