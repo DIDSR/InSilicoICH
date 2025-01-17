@@ -83,7 +83,7 @@ or csv filepath')
     else:
         raise ValueError('seed must be False or integer')
     
-    seed = random.integers(0, 1e6)
+    global_seed = random.integers(0, 1e6)
 
     params = dict(age=[],
                   kVp=[],
@@ -97,7 +97,8 @@ or csv filepath')
                   edema=[],
                   subtype=[],
                   mass_effect=[],
-                  seed=[],
+                  global_seed=[],
+                  case_seed=[],
                   output_directory=[]
                   )
 
@@ -147,7 +148,8 @@ or csv filepath')
         params['volume'].append(vol)
         params['edema'].append(edema)
         params['mass_effect'].append(mass_effect)
-        params['seed'].append(seed)
+        params['global_seed'].append(global_seed)
+        params['case_seed'].append(random.integers(0, 1e6))
         params['output_directory'].append(output_directory)
 
     df = pd.DataFrame(params)
