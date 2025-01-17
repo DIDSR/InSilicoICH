@@ -1,27 +1,27 @@
 # This is an example configuration for PedSilicoICH simulations
 # uncommented parameters here will override defaults
 [general]
-output_directory="peds_test"
-zspan=[0, 10]  # scan range in mm, min max
-desired_cases=10  # desired dataset size
-# keep_raw=false  # keep projection data
-# seed=false  # seed to reproduce dataset
+output_directory="global_seed_test"
+zspan='tight'  # scan range in mm, min max
+desired_cases=2  # desired dataset size
+keep_raw=false  # keep projection data
+seed=false  # seed to reproduce dataset, set to false or integer
 
 [patient]
 age=[0, 100]  # range in yrs [min, max]
 
 [lesion]
-subtypes=[false, 'round', 'epidural', 'subdural']
+subtypes=['round']
 mass_effect=true  # whether lesions displace brain tissue
 edema=[0, 15]  # edema width range [min, max] in pixels
-# volume='src/pedsilicoICH/distributions/BHSD_volume_distributions.csv'  # str or list
-# attenuation='src/pedsilicoICH/distributions/BHSD_HU_distributions.csv'  # str or list
+volume='src/pedsilicoICH/distributions/BHSD_volume_distributions.csv'  # str or list
+attenuation='src/pedsilicoICH/distributions/BHSD_HU_distributions.csv'  # str or list
 
 [acquisition]
-views=100
+views=[100]
 kVp=[120]
-mA=[300, 350, 400]
+mA=200
 
 [recon]
-kernel='soft'
-slice_thickness=5
+kernel=['soft']
+slice_thickness=1

@@ -427,12 +427,11 @@ large, try smaller volume')
         transform.set_random_state(seed)
 
         for _ in range(complexity):
-            lesion_seed = rng.integers(0, 1e6)
-            axes = get_semi_major_axes(eccentricity, lesion_seed)
+            axes = get_semi_major_axes(eccentricity, seed)
             foci = r * axes
             sphere = elliptical_lesion(img.shape, center=(z, x, y),
                                        radius=foci,
-                                       random_rotate=lesion_seed)
+                                       random_rotate=seed)
             sphere = transform(sphere).astype(bool)
             lesion_vol[sphere] = intensity
         lesion_mask = lesion_vol > -1000

@@ -1,6 +1,6 @@
 [project]
 name = "PedSilicoICH"
-version = "0.0.2"
+version = "0.1.0"
 authors = [
   {name="Brandon Nelson", email="brandon.nelson@fda.hhs.gov"},
   {name="Jayse M. Weaver", email="jayse.weaver@fda.hhs.gov"}
@@ -41,3 +41,4 @@ Issues = "https://github.com/brandonjnelsonFDA/PedSilicoICH/issues"
 
 [project.scripts]
 pedsilicoich = "pedsilicoICH.pipeline:pedsilicoich_cli"
+recruit = "pedsilicoICH.recruit_study:recruitment_cli"
