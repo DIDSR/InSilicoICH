@@ -360,7 +360,7 @@ class HeadPhantom(Phantom):
             return
         self._phantom, self._lesion[0] =\
             transform_image_label_pair(transform,
-                                       self.get_CT_number_phantom(),
+                                       self._phantom,
                                        self.get_lesion_mask(),
                                        seed=seed)
 
@@ -586,7 +586,7 @@ class NIHPD_Head(HeadPhantom):
         NeuroImage. 2011;54(1):313-327. doi:10.1016/j.neuroimage.2010.07.033
     '''
     def __init__(self, phantom_dir, age: float, symmetric=False, csf_HU=10,
-                 gm_HU=40, wm_HU=30, skull_HU=1000, shape=None):
+                 gm_HU=40, wm_HU=30, skull_HU=900, shape=None):
         phantom_dir = Path(phantom_dir)
         if not phantom_dir.exists():
             print(f'''
