@@ -20,7 +20,7 @@ source /home/$USER/anaconda3/envs/pedsilicoich/bin/activate
 
 START_TIME=`date +%s`
 set -x
-(pedsilicoich $INPUT --output_directory $OUTPUT)
+(generate $INPUT --output_directory $OUTPUT)
 set +x
 EXIT_STATUS=$?
 END_TIME=`date +%s`

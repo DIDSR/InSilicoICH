@@ -29,7 +29,7 @@ Methods
 
 We have previously combined the `pediatric and adult digital XCAT cohort of phantoms <https://aapm.onlinelibrary.wiley.com/doi/10.1118/1.3480985>`_ with the `XCIST x-ray CT simulation framework <https://iopscience.iop.org/article/10.1088/1361-6560/ac9174/meta>`_ to create realistic CT exams. This preliminary work was in support of investigating the `effectiveness of deep learning denoising algorithms in pediatric patients <https://aapm.onlinelibrary.wiley.com/doi/10.1002/mp.16901>`_.
 
-In this work, synthetic hemorrhages are inserted into head and neck phantoms based on MR templates and atlases. Presently, three hemorrhage subtypes are supported: intraparenchymal (IPH), epidural (EDH), and subdural (SDH). A knowledge-based algorithm is used to guide the placement and shape of the synthetic hemorrhages, using volume and attenuation parameters modeled from `real hemorrhages obtained in a segmentation dataset <https://arxiv.org/abs/2308.11298>`_. Appropriate Hounsfield units can be assigned to each segmented region of the phantom, such as the gray and white matter, bone, CSF, and the hemorrhage. As with previous work, XCIST was used to create realistic simulated CT exams with included synthetic hemorrhages.
+In this work, synthetic hemorrhages are inserted into head and neck phantoms based on MR templates and atlases. Presently, three hemorrhage subtypes are supported: intraparenchymal (IPH), epidural (EDH), and subdural (SDH). A knowledge-based algorithm is used to guide the placement and shape of the synthetic hemorrhages, using volume and attenuation parameters modeled from `real hemorrhages obtained in a segmentation dataset <https://arxiv.org/abs/2308.11298>`_. Appropriate Hounsfield units can be assigned to each segmented region of the phantom, such as the gray and white matter, bone, CSF, and the hemorrhage. As with previous work, `XCIST <https://github.com/xcist/main>`_ is used to create realistic simulated CT exams with included synthetic hemorrhages.
 
 The knowledge-based algorithm allows the following parameters to be controlled:
 
@@ -75,25 +75,40 @@ The synthetic data generation and image simulation tools included in this repo c
 
 **Programmatic Usage**
 
-See the included `jupyter notebooks <notebooks>`_ for example programmatic usage
+See the included `jupyter notebooks <notebooks/tutorials>`_ for example programmatic usage
 
 **Command Line Usage**
 
-After `pip` installing, the `pedsilicoich` program should be available in your environment and can be used as follows
+After `pip` installing, 2 command line programs will be available to:
+
+1. `recruit` which creates a csv of virtual patients to be imaged when given an `inclusion_criteria.toml <example_inclusion_criteria.toml>`_ file which specifies the range and distribution of patient, disease, and acquisition parameters to sample from when recruiting a virtual imaging trial
 
 .. code-block:: bash
 
-        pedsilicoich example_config.toml
+        generate example_inclusion_criteria.toml
+        > default_study/default_study.csv
 
-Any parameters provided in config files like `example_config.toml <example_config.toml>`_, override the `defaults <src/pedsilicoICH/configs/default.toml>`_.
+The output of generate is a `csv` file, here `default_study.csv <default_study/default_study.csv>`_ which specifies explicitly which patients and scans to run, where each row is a preview of the unique scan to be performed. This file can be made manually or edited.
 
-Additionally, command line arguments can be provided as positional or keyword arguments, see the help string for more details:
+See `recruit --help` for more details on how to run the program and `example_inclusion_criteria.toml <example_inclusion_criteria.toml>`_ for more details on the choosing parameter ranges to sample.
+
+2. `generate` takes the recruited patient `.csv` list and runs the scans in the list.
 
 .. code-block:: bash
 
-        pedsilicoich --help
+        generate default_study/default_study.csv
 
-User provide command line arguments override user provided config files, which override the `default <src/pedsilicoICH/configs/default.toml>`_ configs
+See `generate --help` help for more details
+
+Virtual patient recruitment and scanning can be chained together using the pipe `|` operator like so
+
+.. code-block:: bash
+
+        recruit example_inclusion_criteria.toml | generate
+
+Images and any hemorrhage segmentation masks will be saved in DICOM format in subdirectories under the selected `output_directory` specified in the study `input csv <default_study/default_study.csv>`_
+
+The output `default_study/default_study.csv` can then be used to reproduce the dataset again later using `generate`
 
 View a Sample Dataset (local demo)
 ----------------------------------
@@ -134,22 +149,6 @@ Repository Contents
 - `notebooks/tutorials/02_scanners.ipynb <notebooks/tutorials/02_scanners.ipynb>`_: introduce working with virtual CT scanner for CT imaging simulations.
 
 - `notebooks/tutorials/03_studies.ipynb <notebooks/tutorials/03_studies.ipynb>`_: integrates phantoms and scanners to run virtual imaging studies.
-
-*Project Aims*
-
-- `notebooks/00_basic_eda.ipynb <notebooks/00_basic_eda.ipynb>`_: exploratory data analysis of the Hssayeni et 2020 dataset [Aim 1.1]
-- `notebooks/03_epidural_subdural_demo.ipynb <notebooks/03_epidural_subdural_demo.ipynb>`_: expand simulated lesions to subdural and epidural ICH [Aim 1.2]
-- `notebooks/viewing_simulation_results.ipynb <notebooks/viewing_simulation_results.ipynb>`_: for viewing the simulation results from CT_dataset_pipeline.py
-- `notebooks/IQ_evaluations.ipynb <notebooks/IQ_evaluations.ipynb>`_: basic evaluations for quality assurance of XCIST simulations and phantoms
-
-**scripts**: for generating data sets and more production ready
-
-- `CT_dataset_pipeline.py <CT_dataset_pipeline.py>`_: used for generating the in silico dataset
-
-Contributing
-------------
-
-Our current practice is developing locally by cloning the git repo to your local machine or personal directory and accessing a common dataset. Commits are encouraged to be regularly synced between the local and remote repo. Contributions are welcome from all, though developing on your own branch may be best to avoid merge conflicts, then we can decide on what to merge to the main branch (see `software carpentry on collaborating with git <https://swcarpentry.github.io/git-novice/08-collab.html>`_ for details).
 
 See Also
 --------

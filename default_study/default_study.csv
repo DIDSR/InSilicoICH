@@ -1,0 +1,4 @@
+age,kVp,mA,views,zspan,kernel,slice_thickness,intensity,volume,edema,subtype,mass_effect,seed,output_directory
+6.5,120.0,200.0,100.0,"[0, 10]",soft,0,46.69629768762238,29.384526019898857,0,epidural,True,778259,default_study
+15.75,120.0,200.0,100.0,"[0, 10]",soft,0,45.27293521694713,4.159623610243102,0,epidural,True,778259,default_study
+15.75,120.0,200.0,100.0,"[0, 10]",soft,0,0.0,0.0,0,,True,778259,default_study

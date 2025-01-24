@@ -12,6 +12,7 @@ build
 *.air
 *.offset
 *.dcm
+metadata*
 *.nii
 *.prep
 *.scan
