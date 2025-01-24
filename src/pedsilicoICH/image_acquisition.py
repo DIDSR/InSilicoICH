@@ -217,7 +217,7 @@ class Scanner():
                                   threshold)) + 1
             suggested_end_mm = self.start_positions[0] + suggested_end_idx *\
                 self.phantom.spacings[0]
-        return (suggested_start_mm, suggested_end_mm)
+        return (int(suggested_start_mm), int(suggested_end_mm))
 
     def get_lesion_mask(self, startZ: int | None = None,
                         endZ: int | None = None,

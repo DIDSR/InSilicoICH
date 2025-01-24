@@ -65,8 +65,6 @@ class Study:
         if isinstance(zspan, str):
             if zspan == 'dynamic':
                 startZ, endZ = ct.recommend_scan_range()
-            startZ = int(zspan.split(',')[0].split('[')[1])
-            endZ = int(zspan.split(',')[1].split(']')[0])
         elif isinstance(zspan, tuple | list):
             startZ, endZ = zspan
         views = int(views)
