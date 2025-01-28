@@ -43,7 +43,7 @@ def pedsilicoich(input_csv, output_directory=None, keep_raw=False):
 
     for patientid in patientids:
         patient = params.iloc[patientid]
-        output_directory = output_directory or patient['output_directory']
+        output_directory = patient['output_directory'] or output_directory
         output_directory = Path(output_directory)
         print(f'{patientid+1}/{n_params}')
 

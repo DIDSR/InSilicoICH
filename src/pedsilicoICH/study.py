@@ -7,6 +7,7 @@ from pathlib import Path
 from shutil import rmtree
 
 import numpy as np
+import ast
 import pydicom
 import pandas as pd
 from scipy.ndimage import center_of_mass
@@ -65,6 +66,9 @@ class Study:
         if isinstance(zspan, str):
             if zspan == 'dynamic':
                 startZ, endZ = ct.recommend_scan_range()
+            if zspan.startswith('['): # using 'recruit' to create .csv can result in zspan being string of list
+                zspan = ast.literal_eval(zspan) # convert from 'string of list' to just list
+                startZ, endZ = zspan
         elif isinstance(zspan, tuple | list):
             startZ, endZ = zspan
         views = int(views)
@@ -194,11 +198,12 @@ def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
                               **kwargs)
 
     if add_positioning_augmentation:
-        transform = RandAffine(prob=0.5,
+        transform = RandAffine(prob=1,
                                rotate_range=[np.pi/4, np.pi/20, np.pi/20],
                                translate_range=[10, 10, 10],
                                scale_range=[0.1, 0.1, 0.1],
-                               padding_mode="border")
+                               padding_mode="border",
+                               mode='nearest')
         phantom.apply_transform(transform, seed=seed)
 
     scanner = Scanner(phantom, output_dir=output_directory)
