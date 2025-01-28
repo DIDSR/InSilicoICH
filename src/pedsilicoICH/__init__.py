@@ -1,4 +1,3 @@
-from . import insert_lesion_3D
 from . import image_acquisition
 from . import lesion_definition
 from . import ground_truth_definition
