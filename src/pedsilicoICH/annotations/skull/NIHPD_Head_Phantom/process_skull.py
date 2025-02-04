@@ -15,8 +15,8 @@ sys.path.append(main_directory)
 
 class SkullProcess(Skull):
     def __init__(self, path_mesh_brainmask: str):
+        super().__init__()
         self.mesh_brain = self.load_mesh(path_mesh_brainmask)
-        super().__init__(self.mesh_brain)
 
     def load_mesh(self, path_mesh_brainmask: str):
         return pv.read(path_mesh_brainmask)
@@ -89,7 +89,7 @@ class SkullProcess(Skull):
 
         Polar angle for pv.cartesian_to_spherical(): https://docs.pyvista.org/api/utilities/_autosummary/pyvista.cartesian_to_spherical
         """
-        mesh = self.compute_normals(self.mesh_brainmask)
+        mesh = self.compute_normals(self.mesh_brain)
 
         # Compute the normals in-place
         normals = mesh["Normals"]

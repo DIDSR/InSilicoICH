@@ -2,12 +2,10 @@
 Class Skull for various operations.
 """
 
-import numpy as np
-
 
 class Skull(object):
-    def __init__(self, mesh_brainmask):
-        self.mesh_brainmask = mesh_brainmask
+    def __init__(self):
+        self.mesh_brainmask = None
         self.mesh_skull = None
 
     def compute_normals(self, mesh):

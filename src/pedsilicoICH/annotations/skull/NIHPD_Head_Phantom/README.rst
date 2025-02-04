@@ -3,7 +3,7 @@ Skull extraction
 
 Binary segmentation mask to mesh
 --------------------------------
-Run the following command to generate mess (.vtk).
+Run the following command to generate mesh (.vtk).
 
 .. code-block:: shell
 
@@ -17,3 +17,11 @@ Extract skull mesh (.vtk) and load the saved .vtk file in 3D Slicer to visualize
 .. code-block:: shell
 
     python process_skull.py
+
+Export skull mesh to its segmentation
+-------------------------------------
+Save skull segmentation as .nrrd file.
+
+.. code-block:: shell
+
+    PATH_TO_3DSLICER_EXECUTABLE_FILE --no-splash --no-main-window --python-script PATH_TO/save_skull_data.py
