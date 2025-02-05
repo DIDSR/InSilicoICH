@@ -8,6 +8,9 @@ notebooks/__pycache__
 notebooks/*/*.png
 build
 
+batchmode_CT_dataset_pipeline.sge
+run_batchmode.sh
+
 *.raw
 *.air
 *.offset
