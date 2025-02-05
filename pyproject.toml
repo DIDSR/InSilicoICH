@@ -7,7 +7,7 @@ authors = [
 ]
 description = "CT Simulations of virtual pediatric intracranial hemorrhage for computer aided triage device evaluation"
 readme = "README.rst"
-requires-python = ">=3.8"
+requires-python = "<3.13"
 dependencies = [
   "python-dotenv",
   "nibabel",
