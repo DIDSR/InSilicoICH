@@ -107,6 +107,7 @@ or csv filepath')
         if lesion_id is None:
             vol = 0
             intensity = 0
+            edema = 0
         elif lesion_id == 'epidural':
             vol = random.choice(df_volume['EDH_volume'],
                                 p=df_volume['EDH_weight'])
