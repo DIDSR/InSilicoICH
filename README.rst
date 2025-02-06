@@ -144,11 +144,11 @@ Repository Contents
 
 *Tutorials*
 
-- `notebooks/tutorials/01_phantoms.ipynb <notebooks/tutorials/01_phantoms.ipynb>`_: introduce working with phantoms and lesion insertion to generate inputs for CT simulations.
+- `notebooks/01_phantoms.ipynb <notebooks/01_phantoms.ipynb>`_: introduce working with phantoms and lesion insertion to generate inputs for CT simulations.
 
-- `notebooks/tutorials/02_scanners.ipynb <notebooks/tutorials/02_scanners.ipynb>`_: introduce working with virtual CT scanner for CT imaging simulations.
+- `notebooks/02_scanners.ipynb <notebooks/02_scanners.ipynb>`_: introduce working with virtual CT scanner for CT imaging simulations.
 
-- `notebooks/tutorials/03_studies.ipynb <notebooks/tutorials/03_studies.ipynb>`_: integrates phantoms and scanners to run virtual imaging studies.
+- `notebooks/03_studies.ipynb <notebooks/03_studies.ipynb>`_: integrates phantoms and scanners to run virtual imaging studies.
 
 See Also
 --------
