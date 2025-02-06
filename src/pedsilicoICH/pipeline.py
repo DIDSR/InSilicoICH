@@ -62,9 +62,9 @@ def pedsilicoich(input_csv, output_directory=None, keep_raw=False):
                           kernel=patient['kernel'],
                           slice_thickness=patient['slice_thickness'],
                           keep_raw=keep_raw,
-                          edema=int(float(patient['edema'])),
+                          edema=patient['edema'],
                           seed=int(patient['case_seed']))
-        study.metadata['edema'] = int(float(patient['edema']))
+        study.metadata['edema'] = patient['edema']
         study.metadata.to_csv(output_directory / patient_name /
                               f'metadata_{patientid}.csv',
                               index=False)
