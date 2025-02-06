@@ -17,7 +17,7 @@ This repository contains tools for generating synthetic non contrast CT datasets
 Motivation
 ----------
 
-Computer aided triaging (CADt) devices for intracranial hemorrhage (ICH) in the emergency room (e.g. `Rapid ICH K221456 <https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfpmn/pmn.cfm?ID=K221456>`_) is one important example where pediatric and adult cases exist in a reading queue where pediatric patients could be disadvantaged by being deprioritized for time sensitive treatment using an adult-trained AI model that extrapolates poorly to pediatric patients. While these AI/ML devices have potential to benefit pediatric patients, there is currently a lack of annotated pediatric data for evaluating the balance of risk and benefits.
+Intracranial hemorrhage (ICH) is a bleeding in the brain that can result from trauma or stroke, it can be a life threatening condition that needs immediate care. Computer aided triaging (CADt) devices read CT scans taken in the emergency room to detect ICH (e.g. `Rapid ICH K221456 <https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfpmn/pmn.cfm?ID=K221456>`_). Both adults and pediatrics can present with ICH, but with different frequencies. Due to this difference in frequency, pediatric patients could be disadvantaged by being deprioritized for time sensitive treatment using an adult-trained AI model that poorly extrapolates to pediatrics. While these AI/ML devices have potential to benefit pediatric patients, there is currently a lack of annotated pediatric data for evaluating the balance of risk and benefits.
 
 Purpose
 -------
