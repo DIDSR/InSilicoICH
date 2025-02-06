@@ -1,5 +1,5 @@
-CT Imaging Datasets for Pediatric Device Assessment of Intracranial Hemorrhage
-==============================================================================
+Synthetic Intracranial Hemorrhage Modeling Tools
+================================================
 
 |tests|
 
@@ -12,7 +12,7 @@ CT Imaging Datasets for Pediatric Device Assessment of Intracranial Hemorrhage
     :scale: 100%
     :target: https://github.com/brandonjnelsonFDA/PedSilicoICH/actions/workflows/python-app.yml
 
-This repository contains tools for generating synthetic non contrast CT datasets of intracranial hemorrhage (ICH).
+This repository contains tools for generating synthetic non contrast CT datasets of intracranial hemorrhage (ICH) that can be used for evaluating AI detection devices.
 
 Motivation
 ----------
