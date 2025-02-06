@@ -1,5 +1,5 @@
-CT Imaging Datasets for Pediatric Device Assessment of Intracranial Hemorrhage
-==============================================================================
+Synthetic Intracranial Hemorrhage Modeling Tools
+================================================
 
 |tests|
 
@@ -12,12 +12,12 @@ CT Imaging Datasets for Pediatric Device Assessment of Intracranial Hemorrhage
     :scale: 100%
     :target: https://github.com/brandonjnelsonFDA/PedSilicoICH/actions/workflows/python-app.yml
 
-This repository contains tools for generating synthetic non contrast CT datasets of intracranial hemorrhage (ICH).
+This repository contains tools for generating synthetic non contrast CT datasets of intracranial hemorrhage (ICH) that can be used for evaluating AI detection devices.
 
 Motivation
 ----------
 
-Computer aided triaging (CADt) devices for intracranial hemorrhage (ICH) in the emergency room (e.g. `Rapid ICH K221456 <https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfpmn/pmn.cfm?ID=K221456>`_) is one important example where pediatric and adult cases exist in a reading queue where pediatric patients could be disadvantaged by being deprioritized for time sensitive treatment using an adult-trained AI model that extrapolates poorly to pediatric patients. While these AI/ML devices have potential to benefit pediatric patients, there is currently a lack of annotated pediatric data for evaluating the balance of risk and benefits.
+Intracranial hemorrhage (ICH) is a bleeding in the brain that can result from trauma or stroke, it can be a life threatening condition that needs immediate care. Computer aided triaging (CADt) devices read CT scans taken in the emergency room to detect ICH (e.g. `Rapid ICH K221456 <https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfpmn/pmn.cfm?ID=K221456>`_). Both adults and pediatrics can present with ICH, but with different frequencies. Due to this difference in frequency, pediatric patients could be disadvantaged by being deprioritized for time sensitive treatment using an adult-trained AI model that poorly extrapolates to pediatrics. While these AI/ML devices have potential to benefit pediatric patients, there is currently a lack of annotated pediatric data for evaluating the balance of risk and benefits.
 
 Purpose
 -------
@@ -144,11 +144,11 @@ Repository Contents
 
 *Tutorials*
 
-- `notebooks/tutorials/01_phantoms.ipynb <notebooks/tutorials/01_phantoms.ipynb>`_: introduce working with phantoms and lesion insertion to generate inputs for CT simulations.
+- `notebooks/01_phantoms.ipynb <notebooks/01_phantoms.ipynb>`_: introduce working with phantoms and lesion insertion to generate inputs for CT simulations.
 
-- `notebooks/tutorials/02_scanners.ipynb <notebooks/tutorials/02_scanners.ipynb>`_: introduce working with virtual CT scanner for CT imaging simulations.
+- `notebooks/02_scanners.ipynb <notebooks/02_scanners.ipynb>`_: introduce working with virtual CT scanner for CT imaging simulations.
 
-- `notebooks/tutorials/03_studies.ipynb <notebooks/tutorials/03_studies.ipynb>`_: integrates phantoms and scanners to run virtual imaging studies.
+- `notebooks/03_studies.ipynb <notebooks/03_studies.ipynb>`_: integrates phantoms and scanners to run virtual imaging studies.
 
 See Also
 --------
