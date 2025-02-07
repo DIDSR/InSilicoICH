@@ -62,6 +62,12 @@ Below are example simulation outputs:
         :width: 800
         :align: center
 
+Note, the CT simulations also include methods for readily extracting ground truth segmentation masks of the inserted ICH for generating segmentation datasets.
+
+.. image:: assets/ich_masks.png
+        :width: 800
+        :align: center
+
 Installation
 ------------
 
