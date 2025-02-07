@@ -14,7 +14,7 @@ import pandas as pd
 import skimage as ski
 from dotenv import load_dotenv
 from monai.transforms import Resize, RandAffine, Affine, ResizeWithPadOrCrop
-from torchvision.datasets.utils import download_and_extract_archive
+from .utils import download_and_extract_archive
 
 from . import dicom_to_voxelized_phantom
 from ..artifact_generation import transform_image_label_pair
