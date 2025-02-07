@@ -70,12 +70,26 @@ Note, the CT simulations also include `methods for extracting ground truth segme
 
 Installation
 ------------
+In a new python environment, run the following if using pip or conda:
+
+**Pip**
 
 .. code-block:: bash
 
         pip install git+https://github.com/DIDSR/PedSilicoICH.git
 
-Tested on python 3.11.3
+**Conda**
+
+See example conda install instructions `here <https://docs.anaconda.com/miniconda/install/#quick-command-line-install>`_
+
+.. code-block:: bash
+
+        # Best practice, use an environment rather than install in the base env
+        conda create -n my-env
+        conda activate my-env
+        pip install git+https://github.com/DIDSR/PedSilicoICH.git
+
+Tested on python>3.11 and <3.13
 
 Usage
 -----
