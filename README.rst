@@ -31,27 +31,30 @@ We have previously combined the `pediatric and adult digital XCAT cohort of phan
 
 In this work, synthetic hemorrhages are inserted into head and neck phantoms based on MR templates and atlases. Presently, three hemorrhage subtypes are supported: intraparenchymal (IPH), epidural (EDH), and subdural (SDH). A knowledge-based algorithm is used to guide the placement and shape of the synthetic hemorrhages, using volume and attenuation parameters modeled from `real hemorrhages obtained in a segmentation dataset <https://arxiv.org/abs/2308.11298>`_. Appropriate Hounsfield units can be assigned to each segmented region of the phantom, such as the gray and white matter, bone, CSF, and the hemorrhage. As with previous work, `XCIST <https://github.com/xcist/main>`_ is used to create realistic simulated CT exams with included synthetic hemorrhages.
 
-The knowledge-based algorithm allows the following parameters to be controlled:
+The knowledge-based algorithm allows the following parameters to be controlled with suggested ranges and units, some limits on acquisition parameters are scanner dependent, see `XCIST <https://github.com/xcist/main/blob/master/gecatsim/cfg/Scanner_Default.cfg>`_ for further details:
 
 +----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
 |                            |                                                      |                                           |                                 |
 | Patient Characteristics    | Lesion Characteristics                               | Acquisition Characteristics               | Misc./Output Data               |
 +============================+======================================================+===========================================+=================================+
 |                            |                                                      |                                           |                                 |
-| Identifier                 | Intensity [HU]                                       | X-ray tube current [mA]                   | Seed to reproduce               |
+| Identifier                 | Intensity [-30 - 100 HU]                             | X-ray tube current [10-1500 mA]           | Seed to reproduce               |
 +----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
 |                            |                                                      |                                           |                                 |
-| Age (atlas-based)          | Hemorrhage volume [mL] and slice coverage            | X-ray tube peak voltage [kVp]             | Image file location             |
+| `Age [6.5-38 years]`_      | Hemorrhage volume [0-100 mL] and slice coverage      | X-ray tube peak voltage [70-140 kVp]      | Image file location             |
 +----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
 |                            |                                                      |                                           |                                 |
-|                            | Hemorrhage type                                      | CT acquisition view count [views]         | Mask file directory location    |
+|                            | Hemorrhage type [IPH, SDH, EDH, None]                | CT acquisition view count [1000 views]    | Mask file directory location    |
 +----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
 |                            |                                                      |                                           |                                 |
-|                            | Mass effect strength (currently   IPH/round only)    | Reconstructed field of view (FoV) [mm]    | Hemorrhage slice number(s)      |
+|                            | Mass effect [True, False]                            | Reconstruction FOV (FOV) [100 - 500 mm]   | Hemorrhage slice number(s)      |
 +----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
 |                            |                                                      |                                           |                                 |
-|                            | Edema [voxels] (IPH/round only)                      | Reconstruction kernel                     |                                 |
+|                            | Edema [0-15 voxels] (IPH only)                       | `Reconstruction kernel`_                  |                                 |
 +----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
+
+.. _Age [6.5-38 years]: https://github.com/DIDSR/PedSilicoICH/blob/872ee48dd42fb13b9d8a759feb1dac8f0d73a079/src/pedsilicoICH/ground_truth_definition/phantoms.py#L567-L568
+.. _Reconstruction kernel: https://github.com/xcist/main/blob/master/gecatsim/cfg/Recon_Default.cfg#L9-L11
 
 Below are example simulation outputs:
 
