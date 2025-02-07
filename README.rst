@@ -94,7 +94,12 @@ Tested on python=>3.11 and <3.13
 Usage
 -----
 
-The synthetic data generation and image simulation tools included in this repo can be used either programmatically by importing into Python scripts as a Package or via command line interface (CLI)
+The synthetic data generation and image simulation tools included in this repo can be used either programmatically by importing into Python scripts as a Package or via command line interface (CLI). To follow along, clone the repo to your working directory and set the cloned repo as the working directory:
+
+.. code-block:: bash
+
+        git clone https://github.com/DIDSR/PedSilicoICH.git
+        cd PedSilicoICH
 
 **Programmatic Usage**
 
