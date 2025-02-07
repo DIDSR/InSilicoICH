@@ -89,7 +89,7 @@ See example conda install instructions `here <https://docs.anaconda.com/minicond
         conda activate my-env
         pip install git+https://github.com/DIDSR/PedSilicoICH.git
 
-Tested on python>3.11 and <3.13
+Tested on python=>3.11 and <3.13
 
 Usage
 -----
