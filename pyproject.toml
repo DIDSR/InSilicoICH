@@ -19,7 +19,7 @@ dependencies = [
   "pynrrd",
   "pydicom==2.4.4",
   "pytest",
-  "torchvision",
+  "requests",
   "gecatsim @ git+https://github.com/xcist/main.git"
 ]
 classifiers = [
