@@ -99,7 +99,7 @@ After `pip` installing, 2 command line programs will be available to:
 
 The output of generate is a `csv` file, here `default_study.csv <default_study/default_study.csv>`_ which specifies explicitly which patients and scans to run, where each row is a preview of the unique scan to be performed. This file can be made manually or edited.
 
-See `recruit --help` for more details on how to run the program and `example_inclusion_criteria.toml <example_inclusion_criteria.toml>`_ for more details on the choosing parameter ranges to sample.
+See **recruit --help** for more details on how to run the program and `example_inclusion_criteria.toml <example_inclusion_criteria.toml>`_ for more details on the choosing parameter ranges to sample.
 
 2. `generate` takes the recruited patient `.csv` list and runs the scans in the list.
 
@@ -107,7 +107,7 @@ See `recruit --help` for more details on how to run the program and `example_inc
 
         generate default_study/default_study.csv
 
-See `generate --help` help for more details
+See **generate --help** help for more details
 
 Virtual patient recruitment and scanning can be chained together using the pipe `|` operator like so
 
@@ -115,9 +115,9 @@ Virtual patient recruitment and scanning can be chained together using the pipe 
 
         recruit example_inclusion_criteria.toml | generate
 
-Images and any hemorrhage segmentation masks will be saved in DICOM format in subdirectories under the selected `output_directory` specified in the study `input csv <default_study/default_study.csv>`_
+Images and any hemorrhage segmentation masks will be saved in DICOM format in subdirectories under the selected `output_directory` specified in the study list, a csv file containing all the planned study parameters, here called `default_study.csv <default_study/default_study.csv>`_.
 
-The output `default_study/default_study.csv` can then be used to reproduce the dataset again later using `generate`
+The output of `recruit <https://github.com/DIDSR/PedSilicoICH/blob/master/pyproject.toml#L45>`_ is the study csv file, here `default_study/default_study.csv <default_study/default_study.csv>`_, that can then be used to reproduce the dataset again later using `generate <https://github.com/DIDSR/PedSilicoICH/blob/master/pyproject.toml#L43>`_.
 
 View a Sample Dataset (local demo)
 ----------------------------------
