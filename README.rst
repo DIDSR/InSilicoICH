@@ -108,7 +108,7 @@ After `pip` installing, 2 command line programs will be available to:
 
 .. code-block:: bash
 
-        generate example_inclusion_criteria.toml
+        recruit example_inclusion_criteria.toml
         > default_study/default_study.csv
 
 The output of generate is a `csv` file, here `default_study.csv <default_study/default_study.csv>`_ which specifies explicitly which patients and scans to run, where each row is a preview of the unique scan to be performed. This file can be made manually or edited.
