@@ -69,12 +69,12 @@ or csv filepath')
 
     ages = [yr for yr in possible_ages if (yr >= min(age)) & (yr <= max(age))]
     kVp_list = kVp if isinstance(kVp, list | tuple) else [kVp]
-    mA_list = kVp if isinstance(mA, list | tuple) else [mA]
+    mA_list = mA if isinstance(mA, list | tuple) else [mA]
     edema_list = list(range(*edema))  # IPH only
 
     if isinstance(seed, float):
         raise ValueError('seed cannot be float, set to False or integer')
-    elif not seed & isinstance(seed, bool):  # check if seed is bool and False
+    elif (not seed) & isinstance(seed, bool):  # check if seed is bool and False
         random = np.random.default_rng()
     elif seed & isinstance(seed, bool):  # check if seed is bool and True
         raise ValueError('seed cannot be True, set to False or integer')
