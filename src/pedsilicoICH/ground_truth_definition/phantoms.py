@@ -356,6 +356,8 @@ class HeadPhantom(Phantom):
 
     def apply_transform(self, transform: RandAffine | Affine, seed=None):
         if not self._lesion:
+            if seed:
+                transform.set_random_state(seed=seed)
             self._phantom = transform(self._phantom)
             return
         self._phantom, self._lesion[0] =\
