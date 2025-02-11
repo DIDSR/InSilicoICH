@@ -85,11 +85,18 @@ See example conda install instructions `here <https://docs.anaconda.com/minicond
 .. code-block:: bash
 
         # Best practice, use an environment rather than install in the base env
-        conda create -n my-env
+        conda create -n "my-env" python=3.11.9 # tested on python=>3.11 and <3.13>
         conda activate my-env
         pip install git+https://github.com/DIDSR/PedSilicoICH.git
 
-Tested on python=>3.11 and <3.13
+**Phantom downloads**
+Base phantom files (currently NIHPD and MIDA) should be stored in a common phantom directory, defined as environment variable 'PHANTOM_DIRECTORY'. MIDA phantom files must be `downloaded manually <https://itis.swiss/virtual-population/regional-human-models/mida-model/>`_, while NIHPD files are downloaded automatically or can be found `here <https://www.bic.mni.mcgill.ca/ServicesAtlases/NIHPD-obj1>`_.
+
+Two options are available:
+1. Create a file called '.env' in this project's working directory and add:
+.. code-block:: bash
+        PHANTOM_DIRECTORY=/path/to/phantoms
+2. Or, in your terminal, 'export PHANTOM_DIRECTORY=/path/to/phantoms'
 
 Usage
 -----
