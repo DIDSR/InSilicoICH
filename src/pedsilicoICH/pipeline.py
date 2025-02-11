@@ -27,7 +27,7 @@ import pandas as pd
 
 from pedsilicoICH.study import run_study
 
-LESION_TYPES = ['round', 'epidural', 'subdural']
+LESION_TYPES = ['IPH', 'EDH', 'SDH']
 
 
 def pedsilicoich(input_csv, output_directory=None, keep_raw=False):
