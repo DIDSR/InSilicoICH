@@ -1,4 +1,4 @@
-Synthetic Intracranial Hemorrhage Modeling Tools
+InSilicoICH: Synthetic Intracranial Hemorrhage Modeling Tools
 ================================================
 
 |tests|
@@ -56,15 +56,15 @@ The knowledge-based algorithm allows the following parameters to be controlled w
 .. _Age [6.5-38 years]: https://github.com/DIDSR/PedSilicoICH/blob/872ee48dd42fb13b9d8a759feb1dac8f0d73a079/src/pedsilicoICH/ground_truth_definition/phantoms.py#L567-L568
 .. _Reconstruction kernel: https://github.com/xcist/main/blob/master/gecatsim/cfg/Recon_Default.cfg#L9-L11
 
-Below are example simulation outputs:
+Below are example simulation outputs using the `MIDA anatomical model <https://pmc.ncbi.nlm.nih.gov/articles/PMC4406723/>` as the ground truth phantom:
 
-.. image:: assets/montage.png
+.. image:: assets/MIDA_montage_noMask.png
         :width: 800
         :align: center
 
-Note, the CT simulations also include `methods for extracting ground truth segmentation masks <https://github.com/DIDSR/PedSilicoICH/blob/master/src/pedsilicoICH/image_acquisition.py#L222>`_ of the inserted ICH for generating segmentation datasets.
+Note, the CT simulations also include `methods for extracting ground truth segmentation masks <https://github.com/DIDSR/PedSilicoICH/blob/master/src/pedsilicoICH/image_acquisition.py#L222>`_ of the inserted ICH for generating segmentation datasets:
 
-.. image:: assets/ich_masks.png
+.. image:: assets/MIDA_montage_Mask.png
         :width: 800
         :align: center
 
