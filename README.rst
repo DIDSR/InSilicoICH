@@ -56,7 +56,7 @@ The knowledge-based algorithm allows the following parameters to be controlled w
 .. _Age [6.5-38 years]: https://github.com/DIDSR/PedSilicoICH/blob/872ee48dd42fb13b9d8a759feb1dac8f0d73a079/src/pedsilicoICH/ground_truth_definition/phantoms.py#L567-L568
 .. _Reconstruction kernel: https://github.com/xcist/main/blob/master/gecatsim/cfg/Recon_Default.cfg#L9-L11
 
-Below are example simulation outputs using the `MIDA anatomical model <https://pmc.ncbi.nlm.nih.gov/articles/PMC4406723/>` as the ground truth phantom:
+Below are example simulation outputs using the `MIDA anatomical model <https://pmc.ncbi.nlm.nih.gov/articles/PMC4406723/>`_ as the ground truth phantom:
 
 .. image:: assets/MIDA_montage_noMask.png
         :width: 800
