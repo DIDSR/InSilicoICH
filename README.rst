@@ -119,14 +119,14 @@ See the included `jupyter notebooks <notebooks/tutorials>`_ for example programm
 
 After `pip` installing, 2 command line programs will be available:
 
-1. 'recruit' which creates a csv of virtual patients to be imaged defined by a `.toml file<example_inclusion_criteria.toml>`_ which specifies the range and distribution of patient, hemorrhage, and acquisition parameters to sample from.
+1. 'recruit' which creates a csv of virtual patients to be imaged defined by a `.toml file <example_inclusion_criteria.toml>`_ which specifies the range and distribution of patient, hemorrhage, and acquisition parameters to sample from.
 
 .. code-block:: bash
 
         recruit example_inclusion_criteria.toml
         > default_study/default_study.csv
 
-The output .csv file `(example)<default_study/default_study.csv>`_ specifies explicitly which patients and scans to run, where each row is a preview of the unique scan to be performed. This file can be made manually or edited.
+The output .csv file (`example <default_study/default_study.csv>`_) specifies explicitly which patients and scans to run, where each row is a preview of the unique scan to be performed. This file can be made manually or edited.
 
 See **recruit --help** for more details on how to run the program and `example_inclusion_criteria.toml <example_inclusion_criteria.toml>`_ for more details on parameter ranges to sample.
 
