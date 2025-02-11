@@ -90,10 +90,13 @@ See example conda install instructions `here <https://docs.anaconda.com/minicond
         pip install git+https://github.com/DIDSR/PedSilicoICH.git
 
 **Phantom downloads**
+
 Base phantom files (currently NIHPD and MIDA) should be stored in a common phantom directory, defined as environment variable 'PHANTOM_DIRECTORY'. MIDA phantom files must be `downloaded manually <https://itis.swiss/virtual-population/regional-human-models/mida-model/>`_, while NIHPD files are downloaded automatically or can be found `here <https://www.bic.mni.mcgill.ca/ServicesAtlases/NIHPD-obj1>`_.
 
 Two options are available:
+
 1. Create a file called '.env' in this project's working directory and add:
+
 .. code-block:: bash
         PHANTOM_DIRECTORY=/path/to/phantoms
 2. Or, in your terminal, 'export PHANTOM_DIRECTORY=/path/to/phantoms'
@@ -114,36 +117,34 @@ See the included `jupyter notebooks <notebooks/tutorials>`_ for example programm
 
 **Command Line Usage**
 
-After `pip` installing, 2 command line programs will be available to:
+After `pip` installing, 2 command line programs will be available:
 
-1. `recruit` which creates a csv of virtual patients to be imaged when given an `inclusion_criteria.toml <example_inclusion_criteria.toml>`_ file which specifies the range and distribution of patient, disease, and acquisition parameters to sample from when recruiting a virtual imaging trial
+1. 'recruit' which creates a csv of virtual patients to be imaged defined by a `.toml file<example_inclusion_criteria.toml>`_ which specifies the range and distribution of patient, hemorrhage, and acquisition parameters to sample from.
 
 .. code-block:: bash
 
         recruit example_inclusion_criteria.toml
         > default_study/default_study.csv
 
-The output of generate is a `csv` file, here `default_study.csv <default_study/default_study.csv>`_ which specifies explicitly which patients and scans to run, where each row is a preview of the unique scan to be performed. This file can be made manually or edited.
+The output .csv file `(example)<default_study/default_study.csv>`_ specifies explicitly which patients and scans to run, where each row is a preview of the unique scan to be performed. This file can be made manually or edited.
 
-See **recruit --help** for more details on how to run the program and `example_inclusion_criteria.toml <example_inclusion_criteria.toml>`_ for more details on the choosing parameter ranges to sample.
+See **recruit --help** for more details on how to run the program and `example_inclusion_criteria.toml <example_inclusion_criteria.toml>`_ for more details on parameter ranges to sample.
 
-2. `generate` takes the recruited patient `.csv` list and runs the scans in the list.
+2. 'generate' takes the recruited patient .csv list and runs all scans:
 
 .. code-block:: bash
 
         generate default_study/default_study.csv
 
-See **generate --help** help for more details
+See **generate --help** for more details
 
-Virtual patient recruitment and scanning can be chained together using the pipe `|` operator like so
+Virtual patient recruitment and scanning can be chained together using the pipe `|` operator like so:
 
 .. code-block:: bash
 
         recruit example_inclusion_criteria.toml | generate
 
-Images and any hemorrhage segmentation masks will be saved in DICOM format in subdirectories under the selected `output_directory` specified in the study list, a csv file containing all the planned study parameters, here called `default_study.csv <default_study/default_study.csv>`_.
-
-The output of `recruit <https://github.com/DIDSR/PedSilicoICH/blob/master/pyproject.toml#L45>`_ is the study csv file, here `default_study/default_study.csv <default_study/default_study.csv>`_, that can then be used to reproduce the dataset again later using `generate <https://github.com/DIDSR/PedSilicoICH/blob/master/pyproject.toml#L43>`_.
+Images and any hemorrhage segmentation masks will be saved in DICOM format in subdirectories under the 'output_directory' specified in the `study .csv <default_study/default_study.csv>`_.
 
 View a Sample Dataset (local demo)
 ----------------------------------
