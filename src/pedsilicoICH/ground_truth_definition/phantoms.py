@@ -20,7 +20,7 @@ from . import dicom_to_voxelized_phantom
 from ..artifact_generation import transform_image_label_pair
 
 from ..lesion_definition import (elliptical_lesion,
-                                 insert_dural_3D,
+                                 insert_dural,
                                  warp_slice,
                                  get_perimeter)
 from scipy.ndimage import (center_of_mass,
@@ -184,7 +184,7 @@ def load_phantom(age=38, shape=None, name='default'):
     :param age: patient age in years, MIDA currently hard coded at 38 yrs
     :param shape: shape of that the ground truth phantom will be interpolated
     :param name: patient name to be saved in DICOM header
-    :param lesion_type: options include: ['round', 'epidural', 'subdural']
+    :param lesion_type: options include: ['IPH', 'EDH', 'SDH']
     :param radius: lesion radius if sphere is selected
     :param intensity: uniform intensity of the lesion (HU)
     :param add_positioning_augmentation: bool, apply random affine to phantom
@@ -290,7 +290,7 @@ class HeadPhantom(Phantom):
         pass
 
     def get_dura_map(self):
-        'used for epidural, subdural lesion insertion'
+        'used for EDH, SDH lesion insertion'
         pass
 
     def get_skull_map(self):
@@ -318,7 +318,7 @@ class HeadPhantom(Phantom):
         inserts lesion of `lesion_type` into phantom array
 
         :param lesion_type: str, options include
-            ['round', 'epidural', 'subdural'],
+            ['IPH', 'EDH', 'SDH'],
             see associated methods `add_round_lesion`, `_add_dural_lesion`
         :param volume: in mL, volume of the lesion
         :param intensity: lesion CT number in HU
@@ -333,21 +333,22 @@ class HeadPhantom(Phantom):
             return self
         self.lesion_type.append(lesion_type)
         self.mass_effect = mass_effect
-        if lesion_type == 'round':
+        if lesion_type == 'IPH':
             img_w_lesion, lesion_image, lesion_coords =\
                 self.add_round_lesion(volume=volume,
                                       intensity=intensity,
                                       mass_effect=mass_effect,
                                       seed=seed,
                                       **kwargs)
-        elif lesion_type in ['epidural', 'subdural']:
+        elif lesion_type in ['EDH', 'SDH']:
             img_w_lesion, lesion_image, lesion_coords =\
                 self._add_dural_lesion(volume, lesion_type, intensity,
                                        mass_effect=mass_effect,
                                        seed=seed)
         else:
             raise ValueError(f'unknown lesion type passed: {lesion_type}\
-                             currently accepts round, epidural, or subdural')
+                             currently accepts IPH (intraparenchymal),\
+                                 EDH (epidural), or SDH (subdural)')
         self._phantom = img_w_lesion
         self._lesion.append(lesion_image)
         self._lesion_coords.append(lesion_coords)
@@ -466,11 +467,12 @@ large, try smaller volume')
                           seed=None, mass_effect=True):
 
         HU_volume = self.get_CT_number_phantom()
-        lesion_vol, HU_volume = insert_dural_3D(phantom=self,
-                                                desired_volume=volume,
-                                                hematoma_type=lesion_type,
-                                                mass_effect=mass_effect,
-                                                seed=seed)
+        lesion_vol, HU_volume = insert_dural(
+            phantom=self, 
+            desired_volume=volume, 
+            hematoma_type=lesion_type, 
+            mass_effect=mass_effect, 
+            seed=seed)
         if not isinstance(HU_volume, np.ndarray):
             HU_volume = HU_volume.numpy()
 

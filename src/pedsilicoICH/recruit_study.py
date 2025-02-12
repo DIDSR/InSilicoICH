@@ -8,7 +8,8 @@ import numpy as np
 
 from pedsilicoICH.ground_truth_definition.phantoms import possible_ages
 
-LESION_TYPES = ['round', 'epidural', 'subdural']
+# Definitions: IPH/intraparenchymal , EDH/epidural, SDH/subdural
+LESION_TYPES = ['IPH', 'EDH', 'SDH'] 
 
 
 def recruit_patients(output_directory, views=[1000], desired_cases=1,
@@ -108,7 +109,7 @@ or csv filepath')
             vol = 0
             intensity = 0
             edema = 0
-        elif lesion_id == 'epidural':
+        elif lesion_id == 'EDH':
             vol = random.choice(df_volume['EDH_volume'],
                                 p=df_volume['EDH_weight'])
             intensity = 0
@@ -116,7 +117,7 @@ or csv filepath')
                 intensity = random.choice(df_HU['EDH_HU'],
                                           p=df_HU['EDH_weight'])
             edema = 0
-        elif lesion_id == 'subdural':
+        elif lesion_id == 'SDH':
             vol = random.choice(df_volume['SDH_volume'],
                                 p=df_volume['SDH_weight'])
             intensity = 0
@@ -124,7 +125,7 @@ or csv filepath')
                 intensity = random.choice(df_HU['SDH_HU'],
                                           p=df_HU['SDH_weight'])
             edema = 0
-        elif lesion_id == 'round':
+        elif lesion_id == 'IPH':
             vol = random.choice(df_volume['IPH_volume'],
                                 p=df_volume['IPH_weight'])
             while vol > 25:
