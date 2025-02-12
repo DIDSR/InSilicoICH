@@ -324,9 +324,9 @@ def warp_slice(axial_slice, skull_slice, src, dst, hematoma_type):
         # new code to try to "fix" skull warping into brain
         problem_voxels = np.argwhere((skull_slice != 1) & (warped_slice > 50))
         for index in problem_voxels:
-            if hematoma_type == 'epidural' or 'subdural':
+            if hematoma_type == 'EDH' or 'SDH':
                 warped_slice[index[0], index[1]] = 50 # HU value of dura mater
-            elif hematoma_type == 'round':
+            elif hematoma_type == 'IPH':
                 warped_slice[index[0], index[1]] = masked_axial[masked_axial!=0].mean()
 
         # finally, replace all voxels outside brain with original voxels
@@ -336,16 +336,16 @@ def warp_slice(axial_slice, skull_slice, src, dst, hematoma_type):
 
 
 def coverage_from_volume(volume, hematoma_type, slice_thickness):  # see RSNA_BHDS_explore.ipynb for logarithmic fit
-    if hematoma_type == 'epidural':
+    if hematoma_type == 'EDH':
         slice_coverage = 13.942*math.log(volume) + 13.449
-    elif hematoma_type == 'subdural':
+    elif hematoma_type == 'SDH':
         slice_coverage = 17.739*math.log(volume) + 17.314
-    elif hematoma_type == 'sphere':
+    elif hematoma_type == 'IPH':
         slice_coverage = 8.7064*math.log(volume) + 18.148  # for now, this is intraparenchymal
     # unused
-    elif hematoma_type == 'subarachnoid':
+    elif hematoma_type == 'SAH':
         slice_coverage = 17.181*math.log(volume) + 27.42
-    elif hematoma_type == 'intraventricular':
+    elif hematoma_type == 'IVH':
         slice_coverage = 11.341*math.log(volume) + 25.435
     # convert units from mm to number of slices
     slice_coverage = slice_coverage / slice_thickness
