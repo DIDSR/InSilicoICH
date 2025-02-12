@@ -22,7 +22,7 @@ sphere_lesion_tol = 32
 
 def test_sphere_augmented_position_study():
     phantom = load_phantom(age)
-    phantom.insert_lesion('round', volume=5, intensity=300, seed=336)
+    phantom.insert_lesion('IPH', volume=5, intensity=300, seed=336)
     phantom.apply_transform(transform, seed=42)
     lesion_level_mm = (phantom.get_CT_number_phantom().shape[0]/2 -
                        phantom._lesion_coords[0][0])*phantom.dz
@@ -41,7 +41,7 @@ shape = 3*[128]
 
 def test_epidural_augmented_position_study():
     phantom = load_phantom(age, shape=shape)
-    phantom.insert_lesion('epidural', volume=5, intensity=300, seed=336)
+    phantom.insert_lesion('EDH', volume=5, intensity=300, seed=336)
     phantom.apply_transform(transform, seed=42)
     lesion_level_mm = (phantom.get_CT_number_phantom().shape[0]/2 -
                        phantom._lesion_coords[0][0])*phantom.dz
@@ -58,7 +58,7 @@ def test_epidural_augmented_position_study():
 
 def test_subdural_augmented_position_study():
     phantom = load_phantom(age, shape=shape)
-    phantom.insert_lesion('subdural', volume=5, intensity=300, seed=336)
+    phantom.insert_lesion('SDH', volume=5, intensity=300, seed=336)
     phantom.apply_transform(transform, seed=42)
     lesion_level_mm = (phantom.get_CT_number_phantom().shape[0]/2 -
                        phantom._lesion_coords[0][0])*phantom.dz

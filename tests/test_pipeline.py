@@ -85,7 +85,7 @@ def plot_montage(imgs, params, fname):
 
 def test_lesion_characteristics(age=15.75, views=100,
                                 name='tests/images.png'):
-    lesion_types = ['epidural', 'subdural', 'round']
+    lesion_types = ['EDH', 'SDH', 'IPH']
     mass_effect = True
 
     name = Path(name)
@@ -99,7 +99,7 @@ def test_lesion_characteristics(age=15.75, views=100,
     imgs = []
     params = []
     for lesion_type in lesion_types:
-        volumes = np.linspace(0.1, 8, 3) if lesion_type == 'round'\
+        volumes = np.linspace(0.1, 8, 3) if lesion_type == 'IPH'\
             else np.linspace(1, 20, 3)
         intensities = np.linspace(70, 50, 3)
 

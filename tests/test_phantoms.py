@@ -39,7 +39,7 @@ def test_big_epidural_lesion():
     mass_effect = True
     desired_volume = 100
     phantom = load_phantom(age, shape=shape)
-    phantom.insert_lesion('epidural', volume=desired_volume,
+    phantom.insert_lesion('EDH', volume=desired_volume,
                           intensity=intensity,
                           mass_effect=mass_effect,
                           seed=seed)
@@ -55,7 +55,7 @@ def test_big_subdural_lesion():
     desired_volume = 80
     mass_effect = True
     phantom = load_phantom(age, shape=shape)
-    phantom.insert_lesion('subdural', volume=desired_volume,
+    phantom.insert_lesion('SDH', volume=desired_volume,
                           intensity=intensity,
                           mass_effect=mass_effect,
                           seed=seed)
@@ -71,7 +71,7 @@ def test_big_round_lesion():
     desired_volume = 6  # mL
     mass_effect = True
     phantom = load_phantom(age, shape=shape)
-    phantom.insert_lesion('round', volume=desired_volume,
+    phantom.insert_lesion('IPH', volume=desired_volume,
                           intensity=intensity,
                           mass_effect=mass_effect,
                           seed=seed, complexity=1)
@@ -87,7 +87,7 @@ def test_volume_accuracy_full_matrix():
     desired_volume = 6  # mL
     mass_effect = False
     phantom = load_phantom(age)
-    phantom.insert_lesion('round', volume=desired_volume,
+    phantom.insert_lesion('IPH', volume=desired_volume,
                           intensity=intensity, seed=seed,
                           mass_effect=mass_effect,
                           complexity=1)
