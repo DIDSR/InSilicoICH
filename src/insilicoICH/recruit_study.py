@@ -6,7 +6,7 @@ import tomllib
 import pandas as pd
 import numpy as np
 
-from pedsilicoICH.ground_truth_definition.phantoms import possible_ages
+from insilicoICH.ground_truth_definition.phantoms import possible_ages
 
 # Definitions: IPH/intraparenchymal , EDH/epidural, SDH/subdural
 LESION_TYPES = ['IPH', 'EDH', 'SDH'] 

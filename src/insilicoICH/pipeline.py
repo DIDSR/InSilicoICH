@@ -25,12 +25,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from pedsilicoICH.study import run_study
+from insilicoICH.study import run_study
 
 LESION_TYPES = ['IPH', 'EDH', 'SDH']
 
 
-def pedsilicoich(input_csv, output_directory=None, keep_raw=False):
+def insilicoich(input_csv, output_directory=None, keep_raw=False):
 
     params = pd.read_csv(input_csv)
     n_params = len(params)
@@ -76,7 +76,7 @@ def flatten_dict(layered_dict):
     return config
 
 
-def pedsilicoich_cli():
+def insilicoich_cli():
     parser = ArgumentParser(
         description='Runs XCIST CT simulations of ICH models',
         epilog='''
@@ -104,8 +104,8 @@ def pedsilicoich_cli():
         input_csv = sys.stdin.read().strip()
     else:
         parser.print_help()
-    pedsilicoich(input_csv, args.keep_raw)
+    insilicoich(input_csv, args.keep_raw)
 
 
 if __name__ == '__main__':
-    pedsilicoich_cli()
+    insilicoich_cli()

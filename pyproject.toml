@@ -1,5 +1,5 @@
 [project]
-name = "PedSilicoICH"
+name = "InSilicoICH"
 version = "0.1.0"
 authors = [
   {name="Brandon Nelson", email="brandon.nelson@fda.hhs.gov"},
@@ -36,10 +36,10 @@ include-package-data = true
 where = ["src"]
 
 [project.urls]
-Homepage = "https://github.com/brandonjnelsonFDA/PedSilicoICH"
-Issues = "https://github.com/brandonjnelsonFDA/PedSilicoICH/issues"
+Homepage = "https://github.com/DIDSR/InSilicoICH"
+Issues = "https://github.com/DIDSR/InSilicoICH/issues"
 
 [project.scripts]
-generate = "pedsilicoICH.pipeline:pedsilicoich_cli"
-pedsilicoich = "pedsilicoICH.pipeline:pedsilicoich_cli" # keeping for now for backwards compatibility
-recruit = "pedsilicoICH.recruit_study:recruitment_cli"
+generate = "insilicoICH.pipeline:insilicoich_cli"
+insilicoich = "insilicoICH.pipeline:insilicoich_cli" # keeping for now for backwards compatibility
+recruit = "insilicoICH.recruit_study:recruitment_cli"
