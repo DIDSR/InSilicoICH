@@ -7,10 +7,10 @@ InSilicoICH: Synthetic Intracranial Hemorrhage Modeling Tools
         :width: 800
         :align: center
 
-.. |tests| image:: https://github.com/brandonjnelsonFDA/PedSilicoICH/actions/workflows/python-app.yml/badge.svg?branch=master
+.. |tests| image:: https://github.com/brandonjnelsonFDA/InSilicoICH/actions/workflows/python-app.yml/badge.svg?branch=master
     :alt: Package Build and Testing Status
     :scale: 100%
-    :target: https://github.com/brandonjnelsonFDA/PedSilicoICH/actions/workflows/python-app.yml
+    :target: https://github.com/brandonjnelsonFDA/InSilicoICH/actions/workflows/python-app.yml
 
 This repository contains tools for generating synthetic non contrast CT datasets of intracranial hemorrhage (ICH) that can be used for evaluating AI detection devices.
 
@@ -53,7 +53,7 @@ The knowledge-based algorithm allows the following parameters to be controlled w
 |                            | Edema [0-15 voxels] (IPH only)                       | `Reconstruction kernel`_                  |                                 |
 +----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
 
-.. _Age [6.5-38 years]: https://github.com/DIDSR/PedSilicoICH/blob/872ee48dd42fb13b9d8a759feb1dac8f0d73a079/src/pedsilicoICH/ground_truth_definition/phantoms.py#L567-L568
+.. _Age [6.5-38 years]: https://github.com/DIDSR/InSilicoICH/blob/872ee48dd42fb13b9d8a759feb1dac8f0d73a079/src/InSilicoICH/ground_truth_definition/phantoms.py#L567-L568
 .. _Reconstruction kernel: https://github.com/xcist/main/blob/master/gecatsim/cfg/Recon_Default.cfg#L9-L11
 
 Below are example simulation outputs using the `MIDA anatomical model <https://pmc.ncbi.nlm.nih.gov/articles/PMC4406723/>`_ as the ground truth phantom:
@@ -62,7 +62,7 @@ Below are example simulation outputs using the `MIDA anatomical model <https://p
         :width: 800
         :align: center
 
-Note, the CT simulations also include `methods for extracting ground truth segmentation masks <https://github.com/DIDSR/PedSilicoICH/blob/master/src/pedsilicoICH/image_acquisition.py#L222>`_ of the inserted ICH for generating segmentation datasets:
+Note, the CT simulations also include `methods for extracting ground truth segmentation masks <https://github.com/DIDSR/InSilicoICH/blob/master/src/InSilicoICH/image_acquisition.py#L222>`_ of the inserted ICH for generating segmentation datasets:
 
 .. image:: assets/MIDA_montage_Mask.png
         :width: 800
@@ -76,7 +76,7 @@ In a new python environment, run the following if using pip or conda:
 
 .. code-block:: bash
 
-        pip install git+https://github.com/DIDSR/PedSilicoICH.git
+        pip install git+https://github.com/DIDSR/InSilicoICH.git
 
 **Conda**
 
@@ -87,7 +87,7 @@ See example conda install instructions `here <https://docs.anaconda.com/minicond
         # Best practice, use an environment rather than install in the base env
         conda create -n "my-env" python=3.11.9 # tested on python=>3.11 and <3.13>
         conda activate my-env
-        pip install git+https://github.com/DIDSR/PedSilicoICH.git
+        pip install git+https://github.com/DIDSR/InSilicoICH.git
 
 **Phantom downloads**
 
@@ -108,8 +108,8 @@ The synthetic data generation and image simulation tools included in this repo c
 
 .. code-block:: bash
 
-        git clone https://github.com/DIDSR/PedSilicoICH.git
-        cd PedSilicoICH
+        git clone https://github.com/DIDSR/InSilicoICH.git
+        cd InSilicoICH
 
 **Programmatic Usage**
 
