@@ -95,10 +95,12 @@ Base phantom files (currently NIHPD and MIDA) should be stored in a common phant
 
 Two options are available:
 
-1. Create a file called '.env' in this project's working directory and add:
+1. Create a file called '.env' in this project's working directory with the below line. Afterwards, reinstall InSilicoICH with 'pip install -e <InSilicoICH path>'.
 
 .. code-block:: bash
+
         PHANTOM_DIRECTORY=/path/to/phantoms
+
 2. Or, in your terminal, 'export PHANTOM_DIRECTORY=/path/to/phantoms'
 
 Usage
