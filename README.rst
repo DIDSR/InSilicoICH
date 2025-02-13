@@ -7,10 +7,10 @@ InSilicoICH: Synthetic Intracranial Hemorrhage Modeling Tools
         :width: 800
         :align: center
 
-.. |tests| image:: https://github.com/brandonjnelsonFDA/InSilicoICH/actions/workflows/python-app.yml/badge.svg?branch=master
+.. |tests| image:: https://github.com/DIDSR/InSilicoICH/actions/workflows/python-app.yml/badge.svg?branch=master
     :alt: Package Build and Testing Status
     :scale: 100%
-    :target: https://github.com/brandonjnelsonFDA/InSilicoICH/actions/workflows/python-app.yml
+    :target: https://github.com/DIDSR/InSilicoICH/actions/workflows/python-app.yml
 
 This repository contains tools for generating synthetic non contrast CT datasets of intracranial hemorrhage (ICH) that can be used for evaluating AI detection devices.
 
@@ -190,9 +190,9 @@ See Also
 --------
 
 - `PedSilicoAbdomen <https://github.com/DIDSR/PedSilicoAbdomen>`_ for generating synthetic abdominal non contrast CT datasets
-- `PedSilicoLVO <https://github.com/brandonjnelsonFDA/PedSilicoLVO>`_ for generating synthetic large vessel occlusion (LVO) non contrast CT datasets
+- `PedSilicoLVO <https://github.com/DIDSR/PedSilicoLVO>`_ for generating synthetic large vessel occlusion (LVO) non contrast CT datasets
 - `Virtual Imaging Tools (VITools) <https://github.com/DIDsr/vitools>`_ tools for running virtual imaging trials including image acquisition frameworks
-- `Wait time assessments for ICH CADt VIT <https://github.com/brandonjnelsonFDA/ICH-CADt-VIT>`_
+- `Wait time assessments for ICH CADt VIT <https://github.com/DIDSR/ICH-CADt-VIT>`_
 
 Disclaimer
 ----------
