@@ -1,5 +1,5 @@
 '''
-test low level pedsilicoich phantom generation functionality
+test low level insilicoich phantom generation functionality
 '''
 from pathlib import Path
 import os
@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 from monai.transforms import RandAffine
 import numpy as np
 
-from pedsilicoICH.ground_truth_definition.utils import download_and_extract_archive
-from pedsilicoICH.ground_truth_definition.phantoms import load_phantom
+from insilicoICH.ground_truth_definition.utils import download_and_extract_archive
+from insilicoICH.ground_truth_definition.phantoms import load_phantom
 
 nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
 
