@@ -40,6 +40,6 @@ Homepage = "https://github.com/DIDSR/InSilicoICH"
 Issues = "https://github.com/DIDSR/InSilicoICH/issues"
 
 [project.scripts]
-generate = "pedsilicoICH.pipeline:insilicoich_cli"
-insilicoich = "pedsilicoICH.pipeline:insilicoich_cli" # keeping for now for backwards compatibility
-recruit = "pedsilicoICH.recruit_study:recruitment_cli"
+generate = "insilicoICH.pipeline:insilicoich_cli"
+insilicoich = "insilicoICH.pipeline:insilicoich_cli" # keeping for now for backwards compatibility
+recruit = "insilicoICH.recruit_study:recruitment_cli"

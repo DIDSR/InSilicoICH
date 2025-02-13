@@ -2,8 +2,7 @@ notebooks/.ipynb_checkpoints
 .ipynb_checkpoints
 notebooks/__pycache__
 .vscode
-.PedSilicoICH
-.PedsilicoICH
+.InSilicoICH
 .pytest_cache
 notebooks/*/*.png
 build
@@ -24,7 +23,7 @@ notebooks/*.csv
 *.cfg
 __pycache__
 *.nii
-src/PedSilicoICH.egg-info
+src/InSilicoICH.egg-info
 .env
 tests/*.png
 lesions.png

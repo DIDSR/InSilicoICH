@@ -1,5 +1,5 @@
-include src/pedsilicoICH/defaults/*
-include src/pedsilicoICH/ground_truth_definition/MIDA_v1.csv
-include src/pedsilicoICH/distributions/*
-include src/pedsilicoICH/configs/default.toml
-include src/pedsilicoICH/annotations/suture/NIHPD_Head_Phantom/labelmap.nrrd
+include src/insilicoICH/defaults/*
+include src/insilicoICH/ground_truth_definition/MIDA_v1.csv
+include src/insilicoICH/distributions/*
+include src/insilicoICH/configs/default.toml
+include src/insilicoICH/annotations/suture/NIHPD_Head_Phantom/labelmap.nrrd
