@@ -90,7 +90,7 @@ def test_volume_accuracy_full_matrix():
     phantom.insert_lesion('IPH', volume=desired_volume,
                           intensity=intensity, seed=seed,
                           mass_effect=mass_effect,
-                          complexity=1)
+                          complexity=3)
     measured_volume = phantom._lesion[0].sum() *\
         (phantom.dx*phantom.dy*phantom.dz)/1000
     rel_vol_error = (desired_volume - measured_volume)/desired_volume*100
