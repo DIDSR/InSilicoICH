@@ -300,6 +300,13 @@ class HeadPhantom(Phantom):
     def get_lesion_mask(self):
         return self._lesion[0]
 
+    def get_lesion_volume(self, unit='mL'):
+        vol_mm3 = self.dx*self.dy*self.dz*self.get_lesion_mask().sum()
+        if unit == 'mm3':
+            return vol_mm3
+        if unit == 'mL':
+            return vol_mm3/1000
+
     def __repr__(self) -> str:
         repr = super().__repr__() + f'''
         Number of lesions: {len(self._lesion_coords)}
@@ -376,7 +383,7 @@ class HeadPhantom(Phantom):
                          edema: bool | int = False,
                          complexity: int = 3,
                          overlap: float = 0.4,
-                         seed: int | None = None) -> tuple:
+                         seed: int | None = None, correction=1.25) -> tuple:
         '''
         adds round lesion to img in random location within mask of size radius
         and intensity level intensity
@@ -432,6 +439,8 @@ large, try smaller volume')
         for _ in range(complexity):
             axes = get_semi_major_axes(eccentricity, seed)
             foci = r * axes
+            if correction:
+                foci = foci/correction
             sphere = elliptical_lesion(img.shape, center=(z, x, y),
                                        radius=foci,
                                        random_rotate=seed)

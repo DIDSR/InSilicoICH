@@ -5,6 +5,8 @@ notebooks/__pycache__
 .InSilicoICH
 .pytest_cache
 notebooks/*/*.png
+.PedsilicoICH
+src/PedSilicoICH.egg-info
 build
 
 batchmode_CT_dataset_pipeline.sge
