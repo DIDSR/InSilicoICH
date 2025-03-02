@@ -109,3 +109,22 @@ def test_transforms(threshold=-585):
         phantom.apply_transform(transform)
         test_val = phantom.get_CT_number_phantom().mean()
         assert test_val > threshold
+
+
+def mse(x, y): return np.mean((x-y)**2)
+
+
+def check_volumes(inputs=list(range(1, 10)), complexity=3):
+    outs = []
+    for input_vol in inputs:
+        phantom = load_phantom(6.5)
+        phantom.insert_lesion(lesion_type='IPH', volume=input_vol,
+                              complexity=complexity)
+        outs.append(phantom.get_lesion_volume())
+    return outs
+
+
+def test_IPH_volume_accuracy():
+    inputs = np.linspace(1, 70, 3)
+    corrected = check_volumes(inputs=inputs, complexity=3)
+    assert mse(inputs, corrected) < 30

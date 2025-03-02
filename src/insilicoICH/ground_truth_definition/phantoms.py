@@ -383,7 +383,7 @@ class HeadPhantom(Phantom):
                          edema: bool | int = False,
                          complexity: int = 3,
                          overlap: float = 0.4,
-                         seed: int | None = None, correction=1.25) -> tuple:
+                         seed: int | None = None) -> tuple:
         '''
         adds round lesion to img in random location within mask of size radius
         and intensity level intensity
@@ -439,8 +439,8 @@ large, try smaller volume')
         for _ in range(complexity):
             axes = get_semi_major_axes(eccentricity, seed)
             foci = r * axes
-            if correction:
-                foci = foci/correction
+            correction = 3/4*np.pow(complexity*overlap, 1/3)
+            foci = foci*correction
             sphere = elliptical_lesion(img.shape, center=(z, x, y),
                                        radius=foci,
                                        random_rotate=seed)
