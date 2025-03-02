@@ -67,9 +67,9 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
                                       slice_thickness=phantom.dz)
     ab = (desired_volume*2000)/(num_slices * phantom.dz)  # using ABC/2 formula (although /2000 for mL and mm)
     if hematoma_type == 'EDH':
-        desired_distance = math.sqrt(4*ab) # assume that length of epidural hemorrhage is about 4 times the width
+        desired_distance = math.sqrt(3*ab) # assume that length of epidural hemorrhage is about 3 times the width
     elif hematoma_type == 'SDH':
-        desired_distance = math.sqrt(8*ab) # assume that length of epidural hemorrhage is about 4 times the width
+        desired_distance = math.sqrt(7*ab) # assume that length of epidural hemorrhage is about 7 times the width
 
     HU_array = phantom.get_CT_number_phantom()
 
