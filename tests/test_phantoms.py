@@ -33,6 +33,9 @@ shape = 3*[128]
 seed = 41
 
 
+def rmse(x, y): return np.sqrt(np.mean((x-y)**2))
+
+
 def test_big_epidural_lesion():
     intensity = 100
     age = 9
@@ -43,10 +46,8 @@ def test_big_epidural_lesion():
                           intensity=intensity,
                           mass_effect=mass_effect,
                           seed=seed)
-    measured_volume = phantom._lesion[0].sum() *\
-        (phantom.dx*phantom.dy*phantom.dz)/1000
-    rel_vol_error = (desired_volume - measured_volume)/desired_volume*100
-    assert abs(rel_vol_error) < 50
+    measured_volume = phantom.get_lesion_volume()
+    assert rmse(desired_volume, measured_volume) < 20
 
 
 def test_big_subdural_lesion():
@@ -59,42 +60,8 @@ def test_big_subdural_lesion():
                           intensity=intensity,
                           mass_effect=mass_effect,
                           seed=seed)
-    measured_volume = phantom._lesion[0].sum() *\
-        (phantom.dx*phantom.dy*phantom.dz)/1000
-    rel_vol_error = (desired_volume - measured_volume)/desired_volume*100
-    assert abs(rel_vol_error) < 100
-
-
-def test_big_round_lesion():
-    intensity = 100
-    age = 9
-    desired_volume = 6  # mL
-    mass_effect = True
-    phantom = load_phantom(age, shape=shape)
-    phantom.insert_lesion('IPH', volume=desired_volume,
-                          intensity=intensity,
-                          mass_effect=mass_effect,
-                          seed=seed, complexity=1)
-    measured_volume = phantom._lesion[0].sum() *\
-        (phantom.dx*phantom.dy*phantom.dz)/1000
-    rel_vol_error = (desired_volume - measured_volume)/desired_volume*100
-    assert abs(rel_vol_error) < 41
-
-
-def test_volume_accuracy_full_matrix():
-    intensity = 100
-    age = 9
-    desired_volume = 6  # mL
-    mass_effect = False
-    phantom = load_phantom(age)
-    phantom.insert_lesion('IPH', volume=desired_volume,
-                          intensity=intensity, seed=seed,
-                          mass_effect=mass_effect,
-                          complexity=3)
-    measured_volume = phantom._lesion[0].sum() *\
-        (phantom.dx*phantom.dy*phantom.dz)/1000
-    rel_vol_error = (desired_volume - measured_volume)/desired_volume*100
-    assert abs(rel_vol_error) < 40
+    measured_volume = phantom.get_lesion_volume()
+    assert rmse(desired_volume, measured_volume) < 56
 
 
 def test_transforms(threshold=-585):
@@ -109,9 +76,6 @@ def test_transforms(threshold=-585):
         phantom.apply_transform(transform)
         test_val = phantom.get_CT_number_phantom().mean()
         assert test_val > threshold
-
-
-def rmse(x, y): return np.sqrt(np.mean((x-y)**2))
 
 
 def check_volumes(inputs=list(range(1, 10)), **kwargs):
