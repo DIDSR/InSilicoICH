@@ -439,7 +439,19 @@ large, try smaller volume')
         for _ in range(complexity):
             axes = get_semi_major_axes(eccentricity, seed)
             foci = r * axes
-            correction = 3/4*np.pow(complexity*overlap, 1/3)
+            if complexity > 1:
+                correction = np.pow(3/(4*np.pi*complexity), 1/3)+overlap
+            else:
+                correction = 1
+            # Vol of sphere: V = 4/3*np.pi*r**3, solve for r:
+            # r = np.pow(3*V/(4*np.pi))
+            # if complexity (assuming overlap=0) increases volume by
+            # complexity*V, by what factor must radius
+            # be decreased to maintain constant volume, substitute
+            # V-->V/V*complexity-->1/complexity
+            # correction = np.pow(3/(4*np.pi*complexity))
+            # finally add allowed overlap to radius
+            # correction = np.pow(3/(4*np.pi*complexity), 1/3)+overlap (BJN)
             foci = foci*correction
             sphere = elliptical_lesion(img.shape, center=(z, x, y),
                                        radius=foci,

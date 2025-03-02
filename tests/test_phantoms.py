@@ -111,20 +111,27 @@ def test_transforms(threshold=-585):
         assert test_val > threshold
 
 
-def mse(x, y): return np.mean((x-y)**2)
+def rmse(x, y): return np.sqrt(np.mean((x-y)**2))
 
 
-def check_volumes(inputs=list(range(1, 10)), complexity=3):
+def check_volumes(inputs=list(range(1, 10)), **kwargs):
     outs = []
     for input_vol in inputs:
         phantom = load_phantom(6.5)
-        phantom.insert_lesion(lesion_type='IPH', volume=input_vol,
-                              complexity=complexity)
+        phantom.insert_lesion(lesion_type='IPH', volume=input_vol, **kwargs)
         outs.append(phantom.get_lesion_volume())
     return outs
 
 
 def test_IPH_volume_accuracy():
+    '''
+    tests IPH volume accuracy across different degress of IPH
+    complexity (multiple sub IPHs) `complexity`>1 and `overlap`
+    of these sub IPHs
+    '''
     inputs = np.linspace(1, 70, 3)
-    corrected = check_volumes(inputs=inputs, complexity=3)
-    assert mse(inputs, corrected) < 30
+    for overlap in [0.2, 0.4]:
+        for complexity in range(1, 4):
+            corrected = check_volumes(inputs=inputs, complexity=complexity,
+                                      overlap=overlap, seed=seed)
+            assert rmse(inputs, corrected) < 20
