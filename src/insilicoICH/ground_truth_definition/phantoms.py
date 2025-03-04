@@ -489,10 +489,10 @@ large, try smaller volume')
 
         HU_volume = self.get_CT_number_phantom()
         lesion_vol, HU_volume = insert_dural(
-            phantom=self, 
-            desired_volume=volume, 
-            hematoma_type=lesion_type, 
-            mass_effect=mass_effect, 
+            phantom=self,
+            desired_volume=volume,
+            hematoma_type=lesion_type,
+            mass_effect=mass_effect,
             seed=seed)
         if not isinstance(HU_volume, np.ndarray):
             HU_volume = HU_volume.numpy()
@@ -791,10 +791,25 @@ from {self.phantom_dir}')
                                                 mode='inner',
                                                 background=0)
 
-    def get_skull_map(self):
+    def get_skull_map_old(self):
         '''obtains rudimentary mask of skull voxels using threshold of
         proton-density weighted image and full mask'''
         skull_map = (self.mask == 0)*self.pdw / self.pdw.max()
         skull_map[skull_map < 0.1] = 0
         skull_map[skull_map > 0] = 1
         return skull_map
+
+    def get_skull_map(self):
+        '''obtains mask of skull voxels'''
+        vol = self.pdw
+        mask = self.mask.astype(bool)
+        thresh = ski.filters.threshold_otsu(vol)
+        brain_and_extracranial = vol > thresh
+        brain_and_extracranial = brain_and_extracranial |\
+            binary_erosion(mask, np.ones(3*[7]))
+        head = np.stack([
+            ski.morphology.area_closing(o, area_threshold=o.sum()/2)
+                        for o in brain_and_extracranial
+                        ])
+        skull = (~brain_and_extracranial) & head
+        return skull
