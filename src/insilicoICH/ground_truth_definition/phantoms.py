@@ -293,7 +293,7 @@ class HeadPhantom(Phantom):
         'used for EDH, SDH lesion insertion'
         pass
 
-    def get_skull_map(self):
+    def get_skull_map(self, method):
         'used for lesion insertion mass effect warping'
         pass
 
@@ -476,7 +476,7 @@ large, try smaller volume')
                 mass_effect = 0.5
             warped = insert_with_mass_effect(img,
                                              lesion_mask,
-                                             self.get_skull_map(),
+                                             self.get_skull_map(method='otsu'),
                                              strength=mass_effect)
             warped[lesion_mask] = img_w_lesion[lesion_mask]
             img_w_lesion[lesion_mask.sum(axis=(1, 2)) > 0] =\
@@ -576,7 +576,7 @@ and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
         dura_map[np.where(self._phantom == 1.0)] = 1.0
         return dura_map
 
-    def get_skull_map(self):
+    def get_skull_map(self, method):
         '''obtains partial skull map using mida atlas,
          ignoring facial bones (for now)'''
         skull_map = np.zeros_like(self._phantom)
@@ -682,7 +682,7 @@ from {self.phantom_dir}')
             self.resize(shape)
 
         self.head_mask = self.get_head_mask()
-        self.skull = self.get_skull_map()
+        self.skull = self.get_skull_map(method='otsu')
         self._phantom = self.get_CT_number_phantom()
 
     def resize(self, shape=None):
@@ -710,7 +710,7 @@ from {self.phantom_dir}')
         src_dir = Path(__file__).parents[1]
         fname = src_dir / 'annotations/suture/NIHPD_Head_Phantom/labelmap.nrrd'
         data = nrrd.read(fname)[0].transpose(2, 1, 0)[::-1, ::-1]
-        skull = self.get_skull_map().astype(bool)
+        skull = self.get_skull_map(method='otsu').astype(bool)
         dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
         if (dx < 0) | (dy < 0) | (dz < 0):
             resizewithcrop = ResizeWithPadOrCrop(spatial_size=skull.shape)
@@ -774,7 +774,7 @@ from {self.phantom_dir}')
                                                 mode='inner',
                                                 background=0)
 
-    def get_skull_map_old(self):
+    def get_skull_map_old(self, method):
         '''obtains rudimentary mask of skull voxels using threshold of
         proton-density weighted image and full mask'''
         skull_map = (self.mask == 0)*self.pdw / self.pdw.max()
@@ -795,13 +795,16 @@ from {self.phantom_dir}')
                         ])
         return head
 
-    def get_skull_map(self):
+    def get_skull_map(self, method):
         '''obtains mask of skull voxels'''
-        vol = self.pdw
-        mask = self.mask.astype(bool)
-        thresh = ski.filters.threshold_otsu(vol)
-        brain_and_extracranial = vol > thresh
-        brain_and_extracranial = brain_and_extracranial | binary_erosion(mask, np.ones(3*[7]))
-        head = self.head_mask
-        skull = (~brain_and_extracranial) & head
+        if method=='genAI':
+            method=='otsu'
+        elif method=='otsu':
+            vol = self.pdw
+            mask = self.mask.astype(bool)
+            thresh = ski.filters.threshold_otsu(vol)
+            brain_and_extracranial = vol > thresh
+            brain_and_extracranial = brain_and_extracranial | binary_erosion(mask, np.ones(3*[7]))
+            head = self.head_mask
+            skull = (~brain_and_extracranial) & head
         return skull
