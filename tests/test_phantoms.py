@@ -64,7 +64,7 @@ def test_big_subdural_lesion():
     assert rmse(desired_volume, measured_volume) < 56
 
 
-def test_transforms(threshold=-585):
+def test_transforms(threshold=-685):
     for age in [6.5]:
         phantom = load_phantom(age)
         transform = RandAffine(prob=1,
