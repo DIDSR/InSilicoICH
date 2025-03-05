@@ -593,6 +593,12 @@ nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
 possible_ages = nihpd_ages + [mida_age]
 
 
+def minmax_scale(x, feature_range=(0, 1)):
+    'adapted from sklearn https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.normalize.html'
+    x_std = (x - x.min())/(x.max() - x.min())
+    return x_std*(max(feature_range) - min(feature_range)) + min(feature_range)
+
+
 class NIHPD_Head(HeadPhantom):
     '''
     loads MR brain atlas of mean `age`, downloaded from
@@ -673,10 +679,8 @@ from {self.phantom_dir}')
         if shape:
             self.resize(shape)
 
-        skull = (self.mask == 0)*self.pdw / self.pdw.max()
-        skull[skull < 0.1] = 0
-        skull[skull > 1] = 1
-        self.skull = skull
+        self.head_mask = self.get_head_mask()
+        self.skull = self.get_skull_map()
         self._phantom = self.get_CT_number_phantom()
 
     def resize(self, shape=None):
@@ -708,7 +712,7 @@ from {self.phantom_dir}')
             )
         return params
 
-    def add_scalp(self, vol):
+    def add_scalp_old(self, vol):
         """
         adds skin, fat, and muscle layers to the head `vol`
         """
@@ -725,6 +729,17 @@ from {self.phantom_dir}')
             vol[mask] = param['HU']
         return vol
 
+    def add_scalp(self, vol, feature_range=(-100, 100)):
+        """
+        adds skin, fat, and muscle layers to the head `vol`
+        """
+        mask = self.mask.astype(bool)
+        thresh = ski.filters.threshold_otsu(vol)
+        brain_and_extracranial = vol > thresh
+        extracranial = brain_and_extracranial & ((~mask) & ~self.skull)
+        vol[extracranial] = minmax_scale(self.pdw[extracranial], feature_range)
+        return vol
+
     def get_sutures(self, thickness=2, thresh=30):
         """
         returns suture mask to the self skull
@@ -734,7 +749,8 @@ from {self.phantom_dir}')
             values
         """
         src_dir = Path(__file__).parents[1]
-        data = nrrd.read(src_dir / 'annotations/suture/NIHPD_Head_Phantom/labelmap.nrrd')[0].transpose(2, 1, 0)[::-1, ::-1]
+        fname = src_dir / 'annotations/suture/NIHPD_Head_Phantom/labelmap.nrrd'
+        data = nrrd.read(fname)[0].transpose(2, 1, 0)[::-1, ::-1]
         skull = self.get_skull_map().astype(bool)
         dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
         if (dx < 0) | (dy < 0) | (dz < 0):
@@ -758,12 +774,18 @@ from {self.phantom_dir}')
         sutures = ski.morphology.dilation(sutures, np.ones(3*[thickness]))
         return sutures
 
-    def get_CT_number_phantom(self, add_scalp=True, add_sutures=True):
-        if len(self._lesion_coords) > 0:
-            return self._phantom
+    def assign_HUs(self, feature_range=(-100, 100)):
         phantom = self.csf*self.csf_HU + self.gm*self.gm_HU +\
             self.wm*self.wm_HU + self.skull*self.skull_HU
-        phantom[phantom <= 0] = self.air_HU
+        phantom[phantom<self.csf_HU] = minmax_scale(self.pdw[phantom<self.csf_HU], feature_range)
+        phantom[self.head_mask & (phantom < 0)] = minmax_scale(self.pdw[self.head_mask & (phantom < 0)], feature_range)
+        return phantom
+
+    def get_CT_number_phantom(self, add_scalp=False, add_sutures=False):
+        if len(self._lesion_coords) > 0:
+            return self._phantom
+        phantom = self.assign_HUs()
+        phantom[phantom < 0] = self.air_HU
         phantom[self.get_dura_map()] = 50  # HU same as MIDA
         if add_scalp:
             phantom = self.add_scalp(phantom)
@@ -799,17 +821,26 @@ from {self.phantom_dir}')
         skull_map[skull_map > 0] = 1
         return skull_map
 
+    def get_head_mask(self):
+        '''obtains mask of head voxels'''
+        vol = self.pdw
+        mask = self.mask.astype(bool)
+        thresh = ski.filters.threshold_otsu(vol)
+        brain_and_extracranial = vol > thresh
+        brain_and_extracranial = brain_and_extracranial | binary_erosion(mask, np.ones(3*[7]))
+        head = np.stack([
+            ski.morphology.area_closing(o, area_threshold=o.sum()/2)
+                        for o in brain_and_extracranial
+                        ])
+        return head
+
     def get_skull_map(self):
         '''obtains mask of skull voxels'''
         vol = self.pdw
         mask = self.mask.astype(bool)
         thresh = ski.filters.threshold_otsu(vol)
         brain_and_extracranial = vol > thresh
-        brain_and_extracranial = brain_and_extracranial |\
-            binary_erosion(mask, np.ones(3*[7]))
-        head = np.stack([
-            ski.morphology.area_closing(o, area_threshold=o.sum()/2)
-                        for o in brain_and_extracranial
-                        ])
+        brain_and_extracranial = brain_and_extracranial | binary_erosion(mask, np.ones(3*[7]))
+        head = self.head_mask
         skull = (~brain_and_extracranial) & head
         return skull

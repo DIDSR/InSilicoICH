@@ -80,7 +80,7 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
     new_volume = np.copy(HU_array)
     boundary = phantom.get_dura_map()
     hemorrhage_mask = np.zeros_like(boundary)
-    skull_map = phantom.get_skull_map()
+    skull_map = ski.morphology.binary_dilation(phantom.get_skull_map(), np.ones(3*[5]))
 
     distances = [(desired_distance-5)/phantom.spacings[2], (desired_distance+5)/phantom.spacings[2]]
 
