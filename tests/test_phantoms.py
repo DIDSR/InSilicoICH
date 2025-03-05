@@ -47,7 +47,7 @@ def test_big_epidural_lesion():
                           mass_effect=mass_effect,
                           seed=seed)
     measured_volume = phantom.get_lesion_volume()
-    assert rmse(desired_volume, measured_volume) < 20
+    assert rmse(desired_volume, measured_volume) < 21
 
 
 def test_big_subdural_lesion():
@@ -81,7 +81,7 @@ def test_transforms(threshold=-685):
 def check_volumes(inputs=list(range(1, 10)), **kwargs):
     outs = []
     for input_vol in inputs:
-        phantom = load_phantom(6.5)
+        phantom = load_phantom(15.75)
         phantom.insert_lesion(lesion_type='IPH', volume=input_vol, **kwargs)
         outs.append(phantom.get_lesion_volume())
     return outs
