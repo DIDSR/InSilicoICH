@@ -741,14 +741,12 @@ from {self.phantom_dir}')
             self.pdw[self.head_mask & (phantom < 0)], feature_range)
         return phantom
 
-    def get_CT_number_phantom(self, add_scalp=True, add_sutures=True):
+    def get_CT_number_phantom(self, add_sutures=True):
         if len(self._lesion_coords) > 0:
             return self._phantom
         phantom = self.assign_HUs()
         phantom[phantom < 0] = self.air_HU
         phantom[self.get_dura_map()] = 50  # HU same as MIDA
-        # if add_scalp:
-        #     phantom = self.add_scalp(phantom)
         if add_sutures:
             sutures = self.get_sutures()
             phantom[sutures] = 0  # assume water HU
