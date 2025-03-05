@@ -17,14 +17,12 @@ run_batchmode.sh
 *.offset
 *.dcm
 metadata*
-*.nii
 *.prep
 *.scan
 **/phantoms/*/*.json
 notebooks/*.csv
 *.cfg
 __pycache__
-*.nii
 src/InSilicoICH.egg-info
 .env
 tests/*.png
