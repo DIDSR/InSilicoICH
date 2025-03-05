@@ -635,7 +635,6 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
         self.wm_HU = wm_HU
         self.skull_HU = skull_HU
         self.air_HU = -1000
-        self.scalp_dict = self.set_scalp_dict()
 
         nii_files = list(self.phantom_dir.glob('*.nii'))
         age_ranges = [o.stem.split('_')[2] for o in nii_files]
@@ -697,49 +696,6 @@ from {self.phantom_dir}')
         self.dz, self.dx, self.dy = new_spacings
         self.nz, self.nx, self.ny = shape
 
-    def set_scalp_dict(self):
-        params = OrderedDict()
-        params['skin'] = dict(
-                thickness=2,
-                HU=0)
-        params['fat'] = dict(
-                thickness=3,
-                HU=-30
-            )
-        params['muscle'] = dict(
-                thickness=3,
-                HU=20
-            )
-        return params
-
-    def add_scalp_old(self, vol):
-        """
-        adds skin, fat, and muscle layers to the head `vol`
-        """
-        binary = vol > 0
-        erosion = binary.copy()
-        params = self.scalp_dict
-        for name, param in params.items():
-            thickness = param['thickness'] / self.dx
-            t = max(int(thickness), 3)  # mm
-            struct = np.ones(binary.ndim*[t])
-            new_erosion = binary_erosion(erosion, struct)
-            mask = new_erosion ^ erosion
-            erosion = new_erosion
-            vol[mask] = param['HU']
-        return vol
-
-    def add_scalp(self, vol, feature_range=(-100, 100)):
-        """
-        adds skin, fat, and muscle layers to the head `vol`
-        """
-        mask = self.mask.astype(bool)
-        thresh = ski.filters.threshold_otsu(vol)
-        brain_and_extracranial = vol > thresh
-        extracranial = brain_and_extracranial & ((~mask) & ~self.skull)
-        vol[extracranial] = minmax_scale(self.pdw[extracranial], feature_range)
-        return vol
-
     def get_sutures(self, thickness=2, thresh=30):
         """
         returns suture mask to the self skull
@@ -777,18 +733,22 @@ from {self.phantom_dir}')
     def assign_HUs(self, feature_range=(-100, 100)):
         phantom = self.csf*self.csf_HU + self.gm*self.gm_HU +\
             self.wm*self.wm_HU + self.skull*self.skull_HU
-        phantom[phantom<self.csf_HU] = minmax_scale(self.pdw[phantom<self.csf_HU], feature_range)
-        phantom[self.head_mask & (phantom < 0)] = minmax_scale(self.pdw[self.head_mask & (phantom < 0)], feature_range)
+        # fills remaining tissues with scaled pdw to approximate
+        # tissue densities
+        phantom[phantom < self.csf_HU] = minmax_scale(
+            self.pdw[phantom < self.csf_HU], feature_range)
+        phantom[self.head_mask & (phantom < 0)] = minmax_scale(
+            self.pdw[self.head_mask & (phantom < 0)], feature_range)
         return phantom
 
-    def get_CT_number_phantom(self, add_scalp=False, add_sutures=False):
+    def get_CT_number_phantom(self, add_scalp=True, add_sutures=True):
         if len(self._lesion_coords) > 0:
             return self._phantom
         phantom = self.assign_HUs()
         phantom[phantom < 0] = self.air_HU
         phantom[self.get_dura_map()] = 50  # HU same as MIDA
-        if add_scalp:
-            phantom = self.add_scalp(phantom)
+        # if add_scalp:
+        #     phantom = self.add_scalp(phantom)
         if add_sutures:
             sutures = self.get_sutures()
             phantom[sutures] = 0  # assume water HU
