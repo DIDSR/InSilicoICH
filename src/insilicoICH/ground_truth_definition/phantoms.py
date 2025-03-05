@@ -616,6 +616,8 @@ class NIHPD_Head(HeadPhantom):
         Unbiased average age-appropriate atlases for pediatric studies.
         NeuroImage. 2011;54(1):313-327. doi:10.1016/j.neuroimage.2010.07.033
     '''
+    relative_head_size = dict(zip(nihpd_ages,
+                                  [0.8, 0.82, 0.85, 0.87, 0.9, 0.95]))
     def __init__(self, phantom_dir, age: float, symmetric=False, csf_HU=10,
                  gm_HU=40, wm_HU=30, skull_HU=900, shape=None):
         phantom_dir = Path(phantom_dir)
@@ -651,6 +653,7 @@ from {self.phantom_dir}')
         nib_img = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_pdw.nii')
         header = nib_img.header
         self.dx, self.dy, self.dz = header['pixdim'][1:4]
+        self.dx, self.dy, self.dz = list(map(lambda o: o*self.relative_head_size[age], (self.dx, self.dy, self.dz)))
 
         self.csf = nib.load(
             base_dir / f'nihpd_{symmetry}_{age_range}_csf.nii'
