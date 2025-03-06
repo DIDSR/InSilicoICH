@@ -1,5 +1,5 @@
 '''
-test low level pedsilicoich phantom generation functionality
+test low level insilicoich phantom generation functionality
 '''
 from pathlib import Path
 import os
@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 from monai.transforms import RandAffine
 import numpy as np
 
-from pedsilicoICH.ground_truth_definition.utils import download_and_extract_archive
-from pedsilicoICH.ground_truth_definition.phantoms import load_phantom
+from insilicoICH.ground_truth_definition.utils import download_and_extract_archive
+from insilicoICH.ground_truth_definition.phantoms import load_phantom
 
 nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
 
@@ -33,20 +33,21 @@ shape = 3*[128]
 seed = 41
 
 
+def rmse(x, y): return np.sqrt(np.mean((x-y)**2))
+
+
 def test_big_epidural_lesion():
     intensity = 100
     age = 9
     mass_effect = True
     desired_volume = 100
     phantom = load_phantom(age, shape=shape)
-    phantom.insert_lesion('epidural', volume=desired_volume,
+    phantom.insert_lesion('EDH', volume=desired_volume,
                           intensity=intensity,
                           mass_effect=mass_effect,
                           seed=seed)
-    measured_volume = phantom._lesion[0].sum() *\
-        (phantom.dx*phantom.dy*phantom.dz)/1000
-    rel_vol_error = (desired_volume - measured_volume)/desired_volume*100
-    assert abs(rel_vol_error) < 50
+    measured_volume = phantom.get_lesion_volume()
+    assert rmse(desired_volume, measured_volume) < 20
 
 
 def test_big_subdural_lesion():
@@ -55,46 +56,12 @@ def test_big_subdural_lesion():
     desired_volume = 80
     mass_effect = True
     phantom = load_phantom(age, shape=shape)
-    phantom.insert_lesion('subdural', volume=desired_volume,
+    phantom.insert_lesion('SDH', volume=desired_volume,
                           intensity=intensity,
                           mass_effect=mass_effect,
                           seed=seed)
-    measured_volume = phantom._lesion[0].sum() *\
-        (phantom.dx*phantom.dy*phantom.dz)/1000
-    rel_vol_error = (desired_volume - measured_volume)/desired_volume*100
-    assert abs(rel_vol_error) < 100
-
-
-def test_big_round_lesion():
-    intensity = 100
-    age = 9
-    desired_volume = 6  # mL
-    mass_effect = True
-    phantom = load_phantom(age, shape=shape)
-    phantom.insert_lesion('round', volume=desired_volume,
-                          intensity=intensity,
-                          mass_effect=mass_effect,
-                          seed=seed, complexity=1)
-    measured_volume = phantom._lesion[0].sum() *\
-        (phantom.dx*phantom.dy*phantom.dz)/1000
-    rel_vol_error = (desired_volume - measured_volume)/desired_volume*100
-    assert abs(rel_vol_error) < 41
-
-
-def test_volume_accuracy_full_matrix():
-    intensity = 100
-    age = 9
-    desired_volume = 6  # mL
-    mass_effect = False
-    phantom = load_phantom(age)
-    phantom.insert_lesion('round', volume=desired_volume,
-                          intensity=intensity, seed=seed,
-                          mass_effect=mass_effect,
-                          complexity=1)
-    measured_volume = phantom._lesion[0].sum() *\
-        (phantom.dx*phantom.dy*phantom.dz)/1000
-    rel_vol_error = (desired_volume - measured_volume)/desired_volume*100
-    assert abs(rel_vol_error) < 40
+    measured_volume = phantom.get_lesion_volume()
+    assert rmse(desired_volume, measured_volume) < 56
 
 
 def test_transforms(threshold=-585):
@@ -109,3 +76,26 @@ def test_transforms(threshold=-585):
         phantom.apply_transform(transform)
         test_val = phantom.get_CT_number_phantom().mean()
         assert test_val > threshold
+
+
+def check_volumes(inputs=list(range(1, 10)), **kwargs):
+    outs = []
+    for input_vol in inputs:
+        phantom = load_phantom(6.5)
+        phantom.insert_lesion(lesion_type='IPH', volume=input_vol, **kwargs)
+        outs.append(phantom.get_lesion_volume())
+    return outs
+
+
+def test_IPH_volume_accuracy():
+    '''
+    tests IPH volume accuracy across different degress of IPH
+    complexity (multiple sub IPHs) `complexity`>1 and `overlap`
+    of these sub IPHs
+    '''
+    inputs = np.linspace(1, 70, 3)
+    for overlap in [0.2, 0.4]:
+        for complexity in range(1, 4):
+            corrected = check_volumes(inputs=inputs, complexity=complexity,
+                                      overlap=overlap, seed=seed)
+            assert rmse(inputs, corrected) < 20

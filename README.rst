@@ -1,16 +1,16 @@
-Synthetic Intracranial Hemorrhage Modeling Tools
+InSilicoICH: Synthetic Intracranial Hemorrhage Modeling Tools
 ================================================
 
 |tests|
 
-.. image:: assets/project_aims.png
+.. image:: assets/pipeline.png
         :width: 800
         :align: center
 
-.. |tests| image:: https://github.com/brandonjnelsonFDA/PedSilicoICH/actions/workflows/python-app.yml/badge.svg?branch=master
+.. |tests| image:: https://github.com/DIDSR/InSilicoICH/actions/workflows/python-app.yml/badge.svg?branch=master
     :alt: Package Build and Testing Status
     :scale: 100%
-    :target: https://github.com/brandonjnelsonFDA/PedSilicoICH/actions/workflows/python-app.yml
+    :target: https://github.com/DIDSR/InSilicoICH/actions/workflows/python-app.yml
 
 This repository contains tools for generating synthetic non contrast CT datasets of intracranial hemorrhage (ICH) that can be used for evaluating AI detection devices.
 
@@ -53,18 +53,18 @@ The knowledge-based algorithm allows the following parameters to be controlled w
 |                            | Edema [0-15 voxels] (IPH only)                       | `Reconstruction kernel`_                  |                                 |
 +----------------------------+------------------------------------------------------+-------------------------------------------+---------------------------------+
 
-.. _Age [6.5-38 years]: https://github.com/DIDSR/PedSilicoICH/blob/872ee48dd42fb13b9d8a759feb1dac8f0d73a079/src/pedsilicoICH/ground_truth_definition/phantoms.py#L567-L568
+.. _Age [6.5-38 years]: https://github.com/DIDSR/InSilicoICH/blob/872ee48dd42fb13b9d8a759feb1dac8f0d73a079/src/InSilicoICH/ground_truth_definition/phantoms.py#L567-L568
 .. _Reconstruction kernel: https://github.com/xcist/main/blob/master/gecatsim/cfg/Recon_Default.cfg#L9-L11
 
-Below are example simulation outputs:
+Below are example simulation outputs using the `MIDA anatomical model <https://pmc.ncbi.nlm.nih.gov/articles/PMC4406723/>`_ as the ground truth phantom:
 
-.. image:: assets/montage.png
+.. image:: assets/MIDA_montage_noMask.png
         :width: 800
         :align: center
 
-Note, the CT simulations also include `methods for extracting ground truth segmentation masks <https://github.com/DIDSR/PedSilicoICH/blob/master/src/pedsilicoICH/image_acquisition.py#L222>`_ of the inserted ICH for generating segmentation datasets.
+Note, the CT simulations also include `methods for extracting ground truth segmentation masks <https://github.com/DIDSR/InSilicoICH/blob/master/src/InSilicoICH/image_acquisition.py#L222>`_ of the inserted ICH for generating segmentation datasets:
 
-.. image:: assets/ich_masks.png
+.. image:: assets/MIDA_montage_Mask.png
         :width: 800
         :align: center
 
@@ -76,7 +76,7 @@ In a new python environment, run the following if using pip or conda:
 
 .. code-block:: bash
 
-        pip install git+https://github.com/DIDSR/PedSilicoICH.git
+        pip install git+https://github.com/DIDSR/InSilicoICH.git
 
 **Conda**
 
@@ -85,11 +85,23 @@ See example conda install instructions `here <https://docs.anaconda.com/minicond
 .. code-block:: bash
 
         # Best practice, use an environment rather than install in the base env
-        conda create -n my-env
+        conda create -n "my-env" python=3.11.9 # tested on python=>3.11 and <3.13>
         conda activate my-env
-        pip install git+https://github.com/DIDSR/PedSilicoICH.git
+        pip install git+https://github.com/DIDSR/InSilicoICH.git
 
-Tested on python=>3.11 and <3.13
+**Phantom downloads**
+
+Base phantom files (currently NIHPD and MIDA) should be stored in a common phantom directory, defined as environment variable 'PHANTOM_DIRECTORY'. MIDA phantom files must be `downloaded manually <https://itis.swiss/virtual-population/regional-human-models/mida-model/>`_, while NIHPD files are downloaded automatically or can be found `here <https://www.bic.mni.mcgill.ca/ServicesAtlases/NIHPD-obj1>`_.
+
+Two options are available:
+
+1. Create a file called '.env' in this project's working directory with the below line. Afterwards, reinstall InSilicoICH with 'pip install -e <InSilicoICH path>'.
+
+.. code-block:: bash
+
+        PHANTOM_DIRECTORY=/path/to/phantoms
+
+2. Or, in your terminal, 'export PHANTOM_DIRECTORY=/path/to/phantoms'
 
 Usage
 -----
@@ -98,8 +110,8 @@ The synthetic data generation and image simulation tools included in this repo c
 
 .. code-block:: bash
 
-        git clone https://github.com/DIDSR/PedSilicoICH.git
-        cd PedSilicoICH
+        git clone https://github.com/DIDSR/InSilicoICH.git
+        cd InSilicoICH
 
 **Programmatic Usage**
 
@@ -107,36 +119,34 @@ See the included `jupyter notebooks <notebooks/tutorials>`_ for example programm
 
 **Command Line Usage**
 
-After `pip` installing, 2 command line programs will be available to:
+After `pip` installing, 2 command line programs will be available:
 
-1. `recruit` which creates a csv of virtual patients to be imaged when given an `inclusion_criteria.toml <example_inclusion_criteria.toml>`_ file which specifies the range and distribution of patient, disease, and acquisition parameters to sample from when recruiting a virtual imaging trial
+1. 'recruit' which creates a csv of virtual patients to be imaged defined by a `.toml file <example_inclusion_criteria.toml>`_ which specifies the range and distribution of patient, hemorrhage, and acquisition parameters to sample from.
 
 .. code-block:: bash
 
         recruit example_inclusion_criteria.toml
         > default_study/default_study.csv
 
-The output of generate is a `csv` file, here `default_study.csv <default_study/default_study.csv>`_ which specifies explicitly which patients and scans to run, where each row is a preview of the unique scan to be performed. This file can be made manually or edited.
+The output .csv file (`example <default_study/default_study.csv>`_) specifies explicitly which patients and scans to run, where each row is a preview of the unique scan to be performed. This file can be made manually or edited.
 
-See **recruit --help** for more details on how to run the program and `example_inclusion_criteria.toml <example_inclusion_criteria.toml>`_ for more details on the choosing parameter ranges to sample.
+See **recruit --help** for more details on how to run the program and `example_inclusion_criteria.toml <example_inclusion_criteria.toml>`_ for more details on parameter ranges to sample.
 
-2. `generate` takes the recruited patient `.csv` list and runs the scans in the list.
+2. 'generate' takes the recruited patient .csv list and runs all scans:
 
 .. code-block:: bash
 
         generate default_study/default_study.csv
 
-See **generate --help** help for more details
+See **generate --help** for more details
 
-Virtual patient recruitment and scanning can be chained together using the pipe `|` operator like so
+Virtual patient recruitment and scanning can be chained together using the pipe `|` operator like so:
 
 .. code-block:: bash
 
         recruit example_inclusion_criteria.toml | generate
 
-Images and any hemorrhage segmentation masks will be saved in DICOM format in subdirectories under the selected `output_directory` specified in the study list, a csv file containing all the planned study parameters, here called `default_study.csv <default_study/default_study.csv>`_.
-
-The output of `recruit <https://github.com/DIDSR/PedSilicoICH/blob/master/pyproject.toml#L45>`_ is the study csv file, here `default_study/default_study.csv <default_study/default_study.csv>`_, that can then be used to reproduce the dataset again later using `generate <https://github.com/DIDSR/PedSilicoICH/blob/master/pyproject.toml#L43>`_.
+Images and any hemorrhage segmentation masks will be saved in DICOM format in subdirectories under the 'output_directory' specified in the `study .csv <default_study/default_study.csv>`_.
 
 View a Sample Dataset (local demo)
 ----------------------------------
@@ -182,9 +192,9 @@ See Also
 --------
 
 - `PedSilicoAbdomen <https://github.com/DIDSR/PedSilicoAbdomen>`_ for generating synthetic abdominal non contrast CT datasets
-- `PedSilicoLVO <https://github.com/brandonjnelsonFDA/PedSilicoLVO>`_ for generating synthetic large vessel occlusion (LVO) non contrast CT datasets
+- `PedSilicoLVO <https://github.com/DIDSR/PedSilicoLVO>`_ for generating synthetic large vessel occlusion (LVO) non contrast CT datasets
 - `Virtual Imaging Tools (VITools) <https://github.com/DIDsr/vitools>`_ tools for running virtual imaging trials including image acquisition frameworks
-- `Wait time assessments for ICH CADt VIT <https://github.com/brandonjnelsonFDA/ICH-CADt-VIT>`_
+- `Wait time assessments for ICH CADt VIT <https://github.com/DIDSR/ICH-CADt-VIT>`_
 
 Disclaimer
 ----------

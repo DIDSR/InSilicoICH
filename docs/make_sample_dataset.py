@@ -5,9 +5,9 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from pedsilicoICH.ground_truth_definition.phantoms import (possible_ages,
+from insilicoICH.ground_truth_definition.phantoms import (possible_ages,
                                                            load_phantom)
-from pedsilicoICH.image_acquisition import Scanner
+from insilicoICH.image_acquisition import Scanner
 
 logging.basicConfig(filename="newfile.log",
                     format='%(asctime)s %(message)s',
