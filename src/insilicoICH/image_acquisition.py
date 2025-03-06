@@ -249,6 +249,7 @@ class Scanner():
     def scout_view(self, startZ=None, endZ=None, table_speed=0):
         '''
         Preview radiograph useful for determining scan range startZ and endZ
+
         :param startZ: optional starting table position in mm of the scan,
             see self.start_positions
         :param endZ: optional last position of scan in mm,
@@ -402,6 +403,7 @@ class Scanner():
                   mu_water=None, kernel='standard'):
         '''
         perform reconstruction and save to .recon attribute
+
         :param kernel: reconstruction kernel, options include: ['standard',
             'soft', 'bone', 'R-L', 'S-L']
             'R-L': Ramachandran-Lakshminarayanan (R-L) filter

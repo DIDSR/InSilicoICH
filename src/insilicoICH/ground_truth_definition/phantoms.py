@@ -353,9 +353,7 @@ class HeadPhantom(Phantom):
                                        mass_effect=mass_effect,
                                        seed=seed)
         else:
-            raise ValueError(f'unknown lesion type passed: {lesion_type}\
-                             currently accepts IPH (intraparenchymal),\
-                                 EDH (epidural), or SDH (subdural)')
+            raise ValueError(f"Invalid lesion type: '{lesion_type}'. Expected one of: IPH, EDH, SDH.")
         self._phantom = img_w_lesion
         self._lesion.append(lesion_image)
         self._lesion_coords.append(lesion_coords)
@@ -606,7 +604,7 @@ class NIHPD_Head(HeadPhantom):
     :param symmetry: optional, the atlases are provided in their natural
         asymmetric or artificially generated symmetric state, default is
         asymmetric, see article for more details:
-    1. Fonov V, Evans AC, Botteron K, Almli CR, McKinstry RC, Collins DL.
+        Fonov V, Evans AC, Botteron K, Almli CR, McKinstry RC, Collins DL.
         Unbiased average age-appropriate atlases for pediatric studies.
         NeuroImage. 2011;54(1):313-327. doi:10.1016/j.neuroimage.2010.07.033
     '''

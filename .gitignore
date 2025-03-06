@@ -16,7 +16,7 @@ run_batchmode.sh
 *.air
 *.offset
 *.dcm
-metadata*
+# metadata*
 *.nii
 *.prep
 *.scan

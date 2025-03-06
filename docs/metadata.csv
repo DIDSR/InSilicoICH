@@ -1,0 +1,4 @@
+uid,age_yrs,lesion_type,volume_mL,attenuation,kVp,mA,kernel,slice_thickness_mm,slice_location_mm,file,seed
+0,10.5,intraparenchymal,0.4,34.7,120,630,soft,5,8.5,images/000_10.5_yrs_IPH_120kV_630mA.png,742391
+1,10.5,,6.8,93.9,100,1300,bone,1,-33.5,images/001_10.5_yrs_None_100kV_1300mA.png,770871
+2,38.0,,14.6,40.8,140,1440,standard,5,16.0,images/002_38.0_yrs_None_140kV_1440mA.png,79956
