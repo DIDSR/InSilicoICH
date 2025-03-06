@@ -177,12 +177,13 @@ phantom.overwrite = True  # Flag to overwrite existing files without warning.
     dicom_to_voxelized_phantom.run_from_config(dicom_to_voxel_cfg)
 
 
-def load_phantom(age=38, shape=None, name='default'):
+def load_phantom(age=38, shape=None, skull_seg_method='otsu', name='default'):
     '''
     Loads appropriate phantom based on age as a keyword
 
     :param age: patient age in years, MIDA currently hard coded at 38 yrs
     :param shape: shape of that the ground truth phantom will be interpolated
+    :param skull_seg_method: method for NIHPD skull segmentation ['otsu', 'pseudoct']
     :param name: patient name to be saved in DICOM header
     :param lesion_type: options include: ['IPH', 'EDH', 'SDH']
     :param radius: lesion radius if sphere is selected
@@ -220,7 +221,8 @@ or
         phantom = MIDA_Head(phantom_dir / 'MIDA_Head_Phantom', shape=shape)
     else:
         phantom = NIHPD_Head(phantom_dir / 'NIHPD_Head_Phantom',
-                             age=age, shape=shape)
+                             age=age, shape=shape,
+                             skull_seg_method=skull_seg_method)
 
     phantom.patient_name = name
     phantom.age = age
@@ -293,7 +295,7 @@ class HeadPhantom(Phantom):
         'used for EDH, SDH lesion insertion'
         pass
 
-    def get_skull_map(self, method):
+    def get_skull_map(self):
         'used for lesion insertion mass effect warping'
         pass
 
@@ -477,7 +479,7 @@ large, try smaller volume')
                 mass_effect = 0.5
             warped = insert_with_mass_effect(img,
                                              lesion_mask,
-                                             self.get_skull_map(method='otsu'),
+                                             self.get_skull_map(),
                                              strength=mass_effect)
             warped[lesion_mask] = img_w_lesion[lesion_mask]
             img_w_lesion[lesion_mask.sum(axis=(1, 2)) > 0] =\
@@ -577,7 +579,7 @@ and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
         dura_map[np.where(self._phantom == 1.0)] = 1.0
         return dura_map
 
-    def get_skull_map(self, method):
+    def get_skull_map(self):
         '''obtains partial skull map using mida atlas,
          ignoring facial bones (for now)'''
         skull_map = np.zeros_like(self._phantom)
@@ -620,7 +622,8 @@ class NIHPD_Head(HeadPhantom):
     relative_head_size = dict(zip(nihpd_ages,
                                   [0.8, 0.82, 0.85, 0.87, 0.9, 0.95]))
     def __init__(self, phantom_dir, age: float, symmetric=False, csf_HU=10,
-                 gm_HU=40, wm_HU=30, skull_HU=900, shape=None):
+                 gm_HU=40, wm_HU=30, skull_HU=900, shape=None,
+                 skull_seg_method='otsu'):
         phantom_dir = Path(phantom_dir)
         if not phantom_dir.exists():
             print(f'''
@@ -637,6 +640,7 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
         self.gm_HU = gm_HU
         self.wm_HU = wm_HU
         self.skull_HU = skull_HU
+        self.skull_seg_method = skull_seg_method
         self.air_HU = -1000
 
         nii_files = list(self.phantom_dir.glob('*.nii'))
@@ -672,6 +676,16 @@ from {self.phantom_dir}')
             base_dir / f'nihpd_{symmetry}_{age_range}_pdw.nii'
             ).get_fdata().transpose(2, 1, 0)[:, ::-1, :]
 
+        try:
+            src_dir = Path(__file__).parents[0]
+            self.pseudoct = nib.load(
+                src_dir / 'NIHPD_pseudoCT/nihpd_asym_04.5-08.5_pct.nii'
+                ).get_fdata().transpose(2, 1, 0)[:, ::-1, :]
+            self.pseudoct = self.pseudoct[::-1]
+        except: # if pseudoct can't be loaded, default to otsu skull segmentation method
+            self.skull_seg_method = 'otsu'
+            print('pseudo-CT images not found; defaulting to otsu segmentation method')
+
         self.csf = self.csf[::-1]
         self.gm = self.gm[::-1]
         self.wm = self.wm[::-1]
@@ -683,7 +697,7 @@ from {self.phantom_dir}')
             self.resize(shape)
 
         self.head_mask = self.get_head_mask()
-        self.skull = self.get_skull_map(method='otsu')
+        self.skull = self.get_skull_map()
         self._phantom = self.get_CT_number_phantom()
 
     def resize(self, shape=None):
@@ -711,7 +725,7 @@ from {self.phantom_dir}')
         src_dir = Path(__file__).parents[1]
         fname = src_dir / 'annotations/suture/NIHPD_Head_Phantom/labelmap.nrrd'
         data = nrrd.read(fname)[0].transpose(2, 1, 0)[::-1, ::-1]
-        skull = self.get_skull_map(method='otsu').astype(bool)
+        skull = self.get_skull_map().astype(bool)
         dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
         if (dx < 0) | (dy < 0) | (dz < 0):
             resizewithcrop = ResizeWithPadOrCrop(spatial_size=skull.shape)
@@ -745,12 +759,15 @@ from {self.phantom_dir}')
             self.pdw[self.head_mask & (phantom < 0)], feature_range)
         return phantom
 
-    def get_CT_number_phantom(self, add_sutures=True):
+    def get_CT_number_phantom(self, add_sutures=False):
         if len(self._lesion_coords) > 0:
             return self._phantom
         phantom = self.assign_HUs()
         phantom[phantom < 0] = self.air_HU
-        phantom[self.get_dura_map()] = 50  # HU same as MIDA
+
+        # TODO: dura map currently overlaps with new skull methods, need fix
+        # phantom[self.get_dura_map()] = 50  # HU same as MIDA
+
         if add_sutures:
             sutures = self.get_sutures()
             phantom[sutures] = 0  # assume water HU
@@ -775,14 +792,6 @@ from {self.phantom_dir}')
                                                 mode='inner',
                                                 background=0)
 
-    def get_skull_map_old(self, method):
-        '''obtains rudimentary mask of skull voxels using threshold of
-        proton-density weighted image and full mask'''
-        skull_map = (self.mask == 0)*self.pdw / self.pdw.max()
-        skull_map[skull_map < 0.1] = 0
-        skull_map[skull_map > 0] = 1
-        return skull_map
-
     def get_head_mask(self):
         '''obtains mask of head voxels'''
         vol = self.pdw
@@ -796,15 +805,14 @@ from {self.phantom_dir}')
                         ])
         return head
 
-    def get_skull_map(self, method):
+    def get_skull_map(self):
         '''obtains mask of skull voxels'''
-        if method=='genAI':
+        if self.skull_seg_method =='pseudoct':
             # currently, pesudoCT images are generated outside of the repository, TODO: integrate code
-            src_dir = Path(__file__).parents[1]
-            pct = nib.load(src_dir / 'NIHPD_pseudoCT/nihpd_asym_04.5-08.5_pct.nii').get_fdata().transpose(2, 1, 0)[:, ::-1, :]
             threshold = 300 # units: HU
-            skull_mask = np.where(pct > threshold, 1, 0)   
-        elif method=='otsu':
+            skull = np.where(self.pseudoct > threshold, 1, 0)
+
+        elif self.skull_seg_method =='otsu':
             vol = self.pdw
             mask = self.mask.astype(bool)
             thresh = ski.filters.threshold_otsu(vol)
@@ -812,4 +820,8 @@ from {self.phantom_dir}')
             brain_and_extracranial = brain_and_extracranial | binary_erosion(mask, np.ones(3*[7]))
             head = self.head_mask
             skull = (~brain_and_extracranial) & head
+        elif self.skull_seg_method == 'old': # old method for posterity (gives VERY thick skull...)
+            skull = (self.mask == 0)*self.pdw / self.pdw.max()
+            skull[skull < 0.1] = 0
+            skull[skull > 0] = 1
         return skull
