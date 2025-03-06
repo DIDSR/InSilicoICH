@@ -798,7 +798,11 @@ from {self.phantom_dir}')
     def get_skull_map(self, method):
         '''obtains mask of skull voxels'''
         if method=='genAI':
-            method=='otsu'
+            # currently, pesudoCT images are generated outside of the repository, TODO: integrate code
+            src_dir = Path(__file__).parents[1]
+            pct = nib.load(src_dir / 'NIHPD_pseudoCT/nihpd_asym_04.5-08.5_pct.nii').get_fdata().transpose(2, 1, 0)[:, ::-1, :]
+            threshold = 300 # units: HU
+            skull_mask = np.where(pct > threshold, 1, 0)   
         elif method=='otsu':
             vol = self.pdw
             mask = self.mask.astype(bool)
