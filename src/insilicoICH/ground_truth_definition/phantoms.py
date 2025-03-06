@@ -682,7 +682,9 @@ from {self.phantom_dir}')
                 src_dir / 'NIHPD_pseudoCT/nihpd_asym_04.5-08.5_pct.nii'
                 ).get_fdata().transpose(2, 1, 0)[:, ::-1, :]
             self.pseudoct = self.pseudoct[::-1]
-        except: # if pseudoct can't be loaded, default to otsu skull segmentation method
+        except FileNotFoundError:
+            # if pseudoct can't be loaded, default to
+            # otsu skull segmentation method
             self.skull_seg_method = 'otsu'
             print('pseudo-CT images not found; defaulting to otsu segmentation method')
 
@@ -757,6 +759,8 @@ from {self.phantom_dir}')
             self.pdw[phantom < self.csf_HU], feature_range)
         phantom[self.head_mask & (phantom < 0)] = minmax_scale(
             self.pdw[self.head_mask & (phantom < 0)], feature_range)
+        if self.skull_seg_method == 'pseudoct':
+            phantom[self.skull.astype(bool)] = self.pseudoct[self.skull.astype(bool)]
         return phantom
 
     def get_CT_number_phantom(self, add_sutures=False):
@@ -807,7 +811,7 @@ from {self.phantom_dir}')
 
     def get_skull_map(self):
         '''obtains mask of skull voxels'''
-        if self.skull_seg_method =='pseudoct':
+        if self.skull_seg_method == 'pseudoct':
             # currently, pesudoCT images are generated outside of the repository, TODO: integrate code
             threshold = 300 # units: HU
             skull = np.where(self.pseudoct > threshold, 1, 0)
