@@ -140,14 +140,13 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
                                               skull_map[init_slice, :],
                                               boundary_coords, connect_coords,
                                               hematoma_type)
+                    new_volume[init_slice, :, :] = warped_slice
                 except ValueError:
                     Warning(f'Failed to perform mass effect insertion for\
                           volume: {desired_volume}, now inserting with mass\
                           effect to 0')
                     new_volume[init_slice] = HU_array[init_slice]
                     phantom.mass_effect = 0
-
-                new_volume[init_slice, :, :] = warped_slice
 
             hemorrhage_mask[init_slice, :, :] = filled_array
 
