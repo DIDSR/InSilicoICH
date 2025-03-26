@@ -20,10 +20,11 @@ volume='src/insilicoICH/distributions/BHSD_volume_distributions.csv'  # str or l
 attenuation='src/insilicoICH/distributions/BHSD_HU_distributions.csv'  # str or list
 
 [acquisition]
+scanner=['GE_Lightspeed16','Scanner_Default']
 views=[100]
 kVp=[120]
 mA=[200]
 
 [recon]
-kernel=['soft']
+kernel=['standard']
 slice_thickness=[1]
