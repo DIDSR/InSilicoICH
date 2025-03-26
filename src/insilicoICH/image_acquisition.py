@@ -118,32 +118,6 @@ _table_speed = {'Low': 26.67, 'Intermediate': 48, 'High': 64}
 class Scanner():
     """
     A class to hold CT simulation data and run simulations
-
-    :param phantom: Phantom class instance to be scanned, voxels in units of
-        approximate CT Numbers [HU], typically in python
-        coordinates (z, x, y)
-        where z is perpendicular to the axial plane made by x and y.
-        See <https://en.wikipedia.org/wiki/Hounsfield_scale>
-        for some suggested values for common materials
-
-    :param scanner_model: str, study identifier to be used for virtual identifier and DICOM header
-
-    :param studyname: str, study identifier to be saved in DICOM header
-    :param studyid: int, study identifier to be saved in DICOM header
-    :param seriesname: str, series identifier to be saved in DICOM header
-    :param seriesid: int, series identifier to be saved in DICOM header
-    :param output_dir: optional directory to save the intermediate and
-        final simulation results, defaults to current working directory
-    :param framework: Optional, CT simulation framework options
-        include `['CATSIM']`
-    :param materials: Optional dictionary of {material name: HU value},
-        used for construction volume fraction maps in XCIST,
-        see materials and thresholds from this XCIST example:
-        https://github.com/xcist/phantoms-voxelized/blob/main/DICOM_to_voxelized/DICOM_to_voxelized_example_head.cfg
-
-    :returns: None
-
-    See also <https://github.com/DIDSR/pediatricIQphantoms/blob/main/src/pediatricIQphantoms/make_phantoms.py#L19>
     """
     def __init__(self, phantom: Phantom, scanner_model: str = "Scanner_Default",
                  studyname: str = "default",
@@ -151,7 +125,31 @@ class Scanner():
                  framework: str = 'CATSIM', output_dir: str | Path = None,
                  materials: dict | None = None) -> None:
         """
-        Constructor method
+        :param phantom: Phantom class instance to be scanned, voxels in units of
+            approximate CT Numbers [HU], typically in python
+            coordinates (z, x, y)
+            where z is perpendicular to the axial plane made by x and y.
+            See <https://en.wikipedia.org/wiki/Hounsfield_scale>
+            for some suggested values for common materials
+
+        :param scanner_model: str, study identifier to be used for virtual identifier and DICOM header
+
+        :param studyname: str, study identifier to be saved in DICOM header
+        :param studyid: int, study identifier to be saved in DICOM header
+        :param seriesname: str, series identifier to be saved in DICOM header
+        :param seriesid: int, series identifier to be saved in DICOM header
+        :param output_dir: optional directory to save the intermediate and
+            final simulation results, defaults to current working directory
+        :param framework: Optional, CT simulation framework options
+            include `['CATSIM']`
+        :param materials: Optional dictionary of {material name: HU value},
+            used for construction volume fraction maps in XCIST,
+            see materials and thresholds from this XCIST example:
+            https://github.com/xcist/phantoms-voxelized/blob/main/DICOM_to_voxelized/DICOM_to_voxelized_example_head.cfg
+
+        :returns: None
+
+        See also <https://github.com/DIDSR/pediatricIQphantoms/blob/main/src/pediatricIQphantoms/make_phantoms.py#L19>
         """
         output_dir = output_dir or '.'
         output_dir = Path(output_dir) / f'{phantom.patient_name}'
@@ -165,6 +163,10 @@ class Scanner():
             img = img.numpy()
 
         self.phantom = phantom
+        available_scanners = [o.name for o in install_path.glob('defaults/*')
+                              if not str(o).endswith('.cfg')]
+        if scanner_model not in available_scanners:
+            raise ValueError(f'{scanner_model} not in {available_scanners}')
         self.scanner_model = scanner_model
         self.studyname = studyname or self.patientname
         self.studyid = studyid
@@ -312,7 +314,8 @@ class Scanner():
     def __repr__(self) -> str:
         repr = f'''
         {self.__class__} {self.seriesname}
-        Scanner: {self.framework}
+        Scanner: {self.scanner_model}
+        Simulation Platform: {self.framework}
         '''
         if self.recon is None:
             return repr
