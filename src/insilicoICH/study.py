@@ -181,7 +181,7 @@ class Study:
         return self
 
 
-def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
+def run_study(output_directory=None, patient_name='default', scanner_model='Scanner_Default', age=38, kVp=120,
               mA=200, intensity=200, volume=5, lesion_type=None,
               mass_effect=True, add_positioning_augmentation=True,
               views=1000, zspan='dynamic', kernel='standard',
@@ -206,7 +206,7 @@ def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
                                mode='nearest')
         phantom.apply_transform(transform, seed=seed)
 
-    scanner = Scanner(phantom, output_dir=output_directory)
+    scanner = Scanner(phantom, scanner_model=scanner_model, output_dir=output_directory)
     study = Study(scanner, 'pilot')
     study.run_study(kVp=kVp, mA=mA, views=views, zspan=zspan,
                     kernel=kernel, slice_thickness=slice_thickness)

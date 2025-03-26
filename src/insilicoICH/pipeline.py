@@ -50,6 +50,7 @@ def insilicoich(input_csv, output_directory=None, keep_raw=False):
         patient_name = f'case_{patientid:03}'
         study = run_study(output_directory,
                           patient_name,
+                          scanner_model=str(patient['scanner']),
                           age=float(patient['age']),
                           kVp=float(patient['kVp']),
                           mA=float(patient['mA']),
