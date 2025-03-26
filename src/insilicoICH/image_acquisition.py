@@ -67,6 +67,7 @@ def get_reconstructed_data(ct) -> np.ndarray:
 
 
 def initialize_xcist(ground_truth_image, spacings=(1, 1, 1),
+                     scanner_model='Scanner_Default',
                      output_dir='default', phantom_id='default',
                      materials=None):
     '''
@@ -76,11 +77,13 @@ def initialize_xcist(ground_truth_image, spacings=(1, 1, 1),
     print('Initializing Scanner object...')
     print(''.join(10*['-']))
     # load defaults
+    scanner_path=install_path/'defaults/'/scanner_model
+
     ct = xc.CatSim(install_path/'defaults/Phantom_Default',
                    install_path/'defaults/Physics_Default',
                    install_path/'defaults/Protocol_Default',
                    install_path/'defaults/Recon_Default',
-                   install_path/'defaults/Scanner_Default')
+                   scanner_path)
 
     ct.cfg.waitForKeypress = False
     ct.cfg.do_Recon = True
@@ -115,37 +118,38 @@ _table_speed = {'Low': 26.67, 'Intermediate': 48, 'High': 64}
 class Scanner():
     """
     A class to hold CT simulation data and run simulations
-
-    :param phantom: Phantom class instance to be scanned, voxels in units of
-        approximate CT Numbers [HU], typically in python
-        coordinates (z, x, y)
-        where z is perpendicular to the axial plane made by x and y.
-        See <https://en.wikipedia.org/wiki/Hounsfield_scale>
-        for some suggested values for common materials
-
-    :param studyname: str, study identifier to be saved in DICOM header
-    :param studyid: int, study identifier to be saved in DICOM header
-    :param seriesname: str, series identifier to be saved in DICOM header
-    :param seriesid: int, series identifier to be saved in DICOM header
-    :param output_dir: optional directory to save the intermediate and
-        final simulation results, defaults to current working directory
-    :param framework: Optional, CT simulation framework options
-        include `['CATSIM']`
-    :param materials: Optional dictionary of {material name: HU value},
-        used for construction volume fraction maps in XCIST,
-        see materials and thresholds from this XCIST example:
-        https://github.com/xcist/phantoms-voxelized/blob/main/DICOM_to_voxelized/DICOM_to_voxelized_example_head.cfg
-
-    :returns: None
-
-    See also <https://github.com/DIDSR/pediatricIQphantoms/blob/main/src/pediatricIQphantoms/make_phantoms.py#L19>
     """
-    def __init__(self, phantom: Phantom, studyname: str = "default",
+    def __init__(self, phantom: Phantom, scanner_model: str = "Scanner_Default",
+                 studyname: str = "default",
                  studyid: int = 0, seriesname: str = "default", seriesid=0,
                  framework: str = 'CATSIM', output_dir: str | Path = None,
                  materials: dict | None = None) -> None:
         """
-        Constructor method
+        :param phantom: Phantom class instance to be scanned, voxels in units of
+            approximate CT Numbers [HU], typically in python
+            coordinates (z, x, y)
+            where z is perpendicular to the axial plane made by x and y.
+            See <https://en.wikipedia.org/wiki/Hounsfield_scale>
+            for some suggested values for common materials
+
+        :param scanner_model: str, study identifier to be used for virtual identifier and DICOM header
+
+        :param studyname: str, study identifier to be saved in DICOM header
+        :param studyid: int, study identifier to be saved in DICOM header
+        :param seriesname: str, series identifier to be saved in DICOM header
+        :param seriesid: int, series identifier to be saved in DICOM header
+        :param output_dir: optional directory to save the intermediate and
+            final simulation results, defaults to current working directory
+        :param framework: Optional, CT simulation framework options
+            include `['CATSIM']`
+        :param materials: Optional dictionary of {material name: HU value},
+            used for construction volume fraction maps in XCIST,
+            see materials and thresholds from this XCIST example:
+            https://github.com/xcist/phantoms-voxelized/blob/main/DICOM_to_voxelized/DICOM_to_voxelized_example_head.cfg
+
+        :returns: None
+
+        See also <https://github.com/DIDSR/pediatricIQphantoms/blob/main/src/pediatricIQphantoms/make_phantoms.py#L19>
         """
         output_dir = output_dir or '.'
         output_dir = Path(output_dir) / f'{phantom.patient_name}'
@@ -159,6 +163,11 @@ class Scanner():
             img = img.numpy()
 
         self.phantom = phantom
+        available_scanners = [o.name for o in install_path.glob('defaults/*')
+                              if not str(o).endswith('.cfg')]
+        if scanner_model not in available_scanners:
+            raise ValueError(f'{scanner_model} not in {available_scanners}')
+        self.scanner_model = scanner_model
         self.studyname = studyname or self.patientname
         self.studyid = studyid
         self.seriesname = seriesname
@@ -174,6 +183,7 @@ class Scanner():
         self.zspan = 'dynamic'
 
         self.xcist = initialize_xcist(img, self.phantom.spacings,
+                                      scanner_model=self.scanner_model,
                                       output_dir=self.output_dir,
                                       phantom_id=phantom.patientid,
                                       materials=materials)
@@ -233,6 +243,7 @@ class Scanner():
         lesion_phantom.patient_name = 'lesion only'
         lesion_dir = self.output_dir / 'lesion_mask'
         lesion_only = Scanner(lesion_phantom,
+                              scanner_model=self.scanner_model,
                               materials={
                                 'ICRU_lung_adult_healthy': -1000,
                                 'water': -100},
@@ -303,7 +314,8 @@ class Scanner():
     def __repr__(self) -> str:
         repr = f'''
         {self.__class__} {self.seriesname}
-        Scanner: {self.framework}
+        Scanner: {self.scanner_model}
+        Simulation Platform: {self.framework}
         '''
         if self.recon is None:
             return repr

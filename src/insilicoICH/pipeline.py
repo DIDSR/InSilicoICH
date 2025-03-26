@@ -47,9 +47,16 @@ def insilicoich(input_csv, output_directory=None, keep_raw=False):
         output_directory = Path(output_directory)
         print(f'{patientid+1}/{n_params}')
 
+        # for old .csv files:
+        if 'scanner' in patient:
+            scanner_model = str(patient['scanner'])
+        else:
+            scanner_model = "Scanner_Default"
+
         patient_name = f'case_{patientid:03}'
         study = run_study(output_directory,
                           patient_name,
+                          scanner_model=scanner_model,
                           age=float(patient['age']),
                           kVp=float(patient['kVp']),
                           mA=float(patient['mA']),

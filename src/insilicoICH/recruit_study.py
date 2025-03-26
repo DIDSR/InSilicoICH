@@ -21,6 +21,7 @@ def recruit_patients(output_directory, views=[1000], desired_cases=1,
                                      len(LESION_TYPES)*[[0.1, 60]])),
                      attenuation=dict(zip(LESION_TYPES,
                                       len(LESION_TYPES)*[[0, 90]])),
+                     scanner='Scanner_Default',
                      kVp=[120],
                      mA=[300],
                      save_name=None,
@@ -87,6 +88,7 @@ or csv filepath')
     global_seed = random.integers(0, 1e6)
 
     params = dict(age=[],
+                  scanner=[],
                   kVp=[],
                   mA=[],
                   views=[],
@@ -139,6 +141,7 @@ or csv filepath')
             edema = random.choice(edema_list)
 
         params['age'].append(float(random.choice(ages)))
+        params['scanner'].append(random.choice(scanner))
         params['kVp'].append(float(random.choice(kVp_list)))
         params['mA'].append(float(random.choice(mA_list)))
         params['views'].append(float(random.choice(views)))
