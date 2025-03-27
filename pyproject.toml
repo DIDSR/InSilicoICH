@@ -17,7 +17,7 @@ dependencies = [
   "pandas",
   "numpy",
   "pynrrd",
-  "pydicom==2.4.4",
+  "pydicom==3.0.0",
   "pytest",
   "requests",
   "gecatsim @ git+https://github.com/xcist/main.git"

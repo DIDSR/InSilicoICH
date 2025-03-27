@@ -26,7 +26,7 @@ def read_dicom(dcm_fname: str) -> np.ndarray:
 
     :param dcm_fname: dicom filename to be read
     '''
-    dcm = pydicom.read_file(dcm_fname)
+    dcm = pydicom.dcmread(dcm_fname)
     return dcm.pixel_array + int(dcm.RescaleIntercept)
 
 
@@ -44,8 +44,8 @@ def convert_to_dicom(img_slice: np.ndarray, phantom_path: str,
     ds.Rows, ds.Columns = img_slice.shape
     ds.SliceThickness = spacings[0]
     ds.PixelSpacing = [spacings[1], spacings[2]]
-    ds.PixelData = img_slice.copy(order='C').astype('int16') -\
-        int(ds.RescaleIntercept)
+    ds.PixelData = (img_slice.copy(order='C').astype('int16') -\
+        int(ds.RescaleIntercept)).tobytes()
     pydicom.dcmwrite(phantom_path, ds)
 
 
@@ -554,11 +554,11 @@ class Scanner():
             ds.ImagePositionPatient[0] = -ds.Rows//2*ds.PixelSpacing[0]
             ds.ImagePositionPatient[1] = -ds.Columns//2*ds.PixelSpacing[1]
             ds.ImagePositionPatient[2] = ds.SliceLocation
-            ds.PixelData = array_slice.copy(order='C').astype('int16') -\
-                int(ds.RescaleIntercept)
+            ds.PixelData = (array_slice.copy(order='C').astype('int16') -\
+                int(ds.RescaleIntercept)).tobytes()
             dcm_fname = fname.parent /\
                 f'{fname.stem}_{slice_idx:03d}{fname.suffix}'\
                 if nslices > 1 else fname
             fnames.append(dcm_fname)
-            pydicom.write_file(dcm_fname, ds)
+            pydicom.dcmwrite(dcm_fname, ds)
         return fnames
