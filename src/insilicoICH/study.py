@@ -101,7 +101,7 @@ class Study:
             self.lesion = mask & (self.images > self.images.mean())
             self.scanner.recon = self.images
 
-            dcm = pydicom.read_file(mask_files[0])
+            dcm = pydicom.dcmread(mask_files[0])
             spacings = list(map(float, [dcm.SliceThickness] +
                             list(dcm.PixelSpacing)))
 
