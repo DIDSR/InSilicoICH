@@ -438,7 +438,7 @@ large, try smaller volume')
             axes = get_semi_major_axes(eccentricity, seed)
             foci = r * axes
             if complexity > 1:
-                correction = np.pow(3/(4*np.pi*complexity), 1/3)+overlap
+                correction = np.power(3/(4*np.pi*complexity), 1/3)+overlap
             else:
                 correction = 1
             # Vol of sphere: V = 4/3*np.pi*r**3, solve for r:
