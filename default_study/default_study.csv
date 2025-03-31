@@ -1,0 +1,3 @@
+age,scanner,kVp,mA,views,zspan,kernel,slice_thickness,intensity,volume,edema,subtype,mass_effect,global_seed,case_seed,output_directory
+9.0,GE_Lightspeed16,120.0,200.0,100.0,"[0, 10]",standard,1,70.1202176136439,2.8495037044527542,4,IPH,True,183879,510414,default_study
+9.0,GE_Lightspeed64,120.0,200.0,100.0,"[0, 10]",standard,1,70.1202176136439,2.8495037044527542,4,IPH,True,183879,510414,default_study

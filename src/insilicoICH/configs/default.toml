@@ -1,0 +1,26 @@
+# This is the default configuration for PedSilicoICH simulations
+[general]
+output_directory="test"
+zspan='dynamic'  # scan range in mm, min max
+desired_cases=10
+keep_raw=false  # keep projection data
+seed=false  # seed to reproduce dataset
+
+[patient]
+age=[38]  # range in yrs
+
+[lesion]
+subtypes=[false, 'IPH', 'EDH', 'SDH']
+mass_effect=true  # whether lesions displace brain tissue
+edema=[0, 15]  # edema width range [min, max] in pixels
+volume='distributions/BHSD_volume_distributions.csv'
+attenuation='distributions/BHSD_HU_distributions.csv'
+
+[acquisition]
+views=50
+kVp=[120]
+mA=[300, 350, 400]
+
+[recon]
+kernel='soft'
+slice_thickness=1
