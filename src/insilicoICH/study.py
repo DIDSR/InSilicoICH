@@ -101,7 +101,7 @@ class Study:
             self.lesion = mask & (self.images > self.images.mean())
             self.scanner.recon = self.images
 
-            dcm = pydicom.read_file(mask_files[0])
+            dcm = pydicom.dcmread(mask_files[0])
             spacings = list(map(float, [dcm.SliceThickness] +
                             list(dcm.PixelSpacing)))
 
@@ -161,27 +161,28 @@ class Study:
             center_z_list.append(slice_z)
             lesion_volume_list.append(vol_ml)
 
-        metadata = pd.DataFrame({'name': names,
-                                 'age': ages,
-                                 'intensity': intensity_list,
-                                 'center x': center_x_list,
-                                 'center y': center_y_list,
-                                 'center z': center_z_list,
-                                 'lesion type': lesion_type_list,
-                                 'mass effect': mass_effect,
-                                 'lesion volume [mL]': lesion_volume_list,
-                                 'mA': mA_list,
+        metadata = pd.DataFrame({'Name': names,
+                                 'Age': ages,
                                  'kVp': kVps,
-                                 'views': views_list,
-                                 'fov [mm]': fovs,
-                                 'kernel': kernels,
-                                 'image file': files,
-                                 'mask file': masks})
+                                 'mA': mA_list,
+                                 'Views': views_list,
+                                 'ReconKernel': kernels,
+                                 'SliceThickness(mm)': slice_thickness,
+                                 'LesionAttenuation(HU)': intensity_list,
+                                 'LesionVolume(mL)': lesion_volume_list,
+                                 'Subtype': lesion_type_list,
+                                 'MassEffect': mass_effect,
+                                 'CenterX': center_x_list,
+                                 'CenterY': center_y_list,
+                                 'CenterZ': center_z_list,
+                                 'FOV(mm)': fovs,
+                                 'ImageFilePath': files,
+                                 'MaskFilePath': masks})
         self.metadata = metadata
         return self
 
 
-def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
+def run_study(output_directory=None, patient_name='default', scanner_model='Scanner_Default', age=38, kVp=120,
               mA=200, intensity=200, volume=5, lesion_type=None,
               mass_effect=True, add_positioning_augmentation=True,
               views=1000, zspan='dynamic', kernel='standard',
@@ -206,11 +207,11 @@ def run_study(output_directory=None, patient_name='default', age=38, kVp=120,
                                mode='nearest')
         phantom.apply_transform(transform, seed=seed)
 
-    scanner = Scanner(phantom, output_dir=output_directory)
+    scanner = Scanner(phantom, scanner_model=scanner_model, output_dir=output_directory)
     study = Study(scanner, 'pilot')
     study.run_study(kVp=kVp, mA=mA, views=views, zspan=zspan,
                     kernel=kernel, slice_thickness=slice_thickness)
-    study.metadata['seed'] = seed
+    study.metadata['CaseSeed'] = seed
     if keep_raw is False:
         rmtree(study.scanner.output_dir / 'phantoms')
         rmtree(study.scanner.output_dir / 'simulations')

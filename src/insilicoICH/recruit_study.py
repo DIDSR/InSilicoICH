@@ -21,6 +21,7 @@ def recruit_patients(output_directory, views=[1000], desired_cases=1,
                                      len(LESION_TYPES)*[[0.1, 60]])),
                      attenuation=dict(zip(LESION_TYPES,
                                       len(LESION_TYPES)*[[0, 90]])),
+                     scanner='Scanner_Default',
                      kVp=[120],
                      mA=[300],
                      save_name=None,
@@ -86,22 +87,24 @@ or csv filepath')
 
     global_seed = random.integers(0, 1e6)
 
-    params = dict(age=[],
-                  kVp=[],
-                  mA=[],
-                  views=[],
-                  zspan=[],
-                  kernel=[],
-                  slice_thickness=[],
-                  intensity=[],
-                  volume=[],
-                  edema=[],
-                  subtype=[],
-                  mass_effect=[],
-                  global_seed=[],
-                  case_seed=[],
-                  output_directory=[]
-                  )
+    params = {
+        'Age': [],
+        'Scanner': [],
+        'kVp': [],
+        'mA': [],
+        'Views': [],
+        'ScanCoverage': [],
+        'ReconKernel': [],
+        'SliceThickness(mm)': [],
+        'LesionAttenuation(HU)': [],
+        'Subtype': [],
+        'LesionVolume(mL)': [],
+        'Edema': [],
+        'MassEffect': [],
+        'GlobalSeed': [],
+        'CaseSeed': [],
+        'OutputDirectory': []
+    }
 
     for _ in range(desired_cases):
         lesion_id = random.choice(subtypes)  # select a random lesion type
@@ -138,21 +141,22 @@ or csv filepath')
 
             edema = random.choice(edema_list)
 
-        params['age'].append(float(random.choice(ages)))
+        params['Age'].append(float(random.choice(ages)))
+        params['Scanner'].append(random.choice(scanner))
         params['kVp'].append(float(random.choice(kVp_list)))
         params['mA'].append(float(random.choice(mA_list)))
-        params['views'].append(float(random.choice(views)))
-        params['zspan'].append(zspan)
-        params['kernel'].append(random.choice(kernel))
-        params['slice_thickness'].append(random.choice(slice_thickness))
-        params['intensity'].append(float(intensity))
-        params['subtype'].append(lesion_id)
-        params['volume'].append(vol)
-        params['edema'].append(edema)
-        params['mass_effect'].append(mass_effect)
-        params['global_seed'].append(global_seed)
-        params['case_seed'].append(random.integers(0, 1e6))
-        params['output_directory'].append(output_directory)
+        params['Views'].append(float(random.choice(views)))
+        params['ScanCoverage'].append(zspan)
+        params['ReconKernel'].append(random.choice(kernel))
+        params['SliceThickness(mm)'].append(random.choice(slice_thickness))
+        params['LesionAttenuation(HU)'].append(float(intensity))
+        params['Subtype'].append(lesion_id)
+        params['LesionVolume(mL)'].append(vol)
+        params['Edema'].append(edema)
+        params['MassEffect'].append(mass_effect)
+        params['GlobalSeed'].append(global_seed)
+        params['CaseSeed'].append(random.integers(0, 1e6))
+        params['OutputDirectory'].append(output_directory)
 
     df = pd.DataFrame(params)
     save_name = save_name or output_directory / \
