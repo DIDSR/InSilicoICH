@@ -395,8 +395,9 @@ class Scanner():
         self.results_dir.mkdir(exist_ok=True, parents=True)
         self.xcist.protocol.spectrumFilename = f"tungsten_tar7.0_{int(kVp)}_filt.dat"  # name of the spectrum file
         self.xcist.cfg.experimentDirectory = str(self.results_dir)
-        self.xcist.cfg.resultsName = str((self.results_dir / f'{mA}mA_{kVp}kV').absolute())  # keep projection data from each scan
-        self.xcist.resultsName = self.xcist.cfg.resultsName
+        proj_file = str((self.results_dir / f'{mA}mA_{kVp}kV').absolute())
+        self.xcist.cfg.resultsName = proj_file
+        self.xcist.resultsName = proj_file
         if pitch == 0:  # axial case
             self._projections = self.axial_scan(startZ, endZ)
         else:  # helical
@@ -408,6 +409,7 @@ class Scanner():
 
         runs axial scan from `startZ` [mm] to endZ [mm]
         '''
+        self.xcist.cfg.protocol.tableSpeed = 0
         self.xcist.cfg.protocol.viewCount =\
             self.xcist.cfg.protocol.viewsPerRotation
         self.xcist.protocol.stopViewId =\
@@ -429,11 +431,14 @@ class Scanner():
         projections = []
         for idx, table_position in enumerate(start_positions):
             print(f'scan: {idx+1}/{len(start_positions)}')
-            self.xcist.cfg.resultsName = str((self.results_dir / f'{idx:03d}_{self.xcist.cfg.resultsName}').absolute())  # keep projection data from each scan
-            self.xcist.resultsName = self.xcist.cfg.resultsName
+            proj_file = str((self.results_dir /
+                            f'{idx:03d}_{Path(self.xcist.resultsName).name}'
+                             ).absolute())
+            self.xcist.cfg.resultsName = proj_file
+            self.xcist.resultsName = proj_file
             self.xcist.protocol.startZ = table_position
             self.xcist.run_all()
-            projections.append(self.xcist.cfg.resultsName)
+            projections.append(proj_file)
         return projections
 
     def helical_scan(self, startZ, endZ, pitch):
@@ -536,6 +541,7 @@ class Scanner():
         'performs axial recon from last acquired scan'
         if self.pitch > 0:
             raise ValueError(f'Axial recon requires scan data with pitch=0, detected pitch: {self.pitch}')
+        self.xcist.cfg.recon.reconType  = 'fdk_equiAngle'
         if not sliceCount:
             valid_slices = int(self.scan_width //
                                self.xcist.recon.sliceThickness)
