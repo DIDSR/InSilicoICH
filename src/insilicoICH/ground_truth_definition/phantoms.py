@@ -719,6 +719,7 @@ from {phantom_dir}')
         self.wm = resize(self.wm, shape).numpy()
         self.mask = resize(self.mask, shape).numpy()
         self.pdw = resize(self.pdw, shape).numpy()
+        self.skull = resize(self.skull, shape).numpy()
 
         new_spacings = np.array(original_shape) / np.array(new_shape) *\
             [self.dz, self.dx, self.dy]
