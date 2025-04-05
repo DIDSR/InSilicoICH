@@ -27,7 +27,6 @@ from scipy.ndimage import (center_of_mass,
                            distance_transform_edt,
                            binary_erosion)
 
-
 def sphere_radius_from_volume(volume):
     '''
     Converts volume in mL to radii in mm
@@ -228,78 +227,114 @@ or
 
 class Phantom:
     '''
-    Base phantom that can accept any img array and spacings which
-        specify the size
+    A base phantom that accepts any image array and spacings to define its size.
 
-    :param img: 2D or 3D numpy array defining the phantom
-    :param spacings: tuple, voxel spacings [mm] (z, x, y), defining voxel
-        sizes, defaults to 1 mm in each direction
-    :param patient_name: patient identifier to be saved in DICOM header
-    :param patientid: int, patient identifier to be saved in DICOM header
-    :param age: float, in years to be saved in DICOM header
+    :param img: numpy.ndarray, 2D or 3D, defining the phantom
+    :param spacings: tuple, voxel spacings [mm] (z, x, y). Definition of voxel sizes.
+                    Default is 1 mm in each direction.
+    :param patient_name: str, patient identifier to be saved in DICOM header. Default is 'default'.
+    :param patientid: int, patient identifier to be saved in DICOM header. Default is 0.
+    :param age: float, patient age in years to be saved in DICOM header. Default is 0.
     '''
     def __init__(self, img: np.ndarray, spacings: tuple = (1, 1, 1),
-                 patient_name='default', patientid=0, age=0) -> None:
+                 patient_name: str = 'default', patientid: int = 0, age: float = 0) -> None:
         self._phantom = img
         self.dz, self.dx, self.dy = spacings
         self.nz, self.nx, self.ny = self._phantom.shape
+        self.patient_name = patient_name
         self.patientid = patientid
         self.age = age
 
     def __repr__(self) -> str:
-        repr = f'''
-        phantom class: {self.__class__.__name__}
-        age [yrs]: {self.age}
-        shape [voxels]: {self.shape}
-        size [mm]: {self.size}
+        string_representation = f'''
+        Phantom Class: {self.__class__.__name__}
+        Age (years): {self.age}
+        Shape (voxels): {self.shape}
+        Size (mm): {self.size}
         '''
-        return repr
+        return string_representation
 
     def get_CT_number_phantom(self) -> np.ndarray:
+        '''Returns the phantom array'''
         return self._phantom
 
     @property
-    def spacings(self):
+    def spacings(self) -> tuple:
+        '''Returns the voxel spacings (z, x, y)'''
         return self.dz, self.dx, self.dy
 
     @property
-    def shape(self):
+    def shape(self) -> list:
+        '''Returns the shape of the phantom array'''
         return list(self._phantom.shape)
 
     @property
-    def size(self):
-        return np.array(self.spacings)*self.shape
+    def size(self) -> np.ndarray:
+        '''Returns the size of the phantom array (mm)'''
+        return np.array(self.spacings) * self.shape
 
-    def resize(self, shape):
+    def resize(self, shape: tuple) -> None:
+        '''
+        Resizes the phantom array to the given shape and adjusts the spacings accordingly.
+
+        :param shape: tuple, new shape for the phantom array
+        '''
         original_shape = np.array(self.shape)
         self._phantom = resize(self._phantom, shape)
         new_shape = np.array(self._phantom.shape)
-        new_spacings = original_shape / new_shape *\
-            [self.dz, self.dx, self.dy]
+        new_spacings = original_shape / new_shape * np.array(self.spacings)
         self.dz, self.dx, self.dy = new_spacings
         self.nz, self.nx, self.ny = shape
 
 
 class LesionPhantom(Phantom):
     '''
-    A Phantom object with methods for inserting lesions
+    A Phantom object with methods for inserting lesions.
     '''
-    def __init__(self, img: np.ndarray, spacings: tuple = (1, 1, 1)):
-        super().__init__(img, spacings)
+    def __init__(self, img: np.ndarray, spacings: tuple = (1, 1, 1), **kwargs):
+        '''
+        Initializes a LesionPhantom object.
+
+        Parameters:
+        - img: numpy.ndarray, image data of the phantom.
+        :param spacings: tuple, voxel spacings (dz, dx, dy). Default is (1, 1, 1).
+        '''
+        super().__init__(img, spacings, **kwargs)
         self._lesion = []
         self._lesion_coords = []
         self.lesion_type = []
         self.lesion_intensity = []  # HU
         self.mass_effect = False
+        self.exclusion_mask = np.zeros(self.shape, dtype=bool)
+
+    def resize(self, shape: tuple) -> None:
+        '''
+        Resizes the phantom array to the given shape and adjusts the spacings accordingly.
+
+        :param shape: tuple, new shape for the phantom array
+        '''
+        super().resize(shape)
+        self.exclusion_mask = resize(self.exclusion_mask, shape).astype(bool)
 
     def get_lesion_volume(self, unit='mL'):
-        vol_mm3 = self.dx*self.dy*self.dz*self.get_lesion_mask().sum()
+        '''
+        Calculates the volume of the lesion in either milliliters (mL) or cubic millimeters (mm3).
+
+        :param unit: str, unit of the lesion volume. Default is 'mL'.
+        :return: float, volume of the lesion.
+        '''
+        vol_mm3 = self.dx * self.dy * self.dz * self.get_lesion_mask().sum()
         if unit == 'mm3':
             return vol_mm3
         if unit == 'mL':
-            return vol_mm3/1000
+            return vol_mm3 / 1000
 
     def __repr__(self) -> str:
+        '''
+        Returns a string representation of the LesionPhantom object.
+
+        :return: str, string representation of the LesionPhantom object.
+        '''
         repr = super().__repr__() + f'''
         Number of lesions: {len(self._lesion_coords)}
         Lesion locations [voxel index (z, x, y)]: {self._lesion_coords}
@@ -309,45 +344,38 @@ class LesionPhantom(Phantom):
 
     @property
     def spacings(self):
+        '''
+        Returns the voxel spacings of the phantom.
+
+        :return: tuple, voxel spacings (dz, dx, dy).
+        '''
         return self.dz, self.dx, self.dy
 
-    def insert_lesion(self, lesion_type, volume=5, intensity=50,
-                      mass_effect=False, seed=None, **kwargs):
+    def insert_lesion(self, lesion_type, volume=5, intensity=50, mass_effect=False, seed=None, **kwargs):
         '''
-        inserts lesion of `lesion_type` into phantom array
+        Inserts a lesion of a specified type into the phantom array.
 
-        :param lesion_type: str, options include
-            ['IPH', 'EDH', 'SDH'],
-            see associated methods `add_round_lesion`, `_add_dural_lesion`
-        :param volume: in mL, volume of the lesion
-        :param intensity: lesion CT number in HU
-        :param mass_effect: optional, bool whether to apply mass effect
-            processing to displace brain tissue following lesion insertion
-        :param seed: optional, int specify seed for reproducible lesion
-            insertion, otherwise random
-
-        :return: self
+        :param lesion_type: str, type of the lesion. Options include 'IPH' (intraparenchymal), 'EDH' (epidural), and 'SDH' (subdural).
+        :param volume: float, volume of the lesion in mL. Default is 5.
+        :param intensity: int, CT number of the lesion in HU. Default is 50.
+        :param mass_effect: bool, whether to apply mass effect processing to displace brain tissue following lesion insertion. Default is False.
+        :param seed: int, optional seed for reproducible lesion insertion. Default is None.
+        :param kwargs: additional keyword arguments to pass to the lesion insertion function.
+        :return: self, the updated LesionPhantom object.
         '''
         if volume <= 0:
             return self
         self.lesion_type.append(lesion_type)
         self.mass_effect = mass_effect
         if lesion_type == 'IPH':
-            img_w_lesion, lesion_image, lesion_coords =\
-                self.add_round_lesion(volume=volume,
-                                      intensity=intensity,
-                                      mass_effect=mass_effect,
-                                      seed=seed,
-                                      **kwargs)
+            img_w_lesion, lesion_image, lesion_coords = \
+                self.add_round_lesion(volume=volume, intensity=intensity, mass_effect=mass_effect, seed=seed, **kwargs)
         elif lesion_type in ['EDH', 'SDH']:
-            img_w_lesion, lesion_image, lesion_coords =\
-                self._add_dural_lesion(volume, lesion_type, intensity,
-                                       mass_effect=mass_effect,
-                                       seed=seed)
+            img_w_lesion, lesion_image, lesion_coords = \
+                self._add_dural_lesion(volume, lesion_type, intensity, mass_effect=mass_effect, seed=seed)
         else:
-            raise ValueError(f'unknown lesion type passed: {lesion_type}\
-                             currently accepts IPH (intraparenchymal),\
-                                 EDH (epidural), or SDH (subdural)')
+            raise ValueError(f'unknown lesion type passed: {lesion_type}. '
+                             'Currently accepts IPH (intraparenchymal), EDH (epidural), or SDH (subdural).')
         self._phantom = img_w_lesion
         self._lesion.append(lesion_image)
         self._lesion_coords.append(lesion_coords)
@@ -451,8 +479,8 @@ large, try smaller volume')
                                         np.ones(3*[edema])) ^ lesion_mask
             lesion_vol[edema_mask] = edema_HU
             lesion_mask = lesion_vol > -1000
-        lesion_mask = lesion_mask & ~self.get_skull_map().astype(bool)
-        img_w_lesion = img.copy()
+        lesion_mask = lesion_mask & ~self.exclusion_mask
+        img_w_lesion = np.copy(img)
         img_w_lesion[lesion_mask] = lesion_vol[lesion_mask]
 
         if mass_effect:
@@ -460,7 +488,7 @@ large, try smaller volume')
                 mass_effect = 0.5
             warped = insert_with_mass_effect(img,
                                              lesion_mask,
-                                             self.get_skull_map(),
+                                             self.exclusion_mask,
                                              strength=mass_effect)
             warped[lesion_mask] = img_w_lesion[lesion_mask]
             img_w_lesion[lesion_mask.sum(axis=(1, 2)) > 0] =\
@@ -511,6 +539,7 @@ class HeadPhantom(LesionPhantom):
         super().__init__(phantom, spacings)
         if shape:
             self.resize(shape)
+        self.exclusion_mask = self.get_skull_map().astype(bool)
 
     def load_phantom(self, phantom_dir) -> tuple[np.ndarray, tuple[int, int, int]]:
         'returns phantom and spacings'
