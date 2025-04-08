@@ -177,7 +177,7 @@ phantom.overwrite = True  # Flag to overwrite existing files without warning.
     dicom_to_voxelized_phantom.run_from_config(dicom_to_voxel_cfg)
 
 
-def load_phantom(age=38, shape=None, skull_seg_method='otsu', name='default'):
+def load_phantom(age=38, shape=None, skull_seg_method='pseudoct', name='default'):
     '''
     Loads appropriate phantom based on age as a keyword
 
@@ -623,7 +623,7 @@ class NIHPD_Head(HeadPhantom):
                                   [0.8, 0.82, 0.85, 0.87, 0.9, 0.95]))
     def __init__(self, phantom_dir, age: float, symmetric=False, csf_HU=10,
                  gm_HU=40, wm_HU=30, skull_HU=900, shape=None,
-                 skull_seg_method='otsu'):
+                 skull_seg_method='pseudoct'):
         phantom_dir = Path(phantom_dir)
         if not phantom_dir.exists():
             print(f'''
