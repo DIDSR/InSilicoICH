@@ -445,6 +445,9 @@ class LesionPhantom(Phantom):
 
         lesion_vol = np.zeros_like(img)
         valid_points = distance_transform_edt(mask) > (r * overlap)
+        r_int = np.ceil(r).astype(int)
+        valid_points[:r_int] = False  # ensures lesion is not at the boundary of the phantom
+        valid_points[-r_int:] = False
         if not valid_points.any():
             raise RuntimeError(f'Requested volume: {volume} mL too \
 large, try smaller volume')
