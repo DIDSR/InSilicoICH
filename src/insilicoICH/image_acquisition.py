@@ -412,6 +412,7 @@ class Scanner():
         self.xcist.cfg.protocol.tableSpeed = 0
         self.xcist.cfg.protocol.viewCount =\
             self.xcist.cfg.protocol.viewsPerRotation
+        self.xcist.cfg.protocol.startViewId = 0
         self.xcist.protocol.stopViewId =\
             self.xcist.cfg.protocol.startViewId + self.xcist.cfg.protocol.viewCount - 1
 
@@ -453,12 +454,10 @@ class Scanner():
         self.xcist.cfg.protocol.startZ = startZ
         self.xcist.cfg.protocol.scanTrajectory = "Gantry_Helical"
 
-        exam_range = endZ - startZ
-        table_feed_per_rotation = self.scan_width * pitch  # distance covered in mm in a 360 degree scan rotation
-        rotations = exam_range / table_feed_per_rotation
-
-        self.xcist.cfg.protocol.viewCount = np.ceil(
-            self.xcist.cfg.protocol.viewsPerRotation*rotations).astype(int)
+        rotations = self.rotations_per_scan(startZ, endZ, pitch)
+        self.xcist.cfg.protocol.viewCount =\
+            self.xcist.cfg.protocol.viewsPerRotation*rotations
+        self.xcist.cfg.protocol.startViewId = 0
         self.xcist.cfg.protocol.stopViewId =\
             self.xcist.cfg.protocol.startViewId + self.xcist.cfg.protocol.viewCount - 1
 
@@ -484,7 +483,12 @@ class Scanner():
         if pitch > 0:  # helical scan mode
             exam_range = endZ - startZ
             table_feed_per_rotation = self.scan_width * pitch  # distance covered in mm in a 360 degree scan rotation
-            return exam_range / table_feed_per_rotation
+            # XCIST assumes integer number of rotations, no partial rotations or else strange artifacts occur
+            rotations = exam_range / table_feed_per_rotation
+            rotations = np.round(rotations).astype(int)
+            if rotations % 2 == 0:
+                rotations += 1  # need odd number of rotations
+            return rotations
         else:  # axial scan mode
             return len(start_positions)
 
