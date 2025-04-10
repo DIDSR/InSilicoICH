@@ -134,6 +134,7 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
                                boundary=temp_boundary,
                                hematoma_type=hematoma_type)
 
+            #print(init_slice)
             if mass_effect:
                 try:
                     warped_slice = warp_slice(HU_array[init_slice, :],
@@ -158,6 +159,15 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
             slice_idx = slice_counter
         elif slice_counter > (num_slices-1)/2:  # start moving up from init_slice
             slice_idx = -1*(slice_counter - int((num_slices-1)/2))
+    
+        if int(init_slice-slice_idx) == 143:
+            print('pre-warp-mean: ' + str(np.mean(HU_array[init_slice-slice_idx, :])))
+            print('pre-warp-std: ' + str(np.std(HU_array[init_slice-slice_idx, :])))
+            print(init_slice-slice_idx)
+            import matplotlib.pyplot as plt 
+            plt.figure()
+            plt.imshow(HU_array[init_slice-slice_idx, :])
+            plt.show()
 
         temp_boundary = boundary[init_slice-slice_idx]
         dura_idx = np.argwhere(temp_boundary == 1.0)
@@ -196,6 +206,14 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
                     new_volume[init_slice-slice_idx] =\
                         HU_array[init_slice-slice_idx]
                     phantom.mass_effect = 0
+
+            if int(init_slice-slice_idx) == 143:
+                print('post-warp-mean: ' + str(np.mean(new_volume[init_slice-slice_idx, :])))
+                print('post-warp-std: ' + str(np.std(new_volume[init_slice-slice_idx, :])))
+                print(init_slice-slice_idx)
+                plt.figure()
+                plt.imshow(new_volume[init_slice-slice_idx, :])
+                plt.show()
 
             hemorrhage_mask[init_slice-slice_idx] = filled_array
 
