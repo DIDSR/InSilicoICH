@@ -111,10 +111,6 @@ def initialize_xcist(ground_truth_image, spacings=(1, 1, 1),
     return ct
 
 
-_table_speed = {'Low': 26.67, 'Intermediate': 48, 'High': 64}
-# https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5711061/
-
-
 class Scanner():
     """
     A class to hold CT simulation data and run simulations
@@ -179,50 +175,30 @@ class Scanner():
         self.groundtruth = None
         self.patient_diameter = 18
         self.zspan = 'dynamic'
-        self.table_speed = 'Intermediate'
+        # self.table_speed = 'Intermediate'
+        self.total_scan_length = self.phantom.spacings[0]*self.phantom.shape[0]
         self.pitch = 1
-
         self.xcist = initialize_xcist(img, self.phantom.spacings,
                                       scanner_model=self.scanner_model,
                                       output_dir=self.output_dir,
                                       phantom_id=phantom.patientid,
                                       materials=materials)
+        M = self.xcist.cfg.scanner.sdd/self.xcist.cfg.scanner.sid
+        sliceThickness = self.xcist.cfg.scanner.detectorRowSize/M
+        self.nominal_aperature = sliceThickness*self.xcist.cfg.scanner.detectorRowCount # nominal_aperature == s
         self.start_positions = self.calculate_start_positions()
 
-    def calculate_start_positions(self):
+    def calculate_start_positions(self, startZ=None, endZ=None):
         'determine number of axial scans required to cover the phantom'
-        self.total_scan_length = self.phantom.spacings[0]*self.phantom.shape[0]
-        pitch = self.pitch
-        scan_width = self.scan_width*pitch if pitch else self.scan_width
-        return np.arange(-self.total_scan_length/2,
-                         self.total_scan_length/2,
-                         scan_width)
-
-    @property
-    def scan_width(self):
-        'nominal collimated beam width; the native scan width in axial mode'
-        detector_width = self.xcist.scanner.detectorRowCount *\
-            self.xcist.scanner.detectorRowSize
-        magnification = self.xcist.scanner.sdd / self.xcist.scanner.sid
-        detector_width = detector_width / magnification
-        detector_width = detector_width - 2*self.xcist.scanner.detectorRowSize
-        return detector_width
-
-    @property
-    def table_speed(self):
-        'patient table motion getter in units of mm/s'
-        return self._table_speed
-
-    @table_speed.setter
-    def table_speed(self, table_speed=None):
-        '''patient table motion setter in units of mm/s'
-
-        param table_speed: optional, (float, str), or `Low`, `Intermediate`, `High`
-        '''
-        if isinstance(table_speed, str):
-            self._table_speed = _table_speed[table_speed]
+        if startZ is None:
+            startZ = -self.total_scan_length/2
         else:
-            self._table_speed = table_speed
+            startZ = max(-self.total_scan_length/2, startZ)
+        if endZ is None:
+            endZ = self.total_scan_length/2
+        else:
+            endZ = min(endZ, self.total_scan_length/2)
+        return np.arange(startZ, endZ, self.nominal_aperature)
 
     def recommend_scan_range(self, threshold=-950) -> tuple:
         '''
@@ -283,18 +259,7 @@ class Scanner():
         :param endZ: optional last position of scan in mm,
             see self.start_positions
         '''
-        self.start_positions = self.calculate_start_positions()
-        start_positions = self.start_positions.copy()
-        if startZ is not None:
-            if startZ < start_positions.min():
-                raise ValueError(f'startZ is outside the range of valid\
-                                  start positions: {self.start_positions}')
-            start_positions = start_positions[start_positions > startZ]
-        if endZ is not None:
-            if endZ > self.start_positions.max():
-                raise ValueError(f'startZ is outside the range of valid\
-                                  start positions: {self.start_positions}')
-            start_positions = start_positions[start_positions < endZ]
+        start_positions = self.calculate_start_positions(startZ, endZ)
         img = self.phantom.get_CT_number_phantom()
         plt.imshow(img.sum(axis=1), cmap='gray', origin='lower',
                    extent=[-img.shape[0]*self.phantom.spacings[0]/2,
@@ -307,19 +272,19 @@ class Scanner():
         plt.annotate('Stop', (0, start_positions[0]-10),
                      horizontalalignment='center')
 
-        plt.hlines(y=start_positions[-1] + self.scan_width*pitch,
+        plt.hlines(y=start_positions[-1] + self.nominal_aperature,
                    xmin=-img.shape[0]*self.phantom.spacings[0]/2,
                    xmax=img.shape[0]*self.phantom.spacings[0]/2, color='red')
-        plt.annotate('Start', (0, start_positions[-1] + self.scan_width*pitch + 10),
+        plt.annotate('Start', (0, start_positions[-1] + self.nominal_aperature + 10),
                      horizontalalignment='center')
         rotations = self.rotations_per_scan(startZ, endZ, pitch)
         plt.annotate(f'{rotations:.2f} scans required',
                      xy=(0, (start_positions[0]+start_positions[-1])/2),
                      horizontalalignment='center')
-        plt.annotate('', xy=(40, start_positions[-1] + self.scan_width*pitch),
+        plt.annotate('', xy=(40, start_positions[-1] + self.nominal_aperature),
                      xytext=(40, start_positions[0]),
                      arrowprops=dict(facecolor='black', shrink=0.05))
-        speed = self.calc_table_speed(startZ, endZ, pitch) if pitch > 0 else 0
+        speed = pitch*self.nominal_aperature/self.xcist.cfg.protocol.rotationTime
         plt.title(f'Table Speed: {speed:.2f} mm/s')
         plt.ylabel('scan z position [mm]')
         plt.xlabel('scan x position [mm]')
@@ -416,19 +381,7 @@ class Scanner():
         self.xcist.protocol.stopViewId =\
             self.xcist.cfg.protocol.startViewId + self.xcist.cfg.protocol.viewCount - 1
 
-        self.start_positions = self.calculate_start_positions()
-        start_positions = self.start_positions
-
-        if startZ is not None:
-            if startZ < start_positions.min():
-                raise ValueError(f'startZ is outside the range of valid\
-                                  start positions: {self.start_positions}')
-            start_positions = start_positions[start_positions > startZ]
-        if endZ is not None:
-            if endZ > start_positions.max():
-                raise ValueError(f'startZ is outside the range of valid\
-                                  start positions: {self.start_positions}')
-            start_positions = start_positions[start_positions < endZ]
+        start_positions = self.calculate_start_positions(startZ, endZ)
         projections = []
         for idx, table_position in enumerate(start_positions):
             print(f'scan: {idx+1}/{len(start_positions)}')
@@ -448,7 +401,7 @@ class Scanner():
         runs helical scan from `startZ` [mm] to endZ [mm]
         '''
         startZ = startZ or self.start_positions[0]
-        endZ = endZ or self.start_positions[-1] + self.scan_width
+        endZ = endZ or self.start_positions[-1] + self.nominal_aperature
 
         self.startZ, self.endZ = startZ, endZ
         self.xcist.cfg.protocol.startZ = startZ
@@ -461,46 +414,24 @@ class Scanner():
         self.xcist.cfg.protocol.stopViewId =\
             self.xcist.cfg.protocol.startViewId + self.xcist.cfg.protocol.viewCount - 1
 
-        self.xcist.cfg.protocol.tableSpeed =\
-            self.calc_table_speed(startZ, endZ, pitch)
+        self.xcist.cfg.protocol.tableSpeed = pitch*self.nominal_aperature/self.xcist.cfg.protocol.rotationTime
         self.xcist.run_all()
         projections = [self.xcist.cfg.resultsName]
         return projections
 
     def rotations_per_scan(self, startZ=None, endZ=None, pitch=1):
         'determines how many rotations are required to get from startZ to endZ based on the pitch'
-        self.start_positions = self.calculate_start_positions()
-        start_positions = self.start_positions.copy()
-        if startZ:
-            start_positions = start_positions[start_positions > startZ]
-        else:
-            startZ = start_positions[0]
-        if endZ:
-            start_positions = start_positions[start_positions < endZ]
-        else:
-            endZ = start_positions[-1] + self.scan_width
-
+        start_positions = self.calculate_start_positions(startZ, endZ)
         if pitch > 0:  # helical scan mode
+            table_travel_per_rotation = pitch*self.nominal_aperature # table_travel_per_rotation == d
             exam_range = endZ - startZ
-            table_feed_per_rotation = self.scan_width * pitch  # distance covered in mm in a 360 degree scan rotation
-            # XCIST assumes integer number of rotations, no partial rotations or else strange artifacts occur
-            rotations = exam_range / table_feed_per_rotation
-            rotations = np.round(rotations).astype(int)
+            rotations = exam_range / table_travel_per_rotation
+            rotations = np.ceil(rotations).astype(int)
             if rotations % 2 == 0:
                 rotations += 1  # need odd number of rotations
             return rotations
         else:  # axial scan mode
             return len(start_positions)
-
-    def calc_table_speed(self, startZ, endZ, pitch):
-        if not startZ:
-            startZ = self.start_positions[0]
-        if not endZ:
-            endZ = self.start_positions[0] + self.scan_width
-        exam_range = endZ - startZ
-        rotations = self.rotations_per_scan(startZ, endZ, pitch)
-        scan_duration = rotations * self.xcist.cfg.protocol.rotationTime
-        return exam_range / scan_duration
 
     def run_recon(self, fov=None, sliceThickness=None, sliceCount=None,
                   mu_water=None, kernel='standard'):
@@ -545,10 +476,10 @@ class Scanner():
         'performs axial recon from last acquired scan'
         if self.pitch > 0:
             raise ValueError(f'Axial recon requires scan data with pitch=0, detected pitch: {self.pitch}')
-        self.xcist.cfg.recon.reconType  = 'fdk_equiAngle'
+        self.xcist.cfg.recon.reconType = 'fdk_equiAngle'
         if not sliceCount:
-            valid_slices = int(self.scan_width //
-                               self.xcist.recon.sliceThickness)
+            scan_width = 0.8*self.nominal_aperature
+            valid_slices = int(scan_width // self.xcist.recon.sliceThickness)
             self.xcist.cfg.recon.sliceCount = valid_slices
         else:
             self.xcist.cfg.recon.sliceCount = sliceCount
