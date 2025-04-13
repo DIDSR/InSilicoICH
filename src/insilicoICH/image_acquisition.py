@@ -277,7 +277,9 @@ class Scanner():
                    xmax=img.shape[0]*self.phantom.spacings[0]/2, color='red')
         plt.annotate('Start', (0, start_positions[-1] + self.nominal_aperature + 10),
                      horizontalalignment='center')
-        rotations = self.rotations_per_scan(startZ, endZ, pitch)
+        rotations = len(self.calculate_start_positions(startZ, endZ))
+        if pitch:
+            rotations /= pitch
         plt.annotate(f'{rotations:.2f} scans required',
                      xy=(0, (start_positions[0]+start_positions[-1])/2),
                      horizontalalignment='center')
@@ -363,6 +365,8 @@ class Scanner():
         proj_file = str((self.results_dir / f'{mA}mA_{kVp}kV').absolute())
         self.xcist.cfg.resultsName = proj_file
         self.xcist.resultsName = proj_file
+        startZ = startZ or self.start_positions[0]
+        endZ = endZ or self.start_positions[-1]
         if pitch == 0:  # axial case
             self._projections = self.axial_scan(startZ, endZ)
         else:  # helical
@@ -400,38 +404,23 @@ class Scanner():
 
         runs helical scan from `startZ` [mm] to endZ [mm]
         '''
-        startZ = startZ or self.start_positions[0]
-        endZ = endZ or self.start_positions[-1] + self.nominal_aperature
+        self.xcist.cfg.protocol.scanTrajectory = "Gantry_Helical"
+        self.xcist.cfg.protocol.startZ = startZ
 
         self.startZ, self.endZ = startZ, endZ
-        self.xcist.cfg.protocol.startZ = startZ
-        self.xcist.cfg.protocol.scanTrajectory = "Gantry_Helical"
+        self.xcist.cfg.protocol.tableSpeed = pitch*self.nominal_aperature/self.xcist.cfg.protocol.rotationTime # v = h*s/t
+        table_travel_per_rotation = self.xcist.cfg.protocol.tableSpeed*self.xcist.cfg.protocol.rotationTime # table_travel_per_rotation == d == v*t
+        scan_length = endZ - startZ
+        rotations = np.ceil(scan_length / table_travel_per_rotation).astype(int)
+        if rotations % 2 == 0:
+            rotations += 1
 
-        rotations = self.rotations_per_scan(startZ, endZ, pitch)
-        self.xcist.cfg.protocol.viewCount =\
-            self.xcist.cfg.protocol.viewsPerRotation*rotations
+        self.xcist.cfg.protocol.viewCount = self.xcist.cfg.protocol.viewsPerRotation*rotations
         self.xcist.cfg.protocol.startViewId = 0
-        self.xcist.cfg.protocol.stopViewId =\
-            self.xcist.cfg.protocol.startViewId + self.xcist.cfg.protocol.viewCount - 1
-
-        self.xcist.cfg.protocol.tableSpeed = pitch*self.nominal_aperature/self.xcist.cfg.protocol.rotationTime
+        self.xcist.cfg.protocol.stopViewId = self.xcist.cfg.protocol.startViewId + self.xcist.cfg.protocol.viewCount - 1
         self.xcist.run_all()
         projections = [self.xcist.cfg.resultsName]
         return projections
-
-    def rotations_per_scan(self, startZ=None, endZ=None, pitch=1):
-        'determines how many rotations are required to get from startZ to endZ based on the pitch'
-        start_positions = self.calculate_start_positions(startZ, endZ)
-        if pitch > 0:  # helical scan mode
-            table_travel_per_rotation = pitch*self.nominal_aperature # table_travel_per_rotation == d
-            exam_range = endZ - startZ
-            rotations = exam_range / table_travel_per_rotation
-            rotations = np.ceil(rotations).astype(int)
-            if rotations % 2 == 0:
-                rotations += 1  # need odd number of rotations
-            return rotations
-        else:  # axial scan mode
-            return len(start_positions)
 
     def run_recon(self, fov=None, sliceThickness=None, sliceCount=None,
                   mu_water=None, kernel='standard'):
@@ -465,24 +454,21 @@ class Scanner():
         if self.pitch > 0:
             self.recon = self.helical_recon()
         else:
-            self.recon = self.axial_recon(sliceCount)
+            self.recon = self.axial_recon()
         self.projections = get_projection_data(self.xcist)
         self.groundtruth = None
         self.I0 = self.xcist.cfg.protocol.mA
         self.nsims = 1
         return self
 
-    def axial_recon(self, sliceCount):
+    def axial_recon(self):
         'performs axial recon from last acquired scan'
         if self.pitch > 0:
             raise ValueError(f'Axial recon requires scan data with pitch=0, detected pitch: {self.pitch}')
         self.xcist.cfg.recon.reconType = 'fdk_equiAngle'
-        if not sliceCount:
-            scan_width = 0.8*self.nominal_aperature
-            valid_slices = int(scan_width // self.xcist.recon.sliceThickness)
-            self.xcist.cfg.recon.sliceCount = valid_slices
-        else:
-            self.xcist.cfg.recon.sliceCount = sliceCount
+        scan_width = 0.8*self.nominal_aperature
+        valid_slices = int(scan_width // self.xcist.recon.sliceThickness)
+        self.xcist.cfg.recon.sliceCount = valid_slices
         recons = []
         for proj in self._projections:
             self.xcist.cfg.resultsName = proj
