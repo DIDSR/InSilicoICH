@@ -365,8 +365,8 @@ class Scanner():
         proj_file = str((self.results_dir / f'{mA}mA_{kVp}kV').absolute())
         self.xcist.cfg.resultsName = proj_file
         self.xcist.resultsName = proj_file
-        startZ = startZ or self.start_positions[0]
-        endZ = endZ or self.start_positions[-1]
+        startZ = self.start_positions[0] if startZ is None else startZ
+        endZ = self.start_positions[-1] if endZ is None else endZ
         if pitch == 0:  # axial case
             self._projections = self.axial_scan(startZ, endZ)
         else:  # helical
@@ -463,8 +463,6 @@ class Scanner():
 
     def axial_recon(self):
         'performs axial recon from last acquired scan'
-        if self.pitch > 0:
-            raise ValueError(f'Axial recon requires scan data with pitch=0, detected pitch: {self.pitch}')
         self.xcist.cfg.recon.reconType = 'fdk_equiAngle'
         scan_width = 0.8*self.nominal_aperature
         valid_slices = int(scan_width // self.xcist.recon.sliceThickness)
