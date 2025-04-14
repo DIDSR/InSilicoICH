@@ -25,9 +25,7 @@ from ..lesion_definition import (elliptical_lesion,
                                  get_perimeter)
 from scipy.ndimage import (center_of_mass,
                            distance_transform_edt,
-                           binary_dilation,
                            binary_erosion)
-
 
 def sphere_radius_from_volume(volume):
     '''
@@ -229,85 +227,114 @@ or
 
 class Phantom:
     '''
-    Base phantom that can accept any img array and spacings which
-        specify the size
+    A base phantom that accepts any image array and spacings to define its size.
 
-    :param img: 2D or 3D numpy array defining the phantom
-    :param spacings: tuple, voxel spacings [mm] (z, x, y), defining voxel
-        sizes, defaults to 1 mm in each direction
-    :param patient_name: patient identifier to be saved in DICOM header
-    :param patientid: int, patient identifier to be saved in DICOM header
-    :param age: float, in years to be saved in DICOM header
+    :param img: numpy.ndarray, 2D or 3D, defining the phantom
+    :param spacings: tuple, voxel spacings [mm] (z, x, y). Definition of voxel sizes.
+                    Default is 1 mm in each direction.
+    :param patient_name: str, patient identifier to be saved in DICOM header. Default is 'default'.
+    :param patientid: int, patient identifier to be saved in DICOM header. Default is 0.
+    :param age: float, patient age in years to be saved in DICOM header. Default is 0.
     '''
     def __init__(self, img: np.ndarray, spacings: tuple = (1, 1, 1),
-                 patient_name='default', patientid=0, age=0) -> None:
+                 patient_name: str = 'default', patientid: int = 0, age: float = 0) -> None:
         self._phantom = img
         self.dz, self.dx, self.dy = spacings
+        self.nz, self.nx, self.ny = self._phantom.shape
         self.patient_name = patient_name
         self.patientid = patientid
         self.age = age
 
     def __repr__(self) -> str:
-        repr = f'''
-        phantom class: {self.__class__.__name__}
-        age [yrs]: {self.age}
-        shape [voxels]: {self.shape}
-        size [mm]: {self.size}
+        string_representation = f'''
+        Phantom Class: {self.__class__.__name__}
+        Age (years): {self.age}
+        Shape (voxels): {self.shape}
+        Size (mm): {self.size}
         '''
-        return repr
+        return string_representation
 
     def get_CT_number_phantom(self) -> np.ndarray:
+        '''Returns the phantom array'''
         return self._phantom
 
     @property
-    def spacings(self):
+    def spacings(self) -> tuple:
+        '''Returns the voxel spacings (z, x, y)'''
         return self.dz, self.dx, self.dy
 
     @property
-    def shape(self):
+    def shape(self) -> list:
+        '''Returns the shape of the phantom array'''
         return list(self._phantom.shape)
 
     @property
-    def size(self):
-        return np.array(self.spacings)*self.shape
+    def size(self) -> np.ndarray:
+        '''Returns the size of the phantom array (mm)'''
+        return np.array(self.spacings) * self.shape
+
+    def resize(self, shape: tuple) -> None:
+        '''
+        Resizes the phantom array to the given shape and adjusts the spacings accordingly.
+
+        :param shape: tuple, new shape for the phantom array
+        '''
+        original_shape = np.array(self.shape)
+        self._phantom = resize(self._phantom, shape)
+        new_shape = np.array(self._phantom.shape)
+        new_spacings = original_shape / new_shape * np.array(self.spacings)
+        self.dz, self.dx, self.dy = new_spacings
+        self.nz, self.nx, self.ny = shape
 
 
-class HeadPhantom(Phantom):
-    def __init__(self, phantom_dir):
-        self.phantom_dir = phantom_dir
-        self.materials = {'gray matter': 40,
-                          'white matter': 30,
-                          'CSF': 10,
-                          'skull': 1000}
-        self.patientid = 0
+class LesionPhantom(Phantom):
+    '''
+    A Phantom object with methods for inserting lesions.
+    '''
+    def __init__(self, img: np.ndarray, spacings: tuple = (1, 1, 1), **kwargs):
+        '''
+        Initializes a LesionPhantom object.
+
+        Parameters:
+        - img: numpy.ndarray, image data of the phantom.
+        :param spacings: tuple, voxel spacings (dz, dx, dy). Default is (1, 1, 1).
+        '''
+        super().__init__(img, spacings, **kwargs)
         self._lesion = []
         self._lesion_coords = []
         self.lesion_type = []
         self.lesion_intensity = []  # HU
         self.mass_effect = False
+        self.exclusion_mask = np.zeros(self.shape, dtype=bool)
 
-    def get_material_mask(self, material):
-        pass
+    def resize(self, shape: tuple) -> None:
+        '''
+        Resizes the phantom array to the given shape and adjusts the spacings accordingly.
 
-    def get_dura_map(self):
-        'used for EDH, SDH lesion insertion'
-        pass
-
-    def get_skull_map(self):
-        'used for lesion insertion mass effect warping'
-        pass
-
-    def get_lesion_mask(self):
-        return self._lesion[0]
+        :param shape: tuple, new shape for the phantom array
+        '''
+        super().resize(shape)
+        self.exclusion_mask = resize(self.exclusion_mask, shape).astype(bool)
 
     def get_lesion_volume(self, unit='mL'):
-        vol_mm3 = self.dx*self.dy*self.dz*self.get_lesion_mask().sum()
+        '''
+        Calculates the volume of the lesion in either milliliters (mL) or cubic millimeters (mm3).
+
+        :param unit: str, unit of the lesion volume. Default is 'mL'.
+        :return: float, volume of the lesion.
+        '''
+        vol_mm3 = self.dx * self.dy * self.dz * self.get_lesion_mask().sum()
         if unit == 'mm3':
             return vol_mm3
         if unit == 'mL':
-            return vol_mm3/1000
+            return vol_mm3 / 1000
 
     def __repr__(self) -> str:
+        '''
+        Returns a string representation of the LesionPhantom object.
+
+        :return: str, string representation of the LesionPhantom object.
+        '''
         repr = super().__repr__() + f'''
         Number of lesions: {len(self._lesion_coords)}
         Lesion locations [voxel index (z, x, y)]: {self._lesion_coords}
@@ -317,45 +344,38 @@ class HeadPhantom(Phantom):
 
     @property
     def spacings(self):
+        '''
+        Returns the voxel spacings of the phantom.
+
+        :return: tuple, voxel spacings (dz, dx, dy).
+        '''
         return self.dz, self.dx, self.dy
 
-    def insert_lesion(self, lesion_type, volume=5, intensity=50,
-                      mass_effect=False, seed=None, **kwargs):
+    def insert_lesion(self, lesion_type, volume=5, intensity=50, mass_effect=False, seed=None, **kwargs):
         '''
-        inserts lesion of `lesion_type` into phantom array
+        Inserts a lesion of a specified type into the phantom array.
 
-        :param lesion_type: str, options include
-            ['IPH', 'EDH', 'SDH'],
-            see associated methods `add_round_lesion`, `_add_dural_lesion`
-        :param volume: in mL, volume of the lesion
-        :param intensity: lesion CT number in HU
-        :param mass_effect: optional, bool whether to apply mass effect
-            processing to displace brain tissue following lesion insertion
-        :param seed: optional, int specify seed for reproducible lesion
-            insertion, otherwise random
-
-        :return: img_w_lesion, lesion_image, lesion_coords
+        :param lesion_type: str, type of the lesion. Options include 'IPH' (intraparenchymal), 'EDH' (epidural), and 'SDH' (subdural).
+        :param volume: float, volume of the lesion in mL. Default is 5.
+        :param intensity: int, CT number of the lesion in HU. Default is 50.
+        :param mass_effect: bool, whether to apply mass effect processing to displace brain tissue following lesion insertion. Default is False.
+        :param seed: int, optional seed for reproducible lesion insertion. Default is None.
+        :param kwargs: additional keyword arguments to pass to the lesion insertion function.
+        :return: self, the updated LesionPhantom object.
         '''
         if volume <= 0:
             return self
         self.lesion_type.append(lesion_type)
         self.mass_effect = mass_effect
         if lesion_type == 'IPH':
-            img_w_lesion, lesion_image, lesion_coords =\
-                self.add_round_lesion(volume=volume,
-                                      intensity=intensity,
-                                      mass_effect=mass_effect,
-                                      seed=seed,
-                                      **kwargs)
+            img_w_lesion, lesion_image, lesion_coords = \
+                self.add_round_lesion(volume=volume, intensity=intensity, mass_effect=mass_effect, seed=seed, **kwargs)
         elif lesion_type in ['EDH', 'SDH']:
-            img_w_lesion, lesion_image, lesion_coords =\
-                self._add_dural_lesion(volume, lesion_type, intensity,
-                                       mass_effect=mass_effect,
-                                       seed=seed)
+            img_w_lesion, lesion_image, lesion_coords = \
+                self._add_dural_lesion(volume, lesion_type, intensity, mass_effect=mass_effect, seed=seed)
         else:
-            raise ValueError(f'unknown lesion type passed: {lesion_type}\
-                             currently accepts IPH (intraparenchymal),\
-                                 EDH (epidural), or SDH (subdural)')
+            raise ValueError(f'unknown lesion type passed: {lesion_type}. '
+                             'Currently accepts IPH (intraparenchymal), EDH (epidural), or SDH (subdural).')
         self._phantom = img_w_lesion
         self._lesion.append(lesion_image)
         self._lesion_coords.append(lesion_coords)
@@ -425,6 +445,9 @@ class HeadPhantom(Phantom):
 
         lesion_vol = np.zeros_like(img)
         valid_points = distance_transform_edt(mask) > (r * overlap)
+        r_int = np.ceil(r).astype(int)
+        valid_points[:r_int] = False  # ensures lesion is not at the boundary of the phantom
+        valid_points[-r_int:] = False
         if not valid_points.any():
             raise RuntimeError(f'Requested volume: {volume} mL too \
 large, try smaller volume')
@@ -440,18 +463,9 @@ large, try smaller volume')
             axes = get_semi_major_axes(eccentricity, seed)
             foci = r * axes
             if complexity > 1:
-                correction = np.pow(3/(4*np.pi*complexity), 1/3)+overlap
+                correction = np.power(3/(4*np.pi*complexity), 1/3)+overlap
             else:
                 correction = 1
-            # Vol of sphere: V = 4/3*np.pi*r**3, solve for r:
-            # r = np.pow(3*V/(4*np.pi))
-            # if complexity (assuming overlap=0) increases volume by
-            # complexity*V, by what factor must radius
-            # be decreased to maintain constant volume, substitute
-            # V-->V/V*complexity-->1/complexity
-            # correction = np.pow(3/(4*np.pi*complexity))
-            # finally add allowed overlap to radius
-            # correction = np.pow(3/(4*np.pi*complexity), 1/3)+overlap (BJN)
             foci = foci*correction
             sphere = elliptical_lesion(img.shape, center=(z, x, y),
                                        radius=foci,
@@ -468,8 +482,8 @@ large, try smaller volume')
                                         np.ones(3*[edema])) ^ lesion_mask
             lesion_vol[edema_mask] = edema_HU
             lesion_mask = lesion_vol > -1000
-        lesion_mask = lesion_mask & ~self.get_skull_map().astype(bool)
-        img_w_lesion = img.copy()
+        lesion_mask = lesion_mask & ~self.exclusion_mask
+        img_w_lesion = np.copy(img)
         img_w_lesion[lesion_mask] = lesion_vol[lesion_mask]
 
         if mass_effect:
@@ -477,7 +491,7 @@ large, try smaller volume')
                 mass_effect = 0.5
             warped = insert_with_mass_effect(img,
                                              lesion_mask,
-                                             self.get_skull_map(),
+                                             self.exclusion_mask,
                                              strength=mass_effect)
             warped[lesion_mask] = img_w_lesion[lesion_mask]
             img_w_lesion[lesion_mask.sum(axis=(1, 2)) > 0] =\
@@ -490,10 +504,10 @@ large, try smaller volume')
 
         HU_volume = self.get_CT_number_phantom()
         lesion_vol, HU_volume = insert_dural(
-            phantom=self, 
-            desired_volume=volume, 
-            hematoma_type=lesion_type, 
-            mass_effect=mass_effect, 
+            phantom=self,
+            desired_volume=volume,
+            hematoma_type=lesion_type,
+            mass_effect=mass_effect,
             seed=seed)
         if not isinstance(HU_volume, np.ndarray):
             HU_volume = HU_volume.numpy()
@@ -508,9 +522,49 @@ mida_age = 38  # add 38 as the median US adult age to represent MIDA, consider
 #  other identifiers when adding more patients
 
 
+class HeadPhantom(LesionPhantom):
+    def __init__(self, phantom_dir, shape=None):
+        self.materials = {
+            'csf': 10,
+            'gray matter': 40,
+            'white matter': 30,
+            'air': -1000,
+            'CSF': 10,
+            'skull': 900
+            }
+        self.patientid = 0
+        self._lesion = []
+        self._lesion_coords = []
+        self.lesion_type = []
+        self.lesion_intensity = []  # HU
+        self.mass_effect = False
+        phantom, spacings = self.load_phantom(Path(phantom_dir))
+        super().__init__(phantom, spacings)
+        if shape:
+            self.resize(shape)
+        self.exclusion_mask = self.get_skull_map().astype(bool)
+
+    def load_phantom(self, phantom_dir) -> tuple[np.ndarray, tuple[int, int, int]]:
+        'returns phantom and spacings'
+        pass
+
+    def get_material_mask(self, material):
+        pass
+
+    def get_dura_map(self):
+        'used for EDH, SDH lesion insertion'
+        pass
+
+    def get_skull_map(self):
+        'used for lesion insertion mass effect warping'
+        pass
+
+    def get_lesion_mask(self):
+        return self._lesion[0]
+
+
 class MIDA_Head(HeadPhantom):
-    def __init__(self, phantom_dir, csf_HU=10, gm_HU=40, wm_HU=30,
-                 skull_HU=1000, shape=None):
+    def __init__(self, phantom_dir, shape=None):
         if not phantom_dir.exists():
             raise FileNotFoundError(f'''
 MIDA head phantom files not found in {phantom_dir}
@@ -520,31 +574,17 @@ To use MIDA head phantoms, please download them from:
 
 and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
 ''')
-        super().__init__(phantom_dir)
-        self.age = 38  # median american age
-        self.csf_HU = csf_HU
-        self.gm_HU = gm_HU
-        self.wm_HU = wm_HU
-        self.skull_HU = skull_HU
-        self.air_HU = -1000
+        super().__init__(phantom_dir, shape)
         self.material_lut = self._load_material_LUT()
 
-        img = nib.load(self.phantom_dir/'MIDA_v1.nii')
-        self._phantom = np.array(img.get_fdata()).transpose(1, 0, 2)[::-1]
-
+    def load_phantom(self, phantom_dir):
+        'returns phantom and spacings'
+        img = nib.load(phantom_dir/'MIDA_v1.nii')
+        phantom = np.array(img.get_fdata()).transpose(1, 0, 2)[::-1]
         header = img.header
-        self.dx, self.dy, self.dz = header['pixdim'][1:4]
-
-        original_shape = self._phantom.shape
-        if shape:
-            self._phantom = resize(self._phantom, shape)
-            new_shape = self._phantom.shape
-            new_spacings = np.array(original_shape) / np.array(new_shape) *\
-                [self.dz, self.dx, self.dy]
-            self.dz, self.dx, self.dy = new_spacings
-        else:
-            shape = original_shape
-        self.nz, self.nx, self.ny = shape
+        dx, dy, dz = header['pixdim'][1:4]
+        spacings = dz, dx, dy
+        return phantom, spacings
 
     def _load_material_LUT(self):
         return pd.read_csv(os.path.join(Path(__file__).parent.resolve(),
@@ -558,12 +598,11 @@ and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
         HU_phantom = np.copy(phantom)
         for _, row in material_lut[~material_lut['HU'].isna()].iterrows():
             if row['HU'] == 8888:
-                HU_phantom[phantom == row['MIDA_ID']] = self.wm_HU
+                HU_phantom[phantom == row['MIDA_ID']] = self.materials['white matter']
             elif row['HU'] == 9999:
-                HU_phantom[phantom == row['MIDA_ID']] = self.gm_HU
+                HU_phantom[phantom == row['MIDA_ID']] = self.materials['gray matter']
             else:
                 HU_phantom[phantom == row['MIDA_ID']] = row['HU']
-
         return HU_phantom
 
     def get_material_mask(self, material):
@@ -597,9 +636,9 @@ possible_ages = nihpd_ages + [mida_age]
 class NIHPD_Head(HeadPhantom):
     '''
     loads MR brain atlas of mean `age`, downloaded from
-    <https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1> and saved in `base_dir`
+    <https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1> and saved in `phantom_dir`
 
-    :param base_dir: str, directory holding .nii files from
+    :param phantom_dir: str, directory holding .nii files from
         https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1
     :param age: float, mean age of the atlas phantom to load. Note the brain
         atlases are stored as age ranges, thus the mean age is the mid point
@@ -611,9 +650,10 @@ class NIHPD_Head(HeadPhantom):
         Unbiased average age-appropriate atlases for pediatric studies.
         NeuroImage. 2011;54(1):313-327. doi:10.1016/j.neuroimage.2010.07.033
     '''
-    def __init__(self, phantom_dir, age: float, symmetric=False, csf_HU=10,
-                 gm_HU=40, wm_HU=30, skull_HU=900, shape=None):
+    def __init__(self, phantom_dir, age: float, symmetric=False, shape=None):
         phantom_dir = Path(phantom_dir)
+        self.age = age
+        self.symmetric = symmetric
         if not phantom_dir.exists():
             print(f'''
 `PHANTOM_DIRECTORY` {phantom_dir} not found, now downloading NIHPD phantoms
@@ -623,45 +663,36 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
 `load_phantom` for details on how to add their locations.
 ''')
             download_and_extract_archive(url, phantom_dir)
-        super().__init__(phantom_dir)
-        self.age = age
-        self.csf_HU = csf_HU
-        self.gm_HU = gm_HU
-        self.wm_HU = wm_HU
-        self.skull_HU = skull_HU
-        self.air_HU = -1000
-        self.scalp_dict = self.set_scalp_dict()
+        super().__init__(phantom_dir, shape)
+        self.materials['skull'] = 900
 
-        nii_files = list(self.phantom_dir.glob('*.nii'))
+    def load_phantom(self, phantom_dir, shape=None):
+        'sets ._phantom, and .dx, .dy, .dz, .nx, .ny, .nz'
+        nii_files = list(phantom_dir.glob('*.nii'))
+        age = self.age
         age_ranges = [o.stem.split('_')[2] for o in nii_files]
         ages = {get_mean_age(o): o for o in age_ranges}
 
         if age not in ages:
             raise ValueError(f'age {age} not in {sorted(ages.keys())}\
-from {self.phantom_dir}')
+from {phantom_dir}')
         age_range = ages[age]
-
-        base_dir = self.phantom_dir
-        symmetry = 'sym' if symmetric else 'asym'
-
-        nib_img = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_pdw.nii')
-        header = nib_img.header
-        self.dx, self.dy, self.dz = header['pixdim'][1:4]
-
+        symmetry = 'sym' if self.symmetric else 'asym'
+        nib_img = nib.load(phantom_dir / f'nihpd_{symmetry}_{age_range}_pdw.nii')
         self.csf = nib.load(
-            base_dir / f'nihpd_{symmetry}_{age_range}_csf.nii'
+            phantom_dir / f'nihpd_{symmetry}_{age_range}_csf.nii'
             ).get_fdata().transpose(2, 1, 0)[:, ::-1, :]
         self.gm = nib.load(
-            base_dir / f'nihpd_{symmetry}_{age_range}_gm.nii'
+            phantom_dir / f'nihpd_{symmetry}_{age_range}_gm.nii'
             ).get_fdata().transpose(2, 1, 0)[:, ::-1, :]
         self.wm = nib.load(
-            base_dir / f'nihpd_{symmetry}_{age_range}_wm.nii'
+            phantom_dir / f'nihpd_{symmetry}_{age_range}_wm.nii'
             ).get_fdata().transpose(2, 1, 0)[:, ::-1, :]
         self.mask = nib.load(
-            base_dir / f'nihpd_{symmetry}_{age_range}_mask.nii'
+            phantom_dir / f'nihpd_{symmetry}_{age_range}_mask.nii'
             ).get_fdata().transpose(2, 1, 0)[:, ::-1, :]
         self.pdw = nib.load(
-            base_dir / f'nihpd_{symmetry}_{age_range}_pdw.nii'
+            phantom_dir / f'nihpd_{symmetry}_{age_range}_pdw.nii'
             ).get_fdata().transpose(2, 1, 0)[:, ::-1, :]
 
         self.csf = self.csf[::-1]
@@ -670,15 +701,18 @@ from {self.phantom_dir}')
         self.mask = self.mask[::-1]
         self.pdw = self.pdw[::-1]
 
-        self.nz, self.nx, self.ny = self.csf.shape
-        if shape:
-            self.resize(shape)
-
         skull = (self.mask == 0)*self.pdw / self.pdw.max()
         skull[skull < 0.1] = 0
         skull[skull > 1] = 1
         self.skull = skull
-        self._phantom = self.get_CT_number_phantom()
+        header = nib_img.header
+        self.scalp_dict = self.set_scalp_dict()
+        dx, dy, dz = header['pixdim'][1:4]
+        self.dx = dx
+        phantom = self.get_CT_number_phantom()
+        dx, dy, dz = header['pixdim'][1:4]
+        spacings = dz, dx, dy
+        return phantom, spacings
 
     def resize(self, shape=None):
         original_shape = self.csf.shape
@@ -688,6 +722,7 @@ from {self.phantom_dir}')
         self.wm = resize(self.wm, shape).numpy()
         self.mask = resize(self.mask, shape).numpy()
         self.pdw = resize(self.pdw, shape).numpy()
+        self.skull = resize(self.skull, shape).numpy()
 
         new_spacings = np.array(original_shape) / np.array(new_shape) *\
             [self.dz, self.dx, self.dy]
@@ -762,9 +797,9 @@ from {self.phantom_dir}')
     def get_CT_number_phantom(self, add_scalp=True, add_sutures=True):
         if len(self._lesion_coords) > 0:
             return self._phantom
-        phantom = self.csf*self.csf_HU + self.gm*self.gm_HU +\
-            self.wm*self.wm_HU + self.skull*self.skull_HU
-        phantom[phantom <= 0] = self.air_HU
+        phantom = self.csf*self.materials['csf'] + self.gm*self.materials['gray matter'] +\
+            self.wm*self.materials['white matter'] + self.skull*self.materials['skull']
+        phantom[phantom <= 0] = self.materials['air']
         phantom[self.get_dura_map()] = 50  # HU same as MIDA
         if add_scalp:
             phantom = self.add_scalp(phantom)
