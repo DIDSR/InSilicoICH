@@ -62,6 +62,8 @@ class Study:
         intensity = self.phantom.lesion_intensity
 
         ct = self.scanner
+        if np.isnan(zspan):
+            zspan = 'dynamic'
         if isinstance(zspan, str):
             if zspan == 'dynamic':
                 startZ, endZ = ct.recommend_scan_range()
