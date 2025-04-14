@@ -60,6 +60,7 @@ def insilicoich(input_csv, output_directory=None, keep_raw=False):
                           age=float(patient['Age']),
                           kVp=float(patient['kVp']),
                           mA=float(patient['mA']),
+                          pitch=float(patient['pitch']),
                           intensity=float(patient['LesionAttenuation(HU)']),
                           volume=float(patient['LesionVolume(mL)']),
                           lesion_type=patient['Subtype'],

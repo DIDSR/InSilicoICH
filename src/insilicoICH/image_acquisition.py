@@ -246,7 +246,8 @@ class Scanner():
         lesion_only.xcist.cfg.physics.monochromatic = -1
         lesion_only.xcist.cfg.physics.enableElectronicNoise = 0
         lesion_only.xcist.cfg.physics.enableQuantumNoise = 0
-        lesion_only.run_scan(mA=500, views=100, startZ=startZ, endZ=endZ)
+        lesion_only.run_scan(mA=500, views=100, startZ=startZ, endZ=endZ,
+                             pitch=self.pitch)
         lesion_only.run_recon(sliceThickness=slice_thickness, fov=fov)
         rmtree(lesion_dir)
         return (lesion_only.recon > -950) & (self.recon > -300)

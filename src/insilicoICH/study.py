@@ -53,7 +53,7 @@ class Study:
     def size(self):
         return np.array(self.phantom.spacings)*self.phantom._phantom.shape
 
-    def run_study(self, output_directory=None, kVp=120, mA=200, views=1000,
+    def run_study(self, output_directory=None, kVp=120, mA=200, pitch=0, views=1000,
                   fov=250, zspan='dynamic',
                   kernel='standard', slice_thickness=1, **kwargs):
         patient_name = self.phantom.patient_name
@@ -62,18 +62,17 @@ class Study:
         intensity = self.phantom.lesion_intensity
 
         ct = self.scanner
-
         if isinstance(zspan, str):
             if zspan == 'dynamic':
                 startZ, endZ = ct.recommend_scan_range()
-            if zspan.startswith('['): # using 'recruit' to create .csv can result in zspan being string of list
-                zspan = ast.literal_eval(zspan) # convert from 'string of list' to just list
+            if zspan.startswith('['):  # using 'recruit' to create .csv can result in zspan being string of list
+                zspan = ast.literal_eval(zspan)  # convert from 'string of list' to just list
                 startZ, endZ = zspan
         elif isinstance(zspan, tuple | list):
             startZ, endZ = zspan
         views = int(views)
         ct.run_scan(startZ=startZ, endZ=endZ, views=views,
-                    mA=mA, kVp=kVp)
+                    mA=mA, kVp=kVp, pitch=pitch)
         ct.run_recon(fov=fov, kernel=kernel, sliceThickness=slice_thickness)
         self.scanner = ct
         self.images = ct.recon
@@ -183,7 +182,7 @@ class Study:
 
 
 def run_study(output_directory=None, patient_name='default', scanner_model='Scanner_Default', age=38, kVp=120,
-              mA=200, intensity=200, volume=5, lesion_type=None,
+              mA=200, pitch=0, intensity=200, volume=5, lesion_type=None,
               mass_effect=True, add_positioning_augmentation=True,
               views=1000, zspan='dynamic', kernel='standard',
               slice_thickness=1, keep_raw=False, seed=None, **kwargs) -> Study:
@@ -209,7 +208,7 @@ def run_study(output_directory=None, patient_name='default', scanner_model='Scan
 
     scanner = Scanner(phantom, scanner_model=scanner_model, output_dir=output_directory)
     study = Study(scanner, 'pilot')
-    study.run_study(kVp=kVp, mA=mA, views=views, zspan=zspan,
+    study.run_study(kVp=kVp, mA=mA, pitch=pitch, views=views, zspan=zspan,
                     kernel=kernel, slice_thickness=slice_thickness)
     study.metadata['CaseSeed'] = seed
     if keep_raw is False:
