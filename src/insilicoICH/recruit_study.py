@@ -94,7 +94,7 @@ or csv filepath')
         'Scanner': [],
         'kVp': [],
         'mA': [],
-        'pitch': [],
+        'Pitch': [],
         'Views': [],
         'ScanCoverage': [],
         'ReconKernel': [],
@@ -148,7 +148,7 @@ or csv filepath')
         params['Scanner'].append(random.choice(scanner))
         params['kVp'].append(float(random.choice(kVp_list)))
         params['mA'].append(float(random.choice(mA_list)))
-        params['pitch'].append(float(random.choice(pitch_list)))
+        params['Pitch'].append(float(random.choice(pitch_list)))
         params['Views'].append(float(random.choice(views)))
         params['ScanCoverage'].append(zspan)
         params['ReconKernel'].append(random.choice(kernel))
