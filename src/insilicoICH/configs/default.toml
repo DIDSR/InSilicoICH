@@ -1,26 +1,30 @@
-# This is the default configuration for PedSilicoICH simulations
+# This is an example distribution file for PedSilicoICH simulations
+# All parameters are given as a list which is sampled from in the `recruit` program
+#
+# uncommented parameters here will override defaults
 [general]
 output_directory="test"
-zspan='dynamic'  # scan range in mm, min max
-desired_cases=10
+zspan=[0, 10]  # scan range in mm, min max, comment out to scan whole range
+desired_cases=1  # desired dataset size
 keep_raw=false  # keep projection data
-seed=false  # seed to reproduce dataset
+seed=false  # seed to reproduce dataset, set to false or integer
 
 [patient]
-age=[38]  # range in yrs
+age=[0, 30]  # range in yrs [min, max]
 
 [lesion]
-subtypes=[false, 'IPH', 'EDH', 'SDH']
+subtypes=['IPH', 'SDH', 'EDH'] # add [false] for hemorrhage-absent cases
 mass_effect=true  # whether lesions displace brain tissue
 edema=[0, 15]  # edema width range [min, max] in pixels
-volume='distributions/BHSD_volume_distributions.csv'
-attenuation='distributions/BHSD_HU_distributions.csv'
+volume='distributions/BHSD_volume_distributions.csv'  # str or list
+attenuation='distributions/BHSD_HU_distributions.csv'  # str or list
 
 [acquisition]
-views=50
+scanner=['Scanner_Default']
+views=[100]
 kVp=[120]
-mA=[300, 350, 400]
+mA=[200]
 
 [recon]
-kernel='soft'
-slice_thickness=1
+kernel=['standard']
+slice_thickness=[1]
