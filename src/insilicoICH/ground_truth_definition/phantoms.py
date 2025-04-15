@@ -177,7 +177,7 @@ phantom.overwrite = True  # Flag to overwrite existing files without warning.
     dicom_to_voxelized_phantom.run_from_config(dicom_to_voxel_cfg)
 
 
-def load_phantom(age=38, shape=None, skull_seg_method='pseudoct', name='default'):
+def load_phantom(age=38, shape=None, skull_seg_method='otsu', name='default'):
     '''
     Loads appropriate phantom based on age as a keyword
 
@@ -812,11 +812,13 @@ from {self.phantom_dir}')
     def get_skull_map(self):
         '''obtains mask of skull voxels'''
         if self.skull_seg_method == 'pseudoct':
+            print('using pseudoct method')
             # currently, pesudoCT images are generated outside of the repository, TODO: integrate code
             threshold = 300 # units: HU
             skull = np.where(self.pseudoct > threshold, 1, 0)
 
         elif self.skull_seg_method =='otsu':
+            print('using otsu method')
             vol = self.pdw
             mask = self.mask.astype(bool)
             thresh = ski.filters.threshold_otsu(vol)
