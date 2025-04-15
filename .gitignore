@@ -22,7 +22,6 @@ metadata*
 *.scan
 **/phantoms/*/*.json
 notebooks/*.csv
-*.cfg
 __pycache__
 *.nii
 src/InSilicoICH.egg-info

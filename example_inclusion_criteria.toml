@@ -24,6 +24,7 @@ scanner=['GE_Lightspeed16','Scanner_Default']
 views=[100]
 kVp=[120]
 mA=[200]
+pitch=[0.5]  # pitch = 0 for axial model, pitch > 0 for helical, recommend pitch < 0.6 for head
 
 [recon]
 kernel=['standard']

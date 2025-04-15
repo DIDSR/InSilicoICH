@@ -1,3 +1,4 @@
-age,scanner,kVp,mA,views,zspan,kernel,slice_thickness,intensity,volume,edema,subtype,mass_effect,global_seed,case_seed,output_directory
-9.0,GE_Lightspeed16,120.0,200.0,100.0,"[0, 10]",standard,1,70.1202176136439,2.8495037044527542,4,IPH,True,183879,510414,default_study
-9.0,GE_Lightspeed64,120.0,200.0,100.0,"[0, 10]",standard,1,70.1202176136439,2.8495037044527542,4,IPH,True,183879,510414,default_study
+Age,Scanner,kVp,mA,Pitch,Views,ScanCoverage,ReconKernel,SliceThickness(mm),LesionAttenuation(HU),Subtype,LesionVolume(mL),Edema,MassEffect,GlobalSeed,CaseSeed,OutputDirectory
+10.5,GE_Lightspeed16,120.0,200.0,0.5,100.0,"[0, 10]",standard,1,47.30910492475553,IPH,1.6490885195763385,6,True,787032,358420,default_study
+6.5,GE_Lightspeed16,120.0,200.0,0.5,100.0,"[0, 10]",standard,1,59.61635827489231,SDH,3.4527141169631754,0,True,787032,807502,default_study
+10.5,GE_Lightspeed16,120.0,200.0,0.5,100.0,"[0, 10]",standard,1,53.87631358136152,SDH,31.98132207001092,0,True,787032,354921,default_study
