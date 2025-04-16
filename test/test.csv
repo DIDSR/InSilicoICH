@@ -1,2 +1,0 @@
-Age,Scanner,kVp,mA,Views,ScanCoverage,ReconKernel,SliceThickness(mm),LesionAttenuation(HU),Subtype,LesionVolume(mL),Edema,MassEffect,GlobalSeed,CaseSeed,OutputDirectory
-10.5,Scanner_Default,120.0,200.0,100.0,"[0, 10]",standard,1,76.94275018947135,EDH,9.414811612254724,0,True,469546,138012,test
