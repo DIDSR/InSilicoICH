@@ -579,11 +579,109 @@ class Scanner():
             ds.ImagePositionPatient[0] = -ds.Rows//2*ds.PixelSpacing[0]
             ds.ImagePositionPatient[1] = -ds.Columns//2*ds.PixelSpacing[1]
             ds.ImagePositionPatient[2] = ds.SliceLocation
-            ds.PixelData = (array_slice.copy(order='C').astype('int16') -\
-                int(ds.RescaleIntercept)).tobytes()
+            ds.PixelData = (array_slice.copy(order='C').astype('int16') -
+                            int(ds.RescaleIntercept)).tobytes()
             dcm_fname = fname.parent /\
                 f'{fname.stem}_{slice_idx:03d}{fname.suffix}'\
                 if nslices > 1 else fname
             fnames.append(dcm_fname)
             pydicom.dcmwrite(dcm_fname, ds)
         return fnames
+
+
+class PhotonCountingScanner(Scanner):
+    def __init__(self, *args, scanner_model='Scanner_PCCT', **kwargs):
+        super().__init__(*args, scanner_model=scanner_model, **kwargs)
+
+    def run_scan(self, *args, sum_bins=False, **kwargs):
+        self.xcist.cfg.scanner.detectorSumBins = sum_bins
+        if not self.xcist.cfg.scanner.detectorSumBins:
+            self.xcist.do_prep = 0
+        super().run_scan(*args, **kwargs)
+
+    def run_recon(self, *args, threshold=70, **kwargs):
+        '''
+        threshold: kV threshold to split energy bins into upper and lower energy
+        See Scanner.run_recon for *args, and **kwargs definitions.
+
+        Returns self.recon as [bins, slices, rows, cols] with low energy, high energy
+        '''
+        neglog_lower, neglog_upper = self.threshold_sum(threshold)
+        # first lower energy bin
+        original_projections = self._projections
+        original_name = self.xcist.resultsName
+        if len(self._projections) > 1:
+            for i in range(len(self._projections)):
+                self._projections[i] = original_projections[i] + f'_thresh_{threshold}kV_lower'
+                xc.rawwrite(self._projections[i]+'.prep', neglog_lower)
+        else:
+            self.xcist.resultsName = original_name + f'_thresh_{threshold}kV_lower'
+            self.xcist.cfg.resultsName = self.xcist.resultsName
+            self._projections = [o + f'_thresh_{threshold}kV_lower' for o in original_projections]
+            xc.rawwrite(self.xcist.resultsName+'.prep', neglog_lower)
+        print(f'reconstructing: {self.xcist.resultsName}')
+        super().run_recon(*args, **kwargs)
+        proj_lower = self.projections.copy()
+        recon_lower = self.recon.copy()
+        self.xcist.resultsName = original_name
+        self.xcist.cfg.resultsName = self.xcist.resultsName
+        self._projections = original_projections
+        
+        # now upper
+        original_projections = self._projections
+        original_name = self.xcist.resultsName
+        if len(self._projections) > 1:
+            for i in range(len(self._projections)):
+                self._projections[i] = original_projections[i] + f'_thresh_{threshold}kV_upper'
+                xc.rawwrite(self._projections[i]+'.prep', neglog_upper)
+        else:
+            self.xcist.resultsName = original_name + f'_thresh_{threshold}kV_upper'
+            self.xcist.cfg.resultsName = self.xcist.resultsName
+            self._projections = [o + f'_thresh_{threshold}kV_upper' for o in original_projections]
+            xc.rawwrite(self.xcist.resultsName+'.prep', neglog_upper)
+        print(f'reconstructing: {self.xcist.resultsName}')
+        super().run_recon(*args, **kwargs)
+        proj_upper = self.projections.copy()
+        recon_upper = self.recon.copy()       
+        self.xcist.resultsName = original_name
+        self.xcist.cfg.resultsName = self.xcist.resultsName
+        self._projections = original_projections
+
+        self.projections = np.stack([proj_lower, proj_upper])
+        self.recon = np.stack([recon_lower, recon_upper])
+
+    def threshold_sum(self, thresh):
+        ct = self.xcist
+        nBin = len(ct.scanner.detectorBinThreshold)-1
+        scan = xc.rawread(ct.resultsName + '.scan', [ct.protocol.viewCount,
+                                                     ct.scanner.detectorRowCount,
+                                                     ct.scanner.detectorColCount, nBin], 'float')
+        offset = xc.rawread(ct.resultsName + '.offset', [ct.scanner.detectorRowCount,
+                                                         ct.scanner.detectorColCount, nBin], 'float')
+        air = xc.rawread(ct.resultsName + '.air', [ct.scanner.detectorRowCount,
+                                                   ct.scanner.detectorColCount, nBin], 'float')
+
+        bins = np.array(ct.scanner.detectorBinThreshold)[:-1]
+        scan_lower = scan[:, :, :, bins < thresh]
+        scan_upper = scan[:, :, :, bins >= thresh]
+
+        air_lower = air[:, :, bins < thresh]
+        air_upper = air[:, :, bins >= thresh]
+
+        offset_lower = offset[:, :, bins < thresh]
+        offset_upper = offset[:, :, bins >= thresh]
+        #
+        scan_lower_sum = scan_lower.sum(axis=-1)
+        scan_upper_sum = scan_upper.sum(axis=-1)
+
+        air_lower_sum = air_lower.sum(axis=-1)
+        air_upper_sum = air_upper.sum(axis=-1)
+
+        offset_lower_sum = offset_lower.sum(axis=-1)
+        offset_upper_sum = offset_upper.sum(axis=-1)
+
+        neglog_lower = -np.log((scan_lower_sum - offset_lower_sum)/
+                               (air_lower_sum - offset_lower_sum))
+        neglog_upper = -np.log((scan_upper_sum - offset_upper_sum)/
+                               (air_upper_sum - offset_upper_sum))
+        return neglog_lower, neglog_upper
