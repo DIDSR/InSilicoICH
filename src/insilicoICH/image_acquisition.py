@@ -599,14 +599,14 @@ class PhotonCountingScanner(Scanner):
             self.xcist.do_prep = 0
         super().run_scan(*args, **kwargs)
 
-    def run_recon(self, *args, threshold=70, **kwargs):
+    def run_recon(self, *args, threshold=70, enoise_threshold=True, **kwargs):
         '''
         threshold: kV threshold to split energy bins into upper and lower energy
         See Scanner.run_recon for *args, and **kwargs definitions.
 
         Returns self.recon as [bins, slices, rows, cols] with low energy, high energy
         '''
-        neglog_lower, neglog_upper = self.threshold_sum(threshold)
+        neglog_lower, neglog_upper = self.threshold_sum(threshold, enoise_threshold)
         # first lower energy bin
         original_projections = self._projections
         original_name = self.xcist.resultsName
@@ -650,7 +650,7 @@ class PhotonCountingScanner(Scanner):
         self.projections = np.stack([proj_lower, proj_upper])
         self.recon = np.stack([recon_lower, recon_upper])
 
-    def threshold_sum(self, thresh):
+    def threshold_sum(self, thresh, enoise_threshold):
         ct = self.xcist
         nBin = len(ct.scanner.detectorBinThreshold)-1
         scan = xc.rawread(ct.resultsName + '.scan', [ct.protocol.viewCount,
@@ -662,13 +662,23 @@ class PhotonCountingScanner(Scanner):
                                                    ct.scanner.detectorColCount, nBin], 'float')
 
         bins = np.array(ct.scanner.detectorBinThreshold)[:-1]
-        scan_lower = scan[:, :, :, bins < thresh]
+
+        if enoise_threshold:
+            scan_lower = scan[:, :, :, (25 < bins) & (bins < thresh)]
+        else:
+            scan_lower = scan[:, :, :, bins < thresh]
         scan_upper = scan[:, :, :, bins >= thresh]
 
-        air_lower = air[:, :, bins < thresh]
+        if enoise_threshold:
+            air_lower = air[:, :, (25 < bins) & (bins < thresh)]
+        else:
+            air_lower = air[:, :, bins < thresh]
         air_upper = air[:, :, bins >= thresh]
 
-        offset_lower = offset[:, :, bins < thresh]
+        if enoise_threshold:
+            offset_lower = offset[:, :, (25 < bins) & (bins < thresh)]
+        else:
+            offset_lower = offset[:, :, bins < thresh]
         offset_upper = offset[:, :, bins >= thresh]
         #
         scan_lower_sum = scan_lower.sum(axis=-1)
