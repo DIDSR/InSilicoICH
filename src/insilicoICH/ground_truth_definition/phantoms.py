@@ -12,6 +12,7 @@ import nibabel as nib
 import nrrd
 import pandas as pd
 import skimage as ski
+from skimage.morphology import binary_closing, remove_small_holes, binary_dilation, binary_erosion
 from dotenv import load_dotenv
 from monai.transforms import Resize, RandAffine, Affine, ResizeWithPadOrCrop
 from .utils import download_and_extract_archive
@@ -25,7 +26,6 @@ from ..lesion_definition import (elliptical_lesion,
                                  get_perimeter)
 from scipy.ndimage import (center_of_mass,
                            distance_transform_edt,
-                           binary_dilation,
                            binary_erosion)
 
 
@@ -442,7 +442,7 @@ large, try smaller volume')
             axes = get_semi_major_axes(eccentricity, seed)
             foci = r * axes
             if complexity > 1:
-                correction = np.pow(3/(4*np.pi*complexity), 1/3)+overlap
+                correction = np.power(3/(4*np.pi*complexity), 1/3)+overlap
             else:
                 correction = 1
             # Vol of sphere: V = 4/3*np.pi*r**3, solve for r:
@@ -470,7 +470,7 @@ large, try smaller volume')
                                         np.ones(3*[edema])) ^ lesion_mask
             lesion_vol[edema_mask] = edema_HU
             lesion_mask = lesion_vol > -1000
-        lesion_mask = lesion_mask & ~self.get_skull_map().astype(bool)
+        lesion_mask = lesion_mask & ~self.get_skull_map()
         img_w_lesion = img.copy()
         img_w_lesion[lesion_mask] = lesion_vol[lesion_mask]
 
@@ -588,7 +588,7 @@ and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
         skull_map[np.where(self._phantom == 54)] = 1.0  # skull outer table
         skull_map[np.where(self._phantom == 40)] = 1.0  # skull/facial bone
         skull_map[np.where(self._phantom == 1000)] = 1.0  # other bone voxels
-        return skull_map
+        return skull_map.astype(bool)
 
 
 url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
@@ -659,7 +659,9 @@ from {self.phantom_dir}')
         header = nib_img.header
         self.dx, self.dy, self.dz = header['pixdim'][1:4]
         self.dx, self.dy, self.dz = list(map(lambda o: o*self.relative_head_size[age], (self.dx, self.dy, self.dz)))
-
+        self.t1w = nib.load(
+            base_dir / f'nihpd_{symmetry}_{age_range}_t1w.nii'
+            ).get_fdata().transpose(2, 1, 0)[:, ::-1, :]
         self.csf = nib.load(
             base_dir / f'nihpd_{symmetry}_{age_range}_csf.nii'
             ).get_fdata().transpose(2, 1, 0)[:, ::-1, :]
@@ -691,8 +693,9 @@ from {self.phantom_dir}')
         self.csf = self.csf[::-1]
         self.gm = self.gm[::-1]
         self.wm = self.wm[::-1]
-        self.mask = self.mask[::-1]
+        self.mask = self.mask[::-1].astype(bool)
         self.pdw = self.pdw[::-1]
+        self.t1w = self.t1w[::-1]
 
         self.nz, self.nx, self.ny = self.csf.shape
         if shape:
@@ -727,7 +730,7 @@ from {self.phantom_dir}')
         src_dir = Path(__file__).parents[1]
         fname = src_dir / 'annotations/suture/NIHPD_Head_Phantom/labelmap.nrrd'
         data = nrrd.read(fname)[0].transpose(2, 1, 0)[::-1, ::-1]
-        skull = self.get_skull_map().astype(bool)
+        skull = self.get_skull_map()
         dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
         if (dx < 0) | (dy < 0) | (dz < 0):
             resizewithcrop = ResizeWithPadOrCrop(spatial_size=skull.shape)
@@ -754,24 +757,26 @@ from {self.phantom_dir}')
         phantom = self.csf*self.csf_HU + self.gm*self.gm_HU +\
             self.wm*self.wm_HU + self.skull*self.skull_HU
         # fills remaining tissues with scaled pdw to approximate
-        # tissue densities
         phantom[phantom < self.csf_HU] = minmax_scale(
             self.pdw[phantom < self.csf_HU], feature_range)
+        skin = binary_erosion(self.head_mask, np.ones(3*[3])) ^ binary_dilation(self.head_mask, np.ones(3*[3]))
+        phantom[skin] = minmax_scale(self.pdw[skin], feature_range)     
         phantom[self.head_mask & (phantom < 0)] = minmax_scale(
             self.pdw[self.head_mask & (phantom < 0)], feature_range)
+        sinous = (phantom < 0) & self.head_mask
+        phantom[sinous] = self.csf_HU  # approximates blood
         if self.skull_seg_method == 'pseudoct':
-            phantom[self.skull.astype(bool)] = self.pseudoct[self.skull.astype(bool)]
+            phantom[self.skull] = self.pseudoct[self.skull]
+        phantom[phantom < 0] = self.air_HU
+
+        # # TODO: dura map currently overlaps with new skull methods, need fix
+        # phantom[self.get_dura_map()] = 50  # HU same as MIDA
         return phantom
 
     def get_CT_number_phantom(self, add_sutures=False):
         if len(self._lesion_coords) > 0:
             return self._phantom
         phantom = self.assign_HUs()
-        phantom[phantom < 0] = self.air_HU
-
-        # TODO: dura map currently overlaps with new skull methods, need fix
-        # phantom[self.get_dura_map()] = 50  # HU same as MIDA
-
         if add_sutures:
             sutures = self.get_sutures()
             phantom[sutures] = 0  # assume water HU
@@ -798,36 +803,29 @@ from {self.phantom_dir}')
 
     def get_head_mask(self):
         '''obtains mask of head voxels'''
-        vol = self.pdw
-        mask = self.mask.astype(bool)
-        thresh = ski.filters.threshold_otsu(vol)
-        brain_and_extracranial = vol > thresh
-        brain_and_extracranial = brain_and_extracranial | binary_erosion(mask, np.ones(3*[7]))
-        head = np.stack([
-            ski.morphology.area_closing(o, area_threshold=o.sum()/2)
-                        for o in brain_and_extracranial
-                        ])
-        return head
+        thresh = 35.61893018554474  #ski.filters.threshold_otsu(vol)
+        head_mask = self.pdw > thresh
+        head_mask = binary_closing(head_mask, np.ones(3*[7]))
+        head_mask = remove_small_holes(head_mask, area_threshold=1e5)
+        return head_mask
 
     def get_skull_map(self):
         '''obtains mask of skull voxels'''
         if self.skull_seg_method == 'pseudoct':
             print('using pseudoct method')
             # currently, pesudoCT images are generated outside of the repository, TODO: integrate code
-            threshold = 300 # units: HU
+            threshold = 300  # units: HU
             skull = np.where(self.pseudoct > threshold, 1, 0)
 
-        elif self.skull_seg_method =='otsu':
+        elif self.skull_seg_method == 'otsu':
             print('using otsu method')
-            vol = self.pdw
-            mask = self.mask.astype(bool)
-            thresh = ski.filters.threshold_otsu(vol)
-            brain_and_extracranial = vol > thresh
-            brain_and_extracranial = brain_and_extracranial | binary_erosion(mask, np.ones(3*[7]))
-            head = self.head_mask
-            skull = (~brain_and_extracranial) & head
+            vol = self.t1w
+            thresh = 35.61893018554474  # precalculated by performing otsu across all nihpd
+            skull = vol < thresh
+            skull = skull & ~binary_erosion(self.mask, np.ones(3*[3]))
+            skull = skull & self.head_mask
         elif self.skull_seg_method == 'old': # old method for posterity (gives VERY thick skull...)
             skull = (self.mask == 0)*self.pdw / self.pdw.max()
             skull[skull < 0.1] = 0
             skull[skull > 0] = 1
-        return skull
+        return skull.astype(bool)
