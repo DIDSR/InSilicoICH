@@ -3,28 +3,27 @@
 #
 # uncommented parameters here will override defaults
 [general]
-output_directory="default_study"
-zspan=[0, 10]  # scan range in mm, min max, comment out to scan whole range
-desired_cases=3  # desired dataset size
+output_directory="/projects01/didsr-aiml/jayse.weaver/insilicoich/mixed_2500_count_v2/"
+zspan="dynamic"  # scan range in mm, min max, comment out to scan whole range
+desired_cases=2500  # desired dataset size
 keep_raw=false  # keep projection data
 seed=false  # seed to reproduce dataset, set to false or integer
 
 [patient]
-age=[0, 100]  # range in yrs [min, max]
+age=[1, 100]  # range in yrs [min, max]
 
 [lesion]
-subtypes=['IPH', 'SDH', 'EDH'] # add [false] for hemorrhage-absent cases
+subtypes=[false, 'IPH', 'SDH', 'EDH'] # add [false] for hemorrhage-absent cases
 mass_effect=true  # whether lesions displace brain tissue
 edema=[0, 15]  # edema width range [min, max] in pixels
 volume='src/insilicoICH/distributions/BHSD_volume_distributions.csv'  # str or list
 attenuation='src/insilicoICH/distributions/BHSD_HU_distributions.csv'  # str or list
 
 [acquisition]
-scanner=['GE_Lightspeed16','Scanner_Default']
-views=[100]
+scanner=['GE_Lightspeed16']
+views=[1000]
 kVp=[120]
-mA=[200]
-pitch=[0.5]  # pitch = 0 for axial model, pitch > 0 for helical, recommend pitch < 0.6 for head
+mA=[280]
 
 [recon]
 kernel=['standard']

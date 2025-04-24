@@ -24,6 +24,7 @@ def recruit_patients(output_directory, views=[1000], desired_cases=1,
                      scanner='Scanner_Default',
                      kVp=[120],
                      mA=[300],
+                     pitch=[0],
                      save_name=None,
                      kernel=['soft'],
                      slice_thickness=[1],
@@ -72,6 +73,7 @@ or csv filepath')
     ages = [yr for yr in possible_ages if (yr >= min(age)) & (yr <= max(age))]
     kVp_list = kVp if isinstance(kVp, list | tuple) else [kVp]
     mA_list = mA if isinstance(mA, list | tuple) else [mA]
+    pitch_list = pitch if isinstance(pitch, list | tuple) else [pitch]
     edema_list = list(range(*edema))  # IPH only
 
     if isinstance(seed, float):
@@ -92,6 +94,7 @@ or csv filepath')
         'Scanner': [],
         'kVp': [],
         'mA': [],
+        'Pitch': [],
         'Views': [],
         'ScanCoverage': [],
         'ReconKernel': [],
@@ -145,6 +148,7 @@ or csv filepath')
         params['Scanner'].append(random.choice(scanner))
         params['kVp'].append(float(random.choice(kVp_list)))
         params['mA'].append(float(random.choice(mA_list)))
+        params['Pitch'].append(float(random.choice(pitch_list)))
         params['Views'].append(float(random.choice(views)))
         params['ScanCoverage'].append(zspan)
         params['ReconKernel'].append(random.choice(kernel))
