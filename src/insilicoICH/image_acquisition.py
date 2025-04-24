@@ -18,6 +18,8 @@ from .ground_truth_definition.phantoms import (voxelize_ground_truth,
                                                Phantom)
 
 install_path = Path(__file__).parent
+available_scanners = [o.name for o in install_path.glob('defaults/*')
+                      if not str(o).endswith('.cfg')]
 
 
 def read_dicom(dcm_fname: str) -> np.ndarray:
@@ -157,8 +159,6 @@ class Scanner():
             img = img.numpy()
 
         self.phantom = phantom
-        available_scanners = [o.name for o in install_path.glob('defaults/*')
-                              if not str(o).endswith('.cfg')]
         if scanner_model not in available_scanners:
             raise ValueError(f'{scanner_model} not in {available_scanners}')
         self.scanner_model = scanner_model
