@@ -29,16 +29,54 @@ class WirePhantom(Phantom):
         spacings = [diameter, diameter/diameter_pix, diameter/diameter_pix]
         lrg = create_circle_phantom(image_size=matrix_size,
                                     large_radius_ratio=large_radius_ratio,
-                                    large_circle_value=-150,
+                                    large_circle_value=850,
                                     num_small_circles=1,
                                     small_radius_ratio=wire_radius_ratio,
                                     small_circle_values=[wire_HU],
                                     inner_radius_ratio=0)
         sml = create_circle_phantom(image_size=matrix_size,
-                                    large_circle_value=-150,
+                                    large_circle_value=850,
                                     large_radius_ratio=large_radius_ratio - 0.05,
                                     num_small_circles=0)
         img = lrg - sml
+        img -= 1000
+        img = img[None]
+        super().__init__(img, spacings, patient_name, patientid, age=0)
+
+
+class LowContrastDetectabilityPhantom(Phantom):
+    '''
+    Module 2 frp, ACR CT phantom:
+    https://accreditationsupport.acr.org/support/solutions/articles/11000053945-phantom-overview-ct-revised-3-21-2025-
+    '''
+    def __init__(self, matrix_size=400, bg_value=90, patient_name='low contrast detectability',patientid=0):
+        large_radius_ratio = 0.85
+        diameter = 200
+        diameter_pix = matrix_size*large_radius_ratio
+        spacings = [diameter, diameter/diameter_pix, diameter/diameter_pix]
+        lrg = create_circle_phantom(image_size=matrix_size,
+                                    large_radius_ratio=large_radius_ratio,
+                                    num_small_circles=0,
+                                    large_circle_value=0,
+                                    bg_value=-1000)
+        mid = create_circle_phantom(image_size=matrix_size,
+                                    large_radius_ratio=large_radius_ratio - 0.05,
+                                    num_small_circles=0,
+                                    large_circle_value=bg_value,
+                                    bg_value=0)
+        small_radius_ratio = [0.125] + 4*[0.03] + 4*[0.025] + 4*[0.02] + 4*[0.015] + 4*[0.01]
+        num_small_circles = len(small_radius_ratio)
+        small_circle_values = num_small_circles*[6]
+        sml = create_circle_phantom(image_size=matrix_size,
+                                    large_radius_ratio=large_radius_ratio - 0.05,
+                                    num_small_circles=num_small_circles,
+                                    small_radius_ratio=small_radius_ratio,
+                                    inner_radius_ratio=0.7,
+                                    small_circle_values=small_circle_values,
+                                    large_circle_value=0,
+                                    bg_value=0)
+        img = (lrg + mid + sml)[::-1]
+        img = img.T[::-1]
         img = img[None]
         super().__init__(img, spacings, patient_name, patientid, age=0)
 
@@ -62,11 +100,11 @@ def create_circle_phantom(
     Args:
         image_size (int): The width and height of the output image in pixels.
         large_radius_ratio (float): Radius of the large circle as a fraction
-                                    of half the image size.
+            of half the image size.
         inner_radius_ratio (float): Radius for placing small circle centers,
-                                    as a fraction of the large circle's radius.
-        small_radius_ratio (float): Radius of the small circles, as a fraction
-                                    of the large circle's radius.
+            as a fraction of the large circle's radius.
+        small_radius_ratio (float or list or np.ndarray, optional): Radius of the small circles, as a fraction
+            of the large circle's radius. If float, constant radius, else provide list of radii == num_small_circles
         num_small_circles (int): The number of smaller circles inside.
         bg_value (float): The intensity value for the background (0.0=black).
         large_circle_value (float): The intensity value for the large circle.
@@ -86,12 +124,16 @@ def create_circle_phantom(
     elif len(small_circle_values) != num_small_circles:
         raise ValueError(f"Length of small_circle_values ({len(small_circle_values)}) "
                          f"must match num_small_circles ({num_small_circles})")
+    if isinstance(small_radius_ratio, float):
+        small_radius_ratio = num_small_circles*[small_radius_ratio]
+    elif len(small_radius_ratio) != num_small_circles:
+        raise ValueError(f"Length of small_radius_ratio ({len(small_radius_ratio)}) "
+                         f"must match num_small_circles ({num_small_circles})")
 
     # --- Calculate Dimensions ---
     center_x, center_y = image_size / 2, image_size / 2
     large_radius = large_radius_ratio * (image_size / 2)
     inner_radius = inner_radius_ratio * large_radius
-    small_radius = small_radius_ratio * large_radius
 
     # --- Create Coordinate Grid ---
     # Create arrays of x and y coordinates for each pixel
@@ -122,6 +164,7 @@ def create_circle_phantom(
         dist_from_small_center = np.sqrt((xx - small_cx)**2 + (yy - small_cy)**2)
 
         # Create a mask for the current small circle
+        small_radius = small_radius_ratio[i] * large_radius
         small_circle_mask = dist_from_small_center <= small_radius
 
         # Apply the small circle mask *only within the large circle*
