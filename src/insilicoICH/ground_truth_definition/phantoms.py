@@ -869,6 +869,7 @@ from {phantom_dir}')
             skull = vol < thresh
             skull = skull & ~binary_erosion(self.mask, np.ones(3*[3]))
             skull = skull & self.head_mask
+            skull = skull*(-1*(1-self.mask))
         elif self.skull_seg_method == 'old': # old method for posterity (gives VERY thick skull...)
             skull = (self.mask == 0)*self.pdw / self.pdw.max()
             skull[skull < 0.1] = 0
