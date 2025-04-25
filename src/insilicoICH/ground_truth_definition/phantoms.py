@@ -219,6 +219,7 @@ or
     if age == mida_age:
         phantom = MIDA_Head(phantom_dir / 'MIDA_Head_Phantom', shape=shape)
     else:
+        print(skull_seg_method)
         phantom = NIHPD_Head(phantom_dir / 'NIHPD_Head_Phantom',
                              age=age, shape=shape,
                              skull_seg_method=skull_seg_method)
@@ -661,12 +662,12 @@ class NIHPD_Head(HeadPhantom):
     '''
     relative_head_size = dict(zip(nihpd_ages,
                                   [0.8, 0.82, 0.85, 0.87, 0.9, 0.95]))
-    def __init__(self, phantom_dir, age: float, symmetric=False, csf_HU=10,
-                 gm_HU=40, wm_HU=30, skull_HU=900, shape=None,
-                 skull_seg_method='pseudoct'):
+    def __init__(self, phantom_dir, age: float, symmetric=False, shape=None,
+                 skull_seg_method='otsu'):
         phantom_dir = Path(phantom_dir)
         self.age = age
         self.symmetric = symmetric
+        self.skull_seg_method = skull_seg_method
         if not phantom_dir.exists():
             print(f'''
 `PHANTOM_DIRECTORY` {phantom_dir} not found, now downloading NIHPD phantoms
@@ -676,14 +677,7 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
 `load_phantom` for details on how to add their locations.
 ''')
             download_and_extract_archive(url, phantom_dir)
-        super().__init__(phantom_dir)
-        self.age = age
-        self.csf_HU = csf_HU
-        self.gm_HU = gm_HU
-        self.wm_HU = wm_HU
-        self.skull_HU = skull_HU
-        self.skull_seg_method = skull_seg_method
-        self.air_HU = -1000
+        super().__init__(phantom_dir, shape)
 
     def load_phantom(self, phantom_dir, shape=None):
         'sets ._phantom, and .dx, .dy, .dz, .nx, .ny, .nz'
@@ -697,8 +691,8 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
 from {phantom_dir}')
         age_range = ages[age]
 
-        base_dir = self.phantom_dir
-        symmetry = 'sym' if symmetric else 'asym'
+        base_dir = phantom_dir
+        symmetry = 'sym' if self.symmetric else 'asym'
 
         nib_img = nib.load(base_dir / f'nihpd_{symmetry}_{age_range}_pdw.nii')
         header = nib_img.header
@@ -750,6 +744,9 @@ from {phantom_dir}')
         self.skull = self.get_skull_map()
         self._phantom = self.get_CT_number_phantom()
 
+        spacings = self.dz, self.dx, self.dy
+        return self._phantom, spacings
+
     def resize(self, shape=None):
         original_shape = self.csf.shape
         self.csf = resize(self.csf, shape).numpy()
@@ -800,20 +797,22 @@ from {phantom_dir}')
         return sutures
 
     def assign_HUs(self, feature_range=(-100, 100)):
-        phantom = self.csf*self.csf_HU + self.gm*self.gm_HU +\
-            self.wm*self.wm_HU + self.skull*self.skull_HU
+        phantom = self.csf*self.materials['CSF'] +\
+                    self.gm*self.materials['gray matter'] +\
+                    self.wm*self.materials['white matter'] +\
+                    self.skull*self.materials['skull']
         # fills remaining tissues with scaled pdw to approximate
-        phantom[phantom < self.csf_HU] = minmax_scale(
-            self.pdw[phantom < self.csf_HU], feature_range)
+        phantom[phantom < self.materials['CSF']] = minmax_scale(
+            self.pdw[phantom < self.materials['CSF']], feature_range)
         skin = binary_erosion(self.head_mask, np.ones(3*[3])) ^ binary_dilation(self.head_mask, np.ones(3*[3]))
         phantom[skin] = minmax_scale(self.pdw[skin], feature_range)     
         phantom[self.head_mask & (phantom < 0)] = minmax_scale(
             self.pdw[self.head_mask & (phantom < 0)], feature_range)
         sinous = (phantom < 0) & self.head_mask
-        phantom[sinous] = self.csf_HU  # approximates blood
+        phantom[sinous] = self.materials['CSF']  # approximates blood
         if self.skull_seg_method == 'pseudoct':
             phantom[self.skull] = self.pseudoct[self.skull]
-        phantom[phantom < 0] = self.air_HU
+        phantom[phantom < 0] = self.materials['air']
 
         # # TODO: dura map currently overlaps with new skull methods, need fix
         # phantom[self.get_dura_map()] = 50  # HU same as MIDA
