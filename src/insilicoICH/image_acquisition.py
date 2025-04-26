@@ -104,11 +104,10 @@ def initialize_xcist(ground_truth_image, spacings=(1, 1, 1),
         ground_truth_image = ground_truth_image[None]
 
     dicom_path = phantom_path / 'dicom'
-    dicom_path = fr'{dicom_path}'
     for slice_id, img in enumerate(ground_truth_image):
         dicom_filename = dicom_path / f'1-{slice_id:03d}.dcm'
         convert_to_dicom(img, dicom_filename, spacings=spacings)
-
+    dicom_path = fr'{dicom_path}'
     voxelize_ground_truth(dicom_path, phantom_path,
                           material_threshold_dict=materials)
     print('Scanner Ready')
