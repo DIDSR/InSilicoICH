@@ -27,6 +27,8 @@ from scipy.ndimage import (center_of_mass,
                            distance_transform_edt,
                            binary_erosion)
 
+import gecatsim as xc
+
 
 def sphere_radius_from_volume(volume):
     '''
@@ -152,28 +154,37 @@ def voxelize_ground_truth(dicom_path: str | Path, phantom_path: str | Path,
                                          'ncat_brain',
                                          'ncat_skull'],
                                         [-200, -10, 10, 300]))
+    cfg = xc.CFG()
+    cfg.phantom.dicom_path = dicom_path
+    cfg.phantom.phantom_path = phantom_path
+    cfg.phantom.materials = list(material_threshold_dict.keys())
+    cfg.phantom.mu_energy = 60
+    cfg.phantom.thresholds = list(material_threshold_dict.values())
+    cfg.phantom.slice_range = [slice_range[0], slice_range[-1]]
+    cfg.phantom.show_phantom = False
+    cfg.phantom.overwrite = True
+#     cfg_file_str = fr"""
+# # Path where the DICOM images are located:
+# phantom.dicom_path = '{dicom_path}'
+# # Path where the phantom files are to be written
+# # (the last folder name will be the phantom files' base name):
+# phantom.phantom_path = '{phantom_path}'
+# phantom.materials = {list(material_threshold_dict.keys())}
+# phantom.mu_energy = 60
+# phantom.thresholds = {list(material_threshold_dict.values())}
+# phantom.slice_range = [{[slice_range[0], slice_range[-1]]}] # Range of DICOM
+# # image numbers to include. (first, last slice)
+# phantom.show_phantom = False  # Flag to turn on/off image display.
+# phantom.overwrite = True  # Flag to overwrite existing files without warning.
+# """
 
-    cfg_file_str = f"""
-# Path where the DICOM images are located:
-phantom.dicom_path = '{dicom_path}'
-# Path where the phantom files are to be written
-# (the last folder name will be the phantom files' base name):
-phantom.phantom_path = '{phantom_path}'
-phantom.materials = {list(material_threshold_dict.keys())}
-phantom.mu_energy = 60
-phantom.thresholds = {list(material_threshold_dict.values())}
-phantom.slice_range = [{[slice_range[0], slice_range[-1]]}] # Range of DICOM
-# image numbers to include. (first, last slice)
-phantom.show_phantom = False  # Flag to turn on/off image display.
-phantom.overwrite = True  # Flag to overwrite existing files without warning.
-"""
+#     dicom_to_voxel_cfg = phantom_path / 'dicom_to_voxelized.cfg'
+#     breakpoint()
+#     with open(dicom_to_voxel_cfg, 'w') as f:
+#         f.write(cfg_file_str)
 
-    dicom_to_voxel_cfg = phantom_path / 'dicom_to_voxelized.cfg'
-
-    with open(dicom_to_voxel_cfg, 'w') as f:
-        f.write(cfg_file_str)
-
-    dicom_to_voxelized_phantom.run_from_config(dicom_to_voxel_cfg)
+    dicom_to_voxelized_phantom.DICOM_to_voxelized_phantom(cfg.phantom)
+    # dicom_to_voxelized_phantom.run_from_config(dicom_to_voxel_cfg)
 
 
 def load_phantom(age=38, shape=None, name='default'):
