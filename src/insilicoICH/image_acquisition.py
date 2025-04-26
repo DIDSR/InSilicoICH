@@ -6,6 +6,7 @@ from pathlib import Path
 from shutil import rmtree
 from datetime import datetime
 from copy import deepcopy
+from tempfile import TemporaryDirectory
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -147,7 +148,9 @@ class Scanner():
 
         See also <https://github.com/DIDSR/pediatricIQphantoms/blob/main/src/pediatricIQphantoms/make_phantoms.py#L19>
         """
-        output_dir = output_dir or '.'
+        if output_dir is None:
+            self.tempdir = TemporaryDirectory()
+            output_dir = self.tempdir.name
         output_dir = Path(output_dir) / f'{phantom.patient_name}'
         if output_dir.exists():
             rmtree(output_dir)
