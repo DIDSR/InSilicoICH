@@ -95,15 +95,16 @@ def initialize_xcist(ground_truth_image, spacings=(1, 1, 1),
     output_dir = Path(output_dir)
     output_dir.mkdir(exist_ok=True, parents=True)
 
-    phantom_path = output_dir / 'phantoms' / fr'{phantom_id}'
+    phantom_path = output_dir / 'phantoms' / f'{phantom_id}'
     phantom_path.mkdir(exist_ok=True, parents=True)
-    ct.cfg.phantom.filename = str(phantom_path / fr'{phantom_id}.json')
+    ct.cfg.phantom.filename = str(phantom_path / f'{phantom_id}.json')
 
     # prepare material density arrays from ground truth phantom
     if ground_truth_image.ndim == 2:
         ground_truth_image = ground_truth_image[None]
 
     dicom_path = phantom_path / 'dicom'
+    dicom_path = fr'{dicom_path}'
     for slice_id, img in enumerate(ground_truth_image):
         dicom_filename = dicom_path / f'1-{slice_id:03d}.dcm'
         convert_to_dicom(img, dicom_filename, spacings=spacings)
