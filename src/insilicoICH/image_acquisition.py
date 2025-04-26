@@ -80,12 +80,12 @@ def initialize_xcist(ground_truth_image, spacings=(1, 1, 1),
     print('Initializing Scanner object...')
     print(''.join(10*['-']))
     # load defaults
-    scanner_path=install_path/'defaults/'/scanner_model
+    scanner_path=install_path / 'defaults'/ scanner_model
 
-    ct = xc.CatSim(install_path/'defaults/Phantom_Default',
-                   install_path/'defaults/Physics_Default',
-                   install_path/'defaults/Protocol_Default',
-                   install_path/'defaults/Recon_Default',
+    ct = xc.CatSim(install_path / 'defaults' / 'Phantom_Default',
+                   install_path / 'defaults' / 'Physics_Default',
+                   install_path / 'defaults' / 'Protocol_Default',
+                   install_path / 'defaults' / 'Recon_Default',
                    scanner_path)
 
     ct.cfg.waitForKeypress = False
@@ -95,9 +95,9 @@ def initialize_xcist(ground_truth_image, spacings=(1, 1, 1),
     output_dir = Path(output_dir)
     output_dir.mkdir(exist_ok=True, parents=True)
 
-    phantom_path = output_dir / 'phantoms' / f'{phantom_id}'
+    phantom_path = output_dir / 'phantoms' / fr'{phantom_id}'
     phantom_path.mkdir(exist_ok=True, parents=True)
-    ct.cfg.phantom.filename = str(phantom_path / f'{phantom_id}.json')
+    ct.cfg.phantom.filename = str(phantom_path / fr'{phantom_id}.json')
 
     # prepare material density arrays from ground truth phantom
     if ground_truth_image.ndim == 2:
