@@ -24,6 +24,7 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 
 from insilicoICH.study import run_study
 
@@ -61,17 +62,17 @@ def insilicoich(input_csv, output_directory=None, keep_raw=False):
                           kVp=float(patient['kVp']),
                           mA=float(patient['mA']),
                           pitch=float(patient['Pitch']),
-                          intensity=float(patient['LesionAttenuation(HU)']),
-                          volume=float(patient['LesionVolume(mL)']),
-                          lesion_type=patient['Subtype'],
-                          mass_effect=patient['MassEffect'],
+                          intensity=float(patient['LesionAttenuation(HU)']) if not np.isnan(patient['LesionVolume(mL)']) else None,
+                          volume=float(patient['LesionVolume(mL)']) if not np.isnan(patient['LesionVolume(mL)']) else None,
+                          lesion_type=patient['Subtype'] if not np.isnan(patient['Subtype']) else None,
+                          mass_effect=patient['MassEffect'] if not patient['MassEffect'] else None,
                           views=patient['Views'],
                           zspan=patient['ScanCoverage'],
                           kernel=patient['ReconKernel'],
                           slice_thickness=patient['SliceThickness(mm)'],
                           keep_raw=keep_raw,
-                          edema=patient['Edema'],
-                          seed=int(patient['CaseSeed']))
+                          edema=patient['Edema'] if not np.isnan(patient['Edema']) else None,
+                          seed=int(patient['CaseSeed']) if not np.isnan(patient['CaseSeed']) else None)
         study.metadata['Edema'] = patient['Edema']
         study.metadata.to_csv(output_directory / patient_name /
                               f'metadata_{patientid}.csv',
