@@ -4,7 +4,6 @@ module for working with phantoms
 
 from pathlib import Path
 import os
-from warnings import warn
 from collections import OrderedDict
 
 import numpy as np
@@ -12,8 +11,12 @@ import nibabel as nib
 import nrrd
 import pandas as pd
 import skimage as ski
-from dotenv import load_dotenv
 from monai.transforms import Resize, RandAffine, Affine, ResizeWithPadOrCrop
+
+from scipy.ndimage import (center_of_mass,
+                           distance_transform_edt,
+                           binary_erosion)
+
 from .utils import download_and_extract_archive
 
 from . import dicom_to_voxelized_phantom
@@ -23,9 +26,6 @@ from ..lesion_definition import (elliptical_lesion,
                                  insert_dural,
                                  warp_slice,
                                  get_perimeter)
-from scipy.ndimage import (center_of_mass,
-                           distance_transform_edt,
-                           binary_erosion)
 
 import gecatsim as xc
 
@@ -163,78 +163,7 @@ def voxelize_ground_truth(dicom_path: str | Path, phantom_path: str | Path,
     cfg.phantom.slice_range = [slice_range[0], slice_range[-1]]
     cfg.phantom.show_phantom = False
     cfg.phantom.overwrite = True
-#     cfg_file_str = fr"""
-# # Path where the DICOM images are located:
-# phantom.dicom_path = '{dicom_path}'
-# # Path where the phantom files are to be written
-# # (the last folder name will be the phantom files' base name):
-# phantom.phantom_path = '{phantom_path}'
-# phantom.materials = {list(material_threshold_dict.keys())}
-# phantom.mu_energy = 60
-# phantom.thresholds = {list(material_threshold_dict.values())}
-# phantom.slice_range = [{[slice_range[0], slice_range[-1]]}] # Range of DICOM
-# # image numbers to include. (first, last slice)
-# phantom.show_phantom = False  # Flag to turn on/off image display.
-# phantom.overwrite = True  # Flag to overwrite existing files without warning.
-# """
-
-#     dicom_to_voxel_cfg = phantom_path / 'dicom_to_voxelized.cfg'
-#     breakpoint()
-#     with open(dicom_to_voxel_cfg, 'w') as f:
-#         f.write(cfg_file_str)
-
     dicom_to_voxelized_phantom.DICOM_to_voxelized_phantom(cfg.phantom)
-    # dicom_to_voxelized_phantom.run_from_config(dicom_to_voxel_cfg)
-
-
-def load_phantom(age=38, shape=None, name='default'):
-    '''
-    Loads appropriate phantom based on age as a keyword
-
-    :param age: patient age in years, MIDA currently hard coded at 38 yrs
-    :param shape: shape of that the ground truth phantom will be interpolated
-    :param name: patient name to be saved in DICOM header
-    :param lesion_type: options include: ['IPH', 'EDH', 'SDH']
-    :param radius: lesion radius if sphere is selected
-    :param intensity: uniform intensity of the lesion (HU)
-    :param add_positioning_augmentation: bool, apply random affine to phantom
-    '''
-    load_dotenv()
-    if 'PHANTOM_DIRECTORY' in os.environ:
-        phantom_dir = Path(os.environ['PHANTOM_DIRECTORY'])
-    else:
-        phantom_dir = Path(__file__).parents[2]
-        warn(f'''
-The environment variable `PHANTOM_DIRECTORY` has not been set, this is needed
-to locate stored base phantom files for the NIHPD and MIDA head phantoms.
-
-If these phantom files cannot be located, NIHPD phantoms will be downloaded to
-your working directory: {phantom_dir}
-
-MIDA phantom files need to be downloaded manually and added to this directory,
-see `MIDA_Head_Phantom` for details.
-
-Please do one of the following:
-
-1. create a file called `.env` in this project's working directory and add:
-
-`PHANTOM_DIRECTORY=/path/to/phantoms`
-
-or
-
-2. in your terminal `export PHANTOM_DIRECTORY=/path/to_phantoms`
-''')
-
-    mida_age = 38
-    if age == mida_age:
-        phantom = MIDA_Head(phantom_dir / 'MIDA_Head_Phantom', shape=shape)
-    else:
-        phantom = NIHPD_Head(phantom_dir / 'NIHPD_Head_Phantom',
-                             age=age, shape=shape)
-
-    phantom.patient_name = name
-    phantom.age = age
-    return phantom
 
 
 class Phantom:
@@ -242,11 +171,14 @@ class Phantom:
     A base phantom that accepts any image array and spacings to define its size.
 
     :param img: numpy.ndarray, 2D or 3D, defining the phantom
-    :param spacings: tuple, voxel spacings [mm] (z, x, y). Definition of voxel sizes.
+    :param spacings: tuple, voxel spacings [mm] (z, x, y).
                     Default is 1 mm in each direction.
-    :param patient_name: str, patient identifier to be saved in DICOM header. Default is 'default'.
-    :param patientid: int, patient identifier to be saved in DICOM header. Default is 0.
-    :param age: float, patient age in years to be saved in DICOM header. Default is 0.
+    :param patient_name: str, patient identifier to be saved in DICOM header.
+                        Default is 'default'.
+    :param patientid: int, patient identifier to be saved in DICOM header.
+                     Default is 0.
+    :param age: float, patient age in years to be saved in DICOM header.
+                Default is 0.
     '''
     def __init__(self, img: np.ndarray, spacings: tuple = (1, 1, 1),
                  patient_name: str = 'default', patientid: int = 0, age: float = 0) -> None:
@@ -533,12 +465,8 @@ large, try smaller volume')
         return img_w_lesion, lesion_vol, (int(z), int(x), int(y))
 
 
-mida_age = 38  # add 38 as the median US adult age to represent MIDA, consider
-#  other identifiers when adding more patients
-
-
 class HeadPhantom(LesionPhantom):
-    def __init__(self, phantom_dir, shape=None):
+    def __init__(self, phantom_dir, shape=None, **kwargs):
         self.materials = {
             'csf': 10,
             'gray matter': 40,
@@ -554,7 +482,7 @@ class HeadPhantom(LesionPhantom):
         self.lesion_intensity = []  # HU
         self.mass_effect = False
         phantom, spacings = self.load_phantom(Path(phantom_dir))
-        super().__init__(phantom, spacings)
+        super().__init__(phantom, spacings, **kwargs)
         if shape:
             self.resize(shape)
         self.exclusion_mask = self.get_skull_map().astype(bool)
@@ -579,6 +507,9 @@ class HeadPhantom(LesionPhantom):
 
 
 class MIDA_Head(HeadPhantom):
+    age = 38  # add 38 as the median US adult age to represent MIDA, consider
+#  other identifiers when adding more patients
+
     def __init__(self, phantom_dir, shape=None):
         if not phantom_dir.exists():
             raise FileNotFoundError(f'''
@@ -590,6 +521,7 @@ To use MIDA head phantoms, please download them from:
 and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
 ''')
         super().__init__(phantom_dir, shape)
+        self.patient_name = 'Adult MIDA Head'
         self.material_lut = self._load_material_LUT()
 
     def load_phantom(self, phantom_dir):
@@ -643,11 +575,6 @@ and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
         return skull_map
 
 
-url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
-nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
-possible_ages = nihpd_ages + [mida_age]
-
-
 class NIHPD_Head(HeadPhantom):
     '''
     loads MR brain atlas of mean `age`, downloaded from
@@ -665,23 +592,27 @@ class NIHPD_Head(HeadPhantom):
         Unbiased average age-appropriate atlases for pediatric studies.
         NeuroImage. 2011;54(1):313-327. doi:10.1016/j.neuroimage.2010.07.033
     '''
+    ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
+    url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
+
     def __init__(self, phantom_dir, age: float, symmetric=False, shape=None):
         phantom_dir = Path(phantom_dir)
         self.age = age
+        self.patient_name = f'{age} yr NIHPD Head'
         self.symmetric = symmetric
         if not phantom_dir.exists():
             print(f'''
 `PHANTOM_DIRECTORY` {phantom_dir} not found, now downloading NIHPD phantoms
-from {url}
+from {NIHPD_Head.url}
 
 If you have already downloaded NIHPD and MIDA head phantoms, please see
 `load_phantom` for details on how to add their locations.
 ''')
-            download_and_extract_archive(url, phantom_dir)
-        super().__init__(phantom_dir, shape)
+            download_and_extract_archive(NIHPD_Head.url, phantom_dir)
+        super().__init__(phantom_dir, shape, age=age)
         self.materials['skull'] = 900
 
-    def load_phantom(self, phantom_dir, shape=None):
+    def load_phantom(self, phantom_dir):
         'sets ._phantom, and .dx, .dy, .dz, .nx, .ny, .nz'
         nii_files = list(phantom_dir.glob('*.nii'))
         age = self.age
@@ -849,3 +780,6 @@ from {phantom_dir}')
         skull_map[skull_map < 0.1] = 0
         skull_map[skull_map > 0] = 1
         return skull_map
+
+
+possible_ages = NIHPD_Head.ages + [MIDA_Head.age]

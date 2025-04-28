@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 from insilicoICH.ground_truth_definition.phantoms import (possible_ages,
                                                            load_phantom)
-from insilicoICH.image_acquisition import Scanner
+from insilicoICH import Scanner
 
 logging.basicConfig(filename="newfile.log",
                     format='%(asctime)s %(message)s',
