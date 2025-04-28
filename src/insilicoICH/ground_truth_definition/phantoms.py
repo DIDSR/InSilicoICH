@@ -470,6 +470,9 @@ large, try smaller volume')
         lesion_vol = np.full(img.shape, fill_value=-1000)
         transform = RandAffine(prob=1, translate_range=[r, r])
         transform.set_random_state(seed)
+        if os.name == 'nt':
+            seed = False  # windows compatibility, monai transform crashes windows kernel
+            transform = lambda o: o # return self
 
         for _ in range(complexity):
             axes = get_semi_major_axes(eccentricity, seed)
