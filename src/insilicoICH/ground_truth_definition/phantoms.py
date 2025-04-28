@@ -171,11 +171,14 @@ class Phantom:
     A base phantom that accepts any image array and spacings to define its size.
 
     :param img: numpy.ndarray, 2D or 3D, defining the phantom
-    :param spacings: tuple, voxel spacings [mm] (z, x, y). Definition of voxel sizes.
+    :param spacings: tuple, voxel spacings [mm] (z, x, y).
                     Default is 1 mm in each direction.
-    :param patient_name: str, patient identifier to be saved in DICOM header. Default is 'default'.
-    :param patientid: int, patient identifier to be saved in DICOM header. Default is 0.
-    :param age: float, patient age in years to be saved in DICOM header. Default is 0.
+    :param patient_name: str, patient identifier to be saved in DICOM header.
+                        Default is 'default'.
+    :param patientid: int, patient identifier to be saved in DICOM header.
+                     Default is 0.
+    :param age: float, patient age in years to be saved in DICOM header.
+                Default is 0.
     '''
     def __init__(self, img: np.ndarray, spacings: tuple = (1, 1, 1),
                  patient_name: str = 'default', patientid: int = 0, age: float = 0) -> None:
@@ -602,11 +605,11 @@ from {NIHPD_Head.url}
 If you have already downloaded NIHPD and MIDA head phantoms, please see
 `load_phantom` for details on how to add their locations.
 ''')
-            download_and_extract_archive(url, phantom_dir)
+            download_and_extract_archive(NIHPD_Head.url, phantom_dir)
         super().__init__(phantom_dir, shape)
         self.materials['skull'] = 900
 
-    def load_phantom(self, phantom_dir, shape=None):
+    def load_phantom(self, phantom_dir):
         'sets ._phantom, and .dx, .dy, .dz, .nx, .ny, .nz'
         nii_files = list(phantom_dir.glob('*.nii'))
         age = self.age
