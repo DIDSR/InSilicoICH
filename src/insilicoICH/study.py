@@ -258,7 +258,7 @@ def run_study(output_directory=None, patient_name=None, scanner_model='Scanner_D
     if patient_name:
         phantom.patient_name = patient_name
 
-    if lesion_type and (volume > 0):
+    if lesion_type and (volume > 0) and hasattr(phantom, 'insert_lesion'):
         phantom.insert_lesion(lesion_type,
                               volume=volume,
                               intensity=intensity,

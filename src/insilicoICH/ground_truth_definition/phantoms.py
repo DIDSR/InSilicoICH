@@ -466,7 +466,7 @@ large, try smaller volume')
 
 
 class HeadPhantom(LesionPhantom):
-    def __init__(self, phantom_dir, shape=None):
+    def __init__(self, phantom_dir, shape=None, **kwargs):
         self.materials = {
             'csf': 10,
             'gray matter': 40,
@@ -482,7 +482,7 @@ class HeadPhantom(LesionPhantom):
         self.lesion_intensity = []  # HU
         self.mass_effect = False
         phantom, spacings = self.load_phantom(Path(phantom_dir))
-        super().__init__(phantom, spacings)
+        super().__init__(phantom, spacings, **kwargs)
         if shape:
             self.resize(shape)
         self.exclusion_mask = self.get_skull_map().astype(bool)
@@ -609,7 +609,7 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
 `load_phantom` for details on how to add their locations.
 ''')
             download_and_extract_archive(NIHPD_Head.url, phantom_dir)
-        super().__init__(phantom_dir, shape)
+        super().__init__(phantom_dir, shape, age=age)
         self.materials['skull'] = 900
 
     def load_phantom(self, phantom_dir):
