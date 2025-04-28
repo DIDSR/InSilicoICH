@@ -3,6 +3,7 @@ pipeline: this high level module organizes the healthy head phantoms,
 lesion definitions, augmentations, and CT simulation together into the final
 ct_simulation function.
 '''
+import os
 from pathlib import Path
 from shutil import rmtree
 from warnings import warn
@@ -264,7 +265,8 @@ def run_study(output_directory=None, patient_name=None, scanner_model='Scanner_D
                               mass_effect=mass_effect,
                               seed=seed,
                               **kwargs)
-
+    if os.name == 'nt':
+       add_positioning_augmentation = False  # windows compatibility, monai transform crashes windows kernel
     if add_positioning_augmentation:
         transform = RandAffine(prob=1,
                                rotate_range=[np.pi/4, np.pi/20, np.pi/20],
