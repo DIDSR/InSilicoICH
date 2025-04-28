@@ -459,10 +459,6 @@ large, try smaller volume')
         return img_w_lesion, lesion_vol, (int(z), int(x), int(y))
 
 
-mida_age = 38  # add 38 as the median US adult age to represent MIDA, consider
-#  other identifiers when adding more patients
-
-
 class HeadPhantom(LesionPhantom):
     def __init__(self, phantom_dir, shape=None):
         self.materials = {
@@ -505,6 +501,9 @@ class HeadPhantom(LesionPhantom):
 
 
 class MIDA_Head(HeadPhantom):
+    age = 38  # add 38 as the median US adult age to represent MIDA, consider
+#  other identifiers when adding more patients
+
     def __init__(self, phantom_dir, shape=None):
         if not phantom_dir.exists():
             raise FileNotFoundError(f'''
@@ -516,6 +515,7 @@ To use MIDA head phantoms, please download them from:
 and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
 ''')
         super().__init__(phantom_dir, shape)
+        self.patient_name = 'Adult MIDA Head'
         self.material_lut = self._load_material_LUT()
 
     def load_phantom(self, phantom_dir):
@@ -569,11 +569,6 @@ and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
         return skull_map
 
 
-url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
-nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
-possible_ages = nihpd_ages + [mida_age]
-
-
 class NIHPD_Head(HeadPhantom):
     '''
     loads MR brain atlas of mean `age`, downloaded from
@@ -591,14 +586,18 @@ class NIHPD_Head(HeadPhantom):
         Unbiased average age-appropriate atlases for pediatric studies.
         NeuroImage. 2011;54(1):313-327. doi:10.1016/j.neuroimage.2010.07.033
     '''
+    ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
+    url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
+
     def __init__(self, phantom_dir, age: float, symmetric=False, shape=None):
         phantom_dir = Path(phantom_dir)
         self.age = age
+        self.patient_name = f'{age} yr NIHPD Head'
         self.symmetric = symmetric
         if not phantom_dir.exists():
             print(f'''
 `PHANTOM_DIRECTORY` {phantom_dir} not found, now downloading NIHPD phantoms
-from {url}
+from {NIHPD_Head.url}
 
 If you have already downloaded NIHPD and MIDA head phantoms, please see
 `load_phantom` for details on how to add their locations.
@@ -775,3 +774,6 @@ from {phantom_dir}')
         skull_map[skull_map < 0.1] = 0
         skull_map[skull_map > 0] = 1
         return skull_map
+
+
+possible_ages = NIHPD_Head.ages + [MIDA_Head.age]

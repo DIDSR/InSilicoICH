@@ -16,32 +16,18 @@ from scipy.ndimage import center_of_mass
 from monai.transforms import RandAffine
 
 from .image_acquisition import Scanner, read_dicom
-from .ground_truth_definition.phantoms import NIHPD_Head, MIDA_Head
-from .ground_truth_definition.iq_phantoms import WirePhantom, LowContrastDetectabilityPhantom, DensitometryPhantom
+from .ground_truth_definition.phantoms import (NIHPD_Head,
+                                               MIDA_Head,
+                                               possible_ages)
+from .ground_truth_definition import iq_phantoms
 
 
-def load_vol(file_list):
-    return np.stack(list(map(read_dicom, file_list)))
-
-
-def load_phantom(age=38, shape=None, name='default'):
-    '''
-    Loads appropriate phantom based on age as a keyword
-
-    :param age: patient age in years, MIDA currently hard coded at 38 yrs
-    :param shape: shape of that the ground truth phantom will be interpolated
-    :param name: patient name to be saved in DICOM header
-    :param lesion_type: options include: ['IPH', 'EDH', 'SDH']
-    :param radius: lesion radius if sphere is selected
-    :param intensity: uniform intensity of the lesion (HU)
-    :param add_positioning_augmentation: bool, apply random affine to phantom
-    '''
-    load_dotenv()
-    if 'PHANTOM_DIRECTORY' in os.environ:
-        phantom_dir = Path(os.environ['PHANTOM_DIRECTORY'])
-    else:
-        phantom_dir = Path(__file__).parents[2]
-        warn(f'''
+load_dotenv()
+if 'PHANTOM_DIRECTORY' in os.environ:
+    phantom_dir = Path(os.environ['PHANTOM_DIRECTORY'])
+else:
+    phantom_dir = Path(__file__).parents[2]
+    warn(f'''
 The environment variable `PHANTOM_DIRECTORY` has not been set, this is needed
 to locate stored base phantom files for the NIHPD and MIDA head phantoms.
 
@@ -61,24 +47,40 @@ or
 
 2. in your terminal `export PHANTOM_DIRECTORY=/path/to_phantoms`
 ''')
+
+
+def load_vol(file_list):
+    return np.stack(list(map(read_dicom, file_list)))
+
+
+available_phantoms = possible_ages + [o for o in dir(iq_phantoms) if (not o.startswith('__')) and o not in ['np', 'create_circle_phantom', 'Phantom']]
+
+
+def load_phantom(name='Densitometry', shape=None):
+    '''
+    Loads appropriate phantom based on age as a keyword
+
+    :param name: phantom name, if a head phanton this is patient age in years, MIDA currently hard coded at 38 yrs
+        see `ground_truth_definitions.phantoms.possible_ages` for ages
+    :param shape: shape of that the ground truth phantom will be interpolated
+    :param name: patient name to be saved in DICOM header
+    '''
+
     matrix_size = max(shape) if shape else 400
     mida_age = 38
-    if age == mida_age:
+    if name == mida_age:
         phantom = MIDA_Head(phantom_dir / 'MIDA_Head_Phantom',
                             shape=shape)
-    elif age == 'wire':
-        phantom = WirePhantom(matrix_size=matrix_size)
-    elif age == 'densitometry':
-        phantom = DensitometryPhantom(matrix_size=matrix_size)
-    elif age == 'low contrast detectability':
-        phantom = LowContrastDetectabilityPhantom(matrix_size=matrix_size)
+    elif name == 'WirePhantom':
+        phantom = iq_phantoms.WirePhantom(matrix_size=matrix_size)
+    elif name == 'DensitometryPhantom':
+        phantom = iq_phantoms.DensitometryPhantom(matrix_size=matrix_size)
+    elif name == 'LowContrastDetectabilityPhantom':
+        phantom = iq_phantoms.LowContrastDetectabilityPhantom(matrix_size=matrix_size)
     else:
-        age = float(age)
+        name = float(name)
         phantom = NIHPD_Head(phantom_dir / 'NIHPD_Head_Phantom',
-                             age=age, shape=shape)
-
-    phantom.patient_name = name
-    phantom.age = age
+                             age=name, shape=shape)
     return phantom
 
 
@@ -245,13 +247,15 @@ class Study:
         return self
 
 
-def run_study(output_directory=None, patient_name='default', scanner_model='Scanner_Default', age=38, kVp=120,
+def run_study(output_directory=None, patient_name=None, scanner_model='Scanner_Default', age=6.5, kVp=120,
               mA=200, pitch=0, intensity=200, volume=5, lesion_type=None,
               mass_effect=True, add_positioning_augmentation=True,
               views=1000, zspan='dynamic', kernel='standard',
               slice_thickness=1, keep_raw=False, seed=None, **kwargs) -> Study:
 
-    phantom = load_phantom(age=age, name=patient_name)
+    phantom = load_phantom(age)
+    if patient_name:
+        phantom.patient_name = patient_name
 
     if lesion_type and (volume > 0):
         phantom.insert_lesion(lesion_type,

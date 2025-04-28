@@ -6,8 +6,8 @@ import numpy as np
 from monai.transforms import RandAffine
 
 from insilicoICH.study import Study
-from insilicoICH.ground_truth_definition.phantoms import load_phantom
-from insilicoICH.image_acquisition import Scanner
+from insilicoICH import load_phantom
+from insilicoICH import Scanner
 
 age = 6.5
 transform = RandAffine(prob=0.5,
