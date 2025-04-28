@@ -70,7 +70,7 @@ def insilicoich(input_csv, output_directory=None, keep_raw=False):
         study = run_study(output_directory,
                           patient_name,
                           scanner_model=scanner_model,
-                          age=float(patient['Age']),
+                          age=patient['Age'],
                           kVp=float(patient['kVp']),
                           mA=float(patient['mA']),
                           pitch=float(patient['Pitch']),

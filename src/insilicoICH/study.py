@@ -5,20 +5,81 @@ ct_simulation function.
 '''
 from pathlib import Path
 from shutil import rmtree
-
+from warnings import warn
+import os
 import numpy as np
 import ast
 import pydicom
 import pandas as pd
+from dotenv import load_dotenv
 from scipy.ndimage import center_of_mass
 from monai.transforms import RandAffine
 
 from .image_acquisition import Scanner, read_dicom
-from .ground_truth_definition.phantoms import load_phantom
+from .ground_truth_definition.phantoms import NIHPD_Head, MIDA_Head
+from .ground_truth_definition.iq_phantoms import WirePhantom, LowContrastDetectabilityPhantom, DensitometryPhantom
 
 
 def load_vol(file_list):
     return np.stack(list(map(read_dicom, file_list)))
+
+
+def load_phantom(age=38, shape=None, name='default'):
+    '''
+    Loads appropriate phantom based on age as a keyword
+
+    :param age: patient age in years, MIDA currently hard coded at 38 yrs
+    :param shape: shape of that the ground truth phantom will be interpolated
+    :param name: patient name to be saved in DICOM header
+    :param lesion_type: options include: ['IPH', 'EDH', 'SDH']
+    :param radius: lesion radius if sphere is selected
+    :param intensity: uniform intensity of the lesion (HU)
+    :param add_positioning_augmentation: bool, apply random affine to phantom
+    '''
+    load_dotenv()
+    if 'PHANTOM_DIRECTORY' in os.environ:
+        phantom_dir = Path(os.environ['PHANTOM_DIRECTORY'])
+    else:
+        phantom_dir = Path(__file__).parents[2]
+        warn(f'''
+The environment variable `PHANTOM_DIRECTORY` has not been set, this is needed
+to locate stored base phantom files for the NIHPD and MIDA head phantoms.
+
+If these phantom files cannot be located, NIHPD phantoms will be downloaded to
+your working directory: {phantom_dir}
+
+MIDA phantom files need to be downloaded manually and added to this directory,
+see `MIDA_Head_Phantom` for details.
+
+Please do one of the following:
+
+1. create a file called `.env` in this project's working directory and add:
+
+`PHANTOM_DIRECTORY=/path/to/phantoms`
+
+or
+
+2. in your terminal `export PHANTOM_DIRECTORY=/path/to_phantoms`
+''')
+    matrix_size = max(shape) if shape else 400
+    mida_age = 38
+    if age == mida_age:
+        phantom = MIDA_Head(phantom_dir / 'MIDA_Head_Phantom',
+                            shape=shape)
+    elif age == 'wire':
+        phantom = WirePhantom(matrix_size=matrix_size)
+    elif age == 'densitometry':
+        phantom = DensitometryPhantom(matrix_size=matrix_size)
+    elif age == 'low contrast detectability':
+        phantom = LowContrastDetectabilityPhantom(matrix_size=matrix_size)
+    else:
+        age = float(age)
+        phantom = NIHPD_Head(phantom_dir / 'NIHPD_Head_Phantom',
+                             age=age, shape=shape)
+
+    phantom.patient_name = name
+    phantom.age = age
+    return phantom
 
 
 class Study:
@@ -58,8 +119,8 @@ class Study:
                   kernel='standard', slice_thickness=1, **kwargs):
         patient_name = self.phantom.patient_name
         age = self.phantom.age
-        lesion_type = self.phantom.lesion_type
-        intensity = self.phantom.lesion_intensity
+        lesion_type = self.phantom.lesion_type if hasattr(self.phantom, 'lesion_type') else None
+        intensity = self.phantom.lesion_intensity if hasattr(self.phantom, 'lesion_intensity') else None
 
         ct = self.scanner
         if isinstance(zspan, float):
@@ -207,7 +268,8 @@ def run_study(output_directory=None, patient_name='default', scanner_model='Scan
                                scale_range=[0.1, 0.1, 0.1],
                                padding_mode="border",
                                mode='nearest')
-        phantom.apply_transform(transform, seed=seed)
+        if hasattr(phantom, 'apply_transform'):
+            phantom.apply_transform(transform, seed=seed)
 
     scanner = Scanner(phantom, scanner_model=scanner_model, output_dir=output_directory)
     study = Study(scanner, 'pilot')
