@@ -124,8 +124,8 @@ def get_mean_age(age_range: str):
     return (float(age_range.split('-')[1])+float(age_range.split('-')[0]))/2
 
 
-def resize(phantom, shape):
-    resize = Resize(max(shape), size_mode='longest')
+def resize(phantom, shape, **kwargs):
+    resize = Resize(max(shape), size_mode='longest', **kwargs)
     resized = resize(phantom[None])[0]
     return resized
 
@@ -217,14 +217,14 @@ class Phantom:
         '''Returns the size of the phantom array (mm)'''
         return np.array(self.spacings) * self.shape
 
-    def resize(self, shape: tuple) -> None:
+    def resize(self, shape: tuple, **kwargs) -> None:
         '''
         Resizes the phantom array to the given shape and adjusts the spacings accordingly.
 
         :param shape: tuple, new shape for the phantom array
         '''
         original_shape = np.array(self.shape)
-        self._phantom = resize(self._phantom, shape)
+        self._phantom = resize(self._phantom, shape, **kwargs)
         new_shape = np.array(self._phantom.shape)
         new_spacings = original_shape / new_shape * np.array(self.spacings)
         self.dz, self.dx, self.dy = new_spacings
@@ -251,14 +251,14 @@ class LesionPhantom(Phantom):
         self.mass_effect = False
         self.exclusion_mask = np.zeros(self.shape, dtype=bool)
 
-    def resize(self, shape: tuple) -> None:
+    def resize(self, shape: tuple, **kwargs) -> None:
         '''
         Resizes the phantom array to the given shape and adjusts the spacings accordingly.
 
         :param shape: tuple, new shape for the phantom array
         '''
-        super().resize(shape)
-        self.exclusion_mask = resize(self.exclusion_mask, shape).astype(bool)
+        super().resize(shape, **kwargs)
+        self.exclusion_mask = resize(self.exclusion_mask, shape, **kwargs).astype(bool)
 
     def get_lesion_volume(self, unit='mL'):
         '''

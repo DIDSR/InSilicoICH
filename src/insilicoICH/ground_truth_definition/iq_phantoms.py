@@ -54,11 +54,63 @@ class LowContrastDetectabilityPhantom(Phantom):
         diameter = 200
         diameter_pix = matrix_size*large_radius_ratio
         spacings = [diameter, diameter/diameter_pix, diameter/diameter_pix]
+        lrg = create_circle_phantom(image_size=matrix_size,
+                                    large_radius_ratio=large_radius_ratio,
+                                    num_small_circles=0,
+                                    large_circle_value=0,
+                                    bg_value=-1000)
+        mid = create_circle_phantom(image_size=matrix_size,
+                                    large_radius_ratio=large_radius_ratio - 0.05,
+                                    num_small_circles=0,
+                                    large_circle_value=bg_value,
+                                    bg_value=0)
+        small_radius_ratio = [0.125] + 4*[0.03] + 4*[0.025] + 4*[0.02] + 4*[0.015] + 4*[0.01]
+        num_small_circles = len(small_radius_ratio)
+        small_circle_values = num_small_circles*[6]
+        sml = create_circle_phantom(image_size=matrix_size,
+                                    large_radius_ratio=large_radius_ratio - 0.05,
+                                    num_small_circles=num_small_circles,
+                                    small_radius_ratio=small_radius_ratio,
+                                    inner_radius_ratio=0.7,
+                                    small_circle_values=small_circle_values,
+                                    large_circle_value=0,
+                                    bg_value=0)
+        img = (lrg + mid + sml)[::-1]
+        img = img.T[::-1]
+        img = img[None]
+        super().__init__(img, spacings, patient_name, patientid, age=0)
+
+
+class ACRPhantom(Phantom):
+    '''
+    Contains Modules Module 1, 2, and 3 from the ACR CT accreditation phantom (Gammex 464):
+    Module 1: CT number Accuracy
+    Module 2: Low Contrast Detectability
+    Module 3: Uniformity and Noise
+    https://accreditationsupport.acr.org/support/solutions/articles/11000053945-phantom-overview-ct-revised-3-21-2025-
+    '''
+    def __init__(self, matrix_size=400, bg_value=90, patient_name='ACR phantom', patientid=0):
+        self.matrix_size = matrix_size
+        self.bg_value = bg_value
+        self.large_radius_ratio = 0.85
+        self.diameter = 200
+        module_length = 40
+        self.air_HU = -1000
+        lcd_mod = self.low_contrast_detectability_module()
+        accuracy_mod = self.CT_number_accuracy_module()
+        uniformity_mod = self.uniformity_module()
+        img = np.concat((accuracy_mod, lcd_mod, uniformity_mod))
+        diameter_pix = self.matrix_size*self.large_radius_ratio - 0.05
+        spacings = [module_length, self.diameter/diameter_pix, self.diameter/diameter_pix]
+        super().__init__(img, spacings, patient_name, patientid, age=0)
+
+    def low_contrast_detectability_module(self):
+        diameter_pix = self.matrix_size*self.large_radius_ratio - 0.05
         phantom_rad_px = diameter_pix / 2.0
 
         # Estimate pixel sizes from mm labels (if 200mm phantom = 460px)
         # scale_px_per_mm = 460 / 200 = 2.3 px/mm
-        scale_px_per_mm = diameter_pix / diameter
+        scale_px_per_mm = diameter_pix / self.diameter
 
         group_radii = [
             6 * scale_px_per_mm / 2.0, # 6mm diameter -> 3mm radius
@@ -70,7 +122,7 @@ class LowContrastDetectabilityPhantom(Phantom):
         large_hole_radius = (25 * scale_px_per_mm) / 2.0
 
         img = create_resolution_phantom(
-            image_size=matrix_size,
+            image_size=self.matrix_size,
             phantom_diameter_pixels=diameter_pix,
             group_placement_radius_ratio=0.6, # Adjust for desired placement ring
             group_radii_pixels=group_radii[::-1],
@@ -78,13 +130,48 @@ class LowContrastDetectabilityPhantom(Phantom):
             intra_group_spacing_factor=4, # Adjust spacing between holes in a group
             large_hole_radius_pixels=large_hole_radius,
             large_hole_y_offset_pixels=int(phantom_rad_px * 0.65), # Adjust vertical pos
-            bg_value=-1000.0,           # Air background
-            phantom_body_value=bg_value,   # Example: Solid Water/Plastic HU
-            hole_value=96,         # Air holes
+            bg_value=0,           # Air background
+            phantom_body_value=0,   # Example: Solid Water/Plastic HU
+            hole_value=6,         # Air holes
             start_angle_offset_deg = -60 # Rotate to roughly match example layout
             )
+
+        lrg = create_circle_phantom(image_size=self.matrix_size,
+                                     large_radius_ratio=self.large_radius_ratio,
+                                     num_small_circles=0,
+                                     large_circle_value=0,
+                                     bg_value=self.air_HU)
+        mid = create_circle_phantom(image_size=self.matrix_size,
+                                    large_radius_ratio=self.large_radius_ratio - 0.05,
+                                    num_small_circles=0,
+                                    large_circle_value=self.bg_value,
+                                    bg_value=0)
+        img = img + lrg + mid
         img = img[None]
-        super().__init__(img, spacings, patient_name, patientid, age=0)
+        return img
+
+    def CT_number_accuracy_module(self):
+        values = [-1000, 120, -95, 955]
+        img = create_circle_phantom(self.matrix_size,
+                                    large_radius_ratio=self.large_radius_ratio,
+                                    inner_radius_ratio=0.55,
+                                    small_radius_ratio=0.15,
+                                    num_small_circles=len(values),
+                                    large_circle_value=0,
+                                    small_circle_values=values,
+                                    bg_value=self.air_HU,
+                                    start_angle_offset_deg=45)
+        img = img[None]
+        return img
+
+    def uniformity_module(self):
+        img = create_circle_phantom(self.matrix_size,
+                                    large_radius_ratio=self.large_radius_ratio,
+                                    num_small_circles=0,
+                                    large_circle_value=0,
+                                    bg_value=self.air_HU)
+        img = img[None]
+        return img
 
 
 def create_circle_phantom(
@@ -95,7 +182,8 @@ def create_circle_phantom(
     num_small_circles=6,
     bg_value=0.0,         # Background intensity
     large_circle_value=0.5,  # Main circle intensity
-    small_circle_values=None  # List/array of intensities for small circles
+    small_circle_values=None,  # List/array of intensities for small circles
+    start_angle_offset_deg=0
 ):
     """
     Generates a NumPy array representing a circular phantom.
@@ -119,6 +207,7 @@ def create_circle_phantom(
             The length must match num_small_circles. If None, defaults
             to a range of values from 0.1 to 0.9. Values can range
             from 0.0 (black) to 1.0 (white).
+        start_angle_offset_deg (float): Rotates the starting position of the first group.
 
     Returns:
         np.ndarray: A 2D NumPy array representing the generated image.
@@ -160,6 +249,7 @@ def create_circle_phantom(
     # --- Draw Small Circles ---
     # Calculate angles for placing small circles (in radians)
     angles = np.linspace(0, 2 * np.pi, num_small_circles, endpoint=False) # Use endpoint=False for even spacing
+    angles += np.deg2rad(start_angle_offset_deg) # Apply rotation offset
 
     for i, angle in enumerate(angles):
         # Calculate center coordinates of the current small circle
