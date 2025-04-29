@@ -54,7 +54,7 @@ def load_vol(file_list):
     return np.stack(list(map(read_dicom, file_list)))
 
 
-available_phantoms = possible_ages + [o for o in dir(iq_phantoms) if (not o.startswith('__')) and o not in ['np', 'create_circle_phantom', 'Phantom']]
+available_phantoms = possible_ages + [o for o in dir(iq_phantoms) if (not o.startswith('__')) and o not in ['np', 'create_circle_phantom', 'Phantom', 'create_resolution_phantom']]
 
 
 def load_phantom(name='Densitometry', shape=None):
