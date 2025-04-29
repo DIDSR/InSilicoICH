@@ -78,6 +78,8 @@ def load_phantom(name='Densitometry', shape=None):
         phantom = iq_phantoms.DensitometryPhantom(matrix_size=matrix_size)
     elif name == 'LowContrastDetectabilityPhantom':
         phantom = iq_phantoms.LowContrastDetectabilityPhantom(matrix_size=matrix_size)
+    elif name == 'ACRPhantom':
+        phantom = iq_phantoms.ACRPhantom(matrix_size=matrix_size)
     else:
         name = float(name)
         phantom = NIHPD_Head(phantom_dir / 'NIHPD_Head_Phantom',
