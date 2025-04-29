@@ -191,6 +191,7 @@ Repository Contents
 See Also
 --------
 
+- `InSilicoGUI <https://github.com/DIDSR/InSilicoGUI>`_ graphical user interface for designing and running CT simulations in the browser
 - `PedSilicoAbdomen <https://github.com/DIDSR/PedSilicoAbdomen>`_ for generating synthetic abdominal non contrast CT datasets
 - `PedSilicoLVO <https://github.com/DIDSR/PedSilicoLVO>`_ for generating synthetic large vessel occlusion (LVO) non contrast CT datasets
 - `Virtual Imaging Tools (VITools) <https://github.com/DIDsr/vitools>`_ tools for running virtual imaging trials including image acquisition frameworks
