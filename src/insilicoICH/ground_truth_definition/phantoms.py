@@ -101,7 +101,18 @@ def get_transformation_src_dst(lesion: np.ndarray[bool],
     return src, dst
 
 
-def insert_with_mass_effect(img, lesion, boundary, strength=1):
+def insert_with_mass_effect(self, img, lesion, boundary, strength=1):
+    if self.__class__.__name__ == 'MIDA_Head':
+        phantom_name = 'MIDA_Head'
+        skull_map = self.get_skull_map()
+        mask = skull_map
+    elif self.__class__.__name__ == 'NIHPD_Head':
+        phantom_name = 'NIHPD_Head'
+        skull_map = ski.morphology.binary_dilation(self.get_skull_map(), np.ones(3*[5]))
+        mask = self.mask
+    else:
+        skull_map = self.get_skull_map()
+
     if img.ndim == 2:
         img = img[None]
     assert img.ndim == 3
@@ -113,8 +124,9 @@ def insert_with_mass_effect(img, lesion, boundary, strength=1):
         src, dst = get_transformation_src_dst(lesion[idx], strength)
         dst_coords = np.argwhere(dst)
         src_coords = np.argwhere(src)
-        warped[idx] = warp_slice(img[idx], boundary[idx],
-                                 src_coords, dst_coords, hematoma_type='round')
+        warped[idx] = warp_slice(axial_slice=img[idx], skull_slice=boundary[idx], mask=mask[idx],
+                                 src=src_coords, dst=dst_coords, hematoma_type='round',
+                                 phantom_name=self.__class__.__name__)
     return warped
 
 
@@ -493,7 +505,7 @@ large, try smaller volume')
         if mass_effect:
             if mass_effect is True:
                 mass_effect = 0.5
-            warped = insert_with_mass_effect(img,
+            warped = insert_with_mass_effect(self, img,
                                              lesion_mask,
                                              self.exclusion_mask,
                                              strength=mass_effect)
