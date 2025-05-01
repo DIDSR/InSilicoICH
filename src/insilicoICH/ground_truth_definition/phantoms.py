@@ -125,8 +125,8 @@ def insert_with_mass_effect(self, img, lesion, boundary, strength=1):
         dst_coords = np.argwhere(dst)
         src_coords = np.argwhere(src)
         warped[idx] = warp_slice(axial_slice=img[idx], skull_slice=boundary[idx], mask=mask[idx],
-                                 src=src_coords, dst=dst_coords, hematoma_type='round',
-                                 phantom_name=self.__class__.__name__)
+                                 src=src_coords, dst=dst_coords, hematoma_type='IPH',
+                                 phantom_name=phantom_name)
     return warped
 
 
