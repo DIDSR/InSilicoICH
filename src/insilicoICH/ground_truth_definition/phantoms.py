@@ -611,6 +611,7 @@ class NIHPD_Head(HeadPhantom):
         Unbiased average age-appropriate atlases for pediatric studies.
         NeuroImage. 2011;54(1):313-327. doi:10.1016/j.neuroimage.2010.07.033
     '''
+    nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
     relative_head_size = dict(zip(nihpd_ages,
                                   [0.8, 0.82, 0.85, 0.87, 0.9, 0.95]))
     url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
@@ -629,7 +630,7 @@ from {NIHPD_Head.url}
 If you have already downloaded NIHPD and MIDA head phantoms, please see
 `load_phantom` for details on how to add their locations.
 ''')
-            download_and_extract_archive(url, phantom_dir)
+            download_and_extract_archive(NIHPD_Head.url, phantom_dir)
         super().__init__(phantom_dir, shape)
 
     def load_phantom(self, phantom_dir):
