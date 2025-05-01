@@ -6,6 +6,7 @@ from pathlib import Path
 from shutil import rmtree
 from datetime import datetime
 from copy import deepcopy
+from tempfile import TemporaryDirectory
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,6 +19,8 @@ from .ground_truth_definition.phantoms import (voxelize_ground_truth,
                                                Phantom)
 
 install_path = Path(__file__).parent
+available_scanners = [o.name for o in install_path.glob('defaults/*')
+                      if not str(o).endswith('.cfg')]
 
 
 def read_dicom(dcm_fname: str) -> np.ndarray:
@@ -77,12 +80,12 @@ def initialize_xcist(ground_truth_image, spacings=(1, 1, 1),
     print('Initializing Scanner object...')
     print(''.join(10*['-']))
     # load defaults
-    scanner_path=install_path/'defaults/'/scanner_model
+    scanner_path=install_path / 'defaults'/ scanner_model
 
-    ct = xc.CatSim(install_path/'defaults/Phantom_Default',
-                   install_path/'defaults/Physics_Default',
-                   install_path/'defaults/Protocol_Default',
-                   install_path/'defaults/Recon_Default',
+    ct = xc.CatSim(install_path / 'defaults' / 'Phantom_Default',
+                   install_path / 'defaults' / 'Physics_Default',
+                   install_path / 'defaults' / 'Protocol_Default',
+                   install_path / 'defaults' / 'Recon_Default',
                    scanner_path)
 
     ct.cfg.waitForKeypress = False
@@ -104,7 +107,7 @@ def initialize_xcist(ground_truth_image, spacings=(1, 1, 1),
     for slice_id, img in enumerate(ground_truth_image):
         dicom_filename = dicom_path / f'1-{slice_id:03d}.dcm'
         convert_to_dicom(img, dicom_filename, spacings=spacings)
-
+    dicom_path = fr'{dicom_path}'
     voxelize_ground_truth(dicom_path, phantom_path,
                           material_threshold_dict=materials)
     print('Scanner Ready')
@@ -145,7 +148,9 @@ class Scanner():
 
         See also <https://github.com/DIDSR/pediatricIQphantoms/blob/main/src/pediatricIQphantoms/make_phantoms.py#L19>
         """
-        output_dir = output_dir or '.'
+        if output_dir is None:
+            self.tempdir = TemporaryDirectory()
+            output_dir = self.tempdir.name
         output_dir = Path(output_dir) / f'{phantom.patient_name}'
         if output_dir.exists():
             rmtree(output_dir)
@@ -157,8 +162,6 @@ class Scanner():
             img = img.numpy()
 
         self.phantom = phantom
-        available_scanners = [o.name for o in install_path.glob('defaults/*')
-                              if not str(o).endswith('.cfg')]
         if scanner_model not in available_scanners:
             raise ValueError(f'{scanner_model} not in {available_scanners}')
         self.scanner_model = scanner_model

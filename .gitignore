@@ -10,7 +10,7 @@ build
 
 batchmode_CT_dataset_pipeline.sge
 run_batchmode.sh
-
+*.csv
 *.raw
 *.air
 *.offset
@@ -26,6 +26,7 @@ src/InSilicoICH.egg-info
 tests/*.png
 lesions.png
 *.log
+*.zip
 *.1*
 *.2*
 *.3*

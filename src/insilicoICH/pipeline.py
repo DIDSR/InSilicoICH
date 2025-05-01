@@ -24,6 +24,7 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 
 from insilicoICH.study import run_study
 
@@ -52,26 +53,38 @@ def insilicoich(input_csv, output_directory=None, keep_raw=False):
             scanner_model = str(patient['Scanner'])
         else:
             scanner_model = "Scanner_Default"
-
+        subtype = patient['Subtype']
+        volume = patient['LesionVolume(mL)']
+        attenuation = patient['LesionAttenuation(HU)']
+        mass_effect = patient['MassEffect']
+        edema = patient['Edema']
+        if not isinstance(subtype, str):
+            if np.isnan(subtype):
+                subtype = None
+                attenuation = None
+                edema = None
+                volume = None
+                mass_effect = None
+        seed = int(patient['CaseSeed']) if not np.isnan(patient['CaseSeed']) else None 
         patient_name = f'case_{patientid:03}'
         study = run_study(output_directory,
                           patient_name,
                           scanner_model=scanner_model,
-                          age=float(patient['Age']),
+                          age=patient['Age'],
                           kVp=float(patient['kVp']),
                           mA=float(patient['mA']),
                           pitch=float(patient['Pitch']),
-                          intensity=float(patient['LesionAttenuation(HU)']),
-                          volume=float(patient['LesionVolume(mL)']),
-                          lesion_type=patient['Subtype'],
-                          mass_effect=patient['MassEffect'],
+                          intensity=attenuation,
+                          volume=volume,
+                          lesion_type=subtype,
+                          mass_effect=mass_effect,
                           views=patient['Views'],
                           zspan=patient['ScanCoverage'],
                           kernel=patient['ReconKernel'],
                           slice_thickness=patient['SliceThickness(mm)'],
                           keep_raw=keep_raw,
-                          edema=patient['Edema'],
-                          seed=int(patient['CaseSeed']))
+                          edema=edema,
+                          seed=seed)
         study.metadata['Edema'] = patient['Edema']
         study.metadata.to_csv(output_directory / patient_name /
                               f'metadata_{patientid}.csv',

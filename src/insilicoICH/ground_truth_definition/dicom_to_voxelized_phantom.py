@@ -222,9 +222,9 @@ def initialize(phantom):
     phantom.pixel_size_z = sample_dicom.SliceThickness
     phantom.mu_water = GetMu('water', phantom.mu_energy)
     phantom.mu_water = phantom.mu_water[-1]
-    phantom.json_filename = phantom.phantom_path + '/' + phantom.basename + '.json'
+    phantom.json_filename = os.path.join(phantom.phantom_path, phantom.basename + '.json')
 
-    filenames_first_part = phantom.phantom_path + '/' + phantom.basename + '_'
+    filenames_first_part = os.path.join(phantom.phantom_path, phantom.basename + '_')
     filenames_last_part = '_' + str(phantom.num_cols) + 'x' + str(phantom.num_rows) + 'x' + str(phantom.num_slices) + '.raw'
     mu_list = []
     volume_fraction_array = {}
@@ -465,7 +465,7 @@ def DICOM_to_voxelized_phantom(phantom):
 
 def run_from_config(config_filename):
     config = source_cfg(config_filename)
-    DICOM_to_voxelized_phantom(config.phantom)
+    DICOM_to_voxelized_phantom(fr'{config.phantom}')
 
 if __name__ == "__main__":
 
