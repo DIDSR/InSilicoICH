@@ -99,7 +99,7 @@ class ACRPhantom(Phantom):
         lcd_mod = self.low_contrast_detectability_module()
         accuracy_mod = self.CT_number_accuracy_module()
         uniformity_mod = self.uniformity_module()
-        img = np.concat((accuracy_mod, lcd_mod, uniformity_mod))
+        img = np.concatenate((accuracy_mod, lcd_mod, uniformity_mod))
         diameter_pix = self.matrix_size*self.large_radius_ratio - 0.05
         spacings = [module_length, self.diameter/diameter_pix, self.diameter/diameter_pix]
         super().__init__(img, spacings, patient_name, patientid, age=0)
