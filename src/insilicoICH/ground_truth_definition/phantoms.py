@@ -588,12 +588,6 @@ and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
         skull_map[np.where(self._phantom == 1000)] = 1.0  # other bone voxels
         return skull_map.astype(bool)
 
-
-url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
-nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
-possible_ages = nihpd_ages + [mida_age]
-
-
 def minmax_scale(x, feature_range=(0, 1)):
     'adapted from sklearn https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.normalize.html'
     x_std = (x - x.min())/(x.max() - x.min())
@@ -696,8 +690,6 @@ from {phantom_dir}')
         self.t1w = self.t1w[::-1]
 
         self.nz, self.nx, self.ny = self.csf.shape
-        if shape:
-            self.resize(shape)
 
         self.head_mask = self.get_head_mask()
         self.skull = self.get_skull_map()
