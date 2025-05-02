@@ -17,7 +17,8 @@ from scipy.ndimage import center_of_mass
 from monai.transforms import RandAffine
 
 from .image_acquisition import Scanner, read_dicom
-from .ground_truth_definition.phantoms import (NIHPD_Head,
+from .ground_truth_definition.phantoms import (UNC_Head,
+                                               NIHPD_Head,
                                                MIDA_Head,
                                                possible_ages)
 from .ground_truth_definition import iq_phantoms
@@ -69,7 +70,12 @@ def load_phantom(name='Densitometry', shape=None):
 
     matrix_size = max(shape) if shape else 400
     mida_age = 38
-    if name == mida_age:
+    print(name)
+    print(type(name))
+    if float(name) == (0 or 1.0 or 2.0):
+        name = float(name) 
+        phantom = UNC_Head(phantom_dir / 'UNC_Head_phantom', age=name, shape=shape)
+    elif name == mida_age:
         phantom = MIDA_Head(phantom_dir / 'MIDA_Head_Phantom',
                             shape=shape)
     elif name == 'WirePhantom':
