@@ -6,7 +6,6 @@ notebooks/__pycache__
 .pytest_cache
 notebooks/*/*.png
 .PedsilicoICH
-src/PedSilicoICH.egg-info
 build
 
 batchmode_CT_dataset_pipeline.sge
@@ -17,13 +16,11 @@ run_batchmode.sh
 *.offset
 *.dcm
 metadata*
-*.nii
 *.prep
 *.scan
 **/phantoms/*/*.json
 notebooks/*.csv
 __pycache__
-*.nii
 src/InSilicoICH.egg-info
 .env
 tests/*.png
