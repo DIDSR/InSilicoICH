@@ -700,13 +700,20 @@ from {phantom_dir}')
 
     def resize(self, shape=None):
         original_shape = self.csf.shape
+
+        # resize original images
         self.csf = resize(self.csf, shape).numpy()
-        new_shape = self.csf.shape
         self.gm = resize(self.gm, shape).numpy()
         self.wm = resize(self.wm, shape).numpy()
         self.mask = resize(self.mask, shape).numpy()
         self.pdw = resize(self.pdw, shape).numpy()
+        self.t1w = resize(self.t1w, shape).numpy()
+
+        # resize additional 
+        self.head_mask = resize(self.head_mask, shape).numpy().astype(bool)
         self.skull = resize(self.skull, shape).numpy()
+        
+        new_shape = self.csf.shape
 
         new_spacings = np.array(original_shape) / np.array(new_shape) *\
             [self.dz, self.dx, self.dy]
@@ -814,7 +821,6 @@ from {phantom_dir}')
             skull = np.where(self.pseudoct > threshold, 1, 0)
 
         elif self.skull_seg_method == 'otsu':
-            print('using otsu method')
             vol = self.t1w
             thresh = 35.61893018554474  # precalculated by performing otsu across all nihpd
             skull = vol < thresh
