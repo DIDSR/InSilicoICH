@@ -614,13 +614,15 @@ class NIHPD_Head(HeadPhantom):
     ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
     relative_head_size = dict(zip(ages, [0.8, 0.82, 0.85, 0.87, 0.9, 0.95]))
     url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
+
     def __init__(self, phantom_dir, age: float, symmetric=False, shape=None,
-                 skull_seg_method='otsu'):
+                 skull_seg_method='otsu', add_sutures=True):
         phantom_dir = Path(phantom_dir)
         self.age = age
         self.patient_name = f'{age} yr NIHPD Head'
         self.symmetric = symmetric
         self.skull_seg_method = skull_seg_method
+        self.add_sutures = add_sutures
         if not phantom_dir.exists():
             print(f'''
 `PHANTOM_DIRECTORY` {phantom_dir} not found, now downloading NIHPD phantoms
@@ -630,7 +632,7 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
 `load_phantom` for details on how to add their locations.
 ''')
             download_and_extract_archive(NIHPD_Head.url, phantom_dir)
-        super().__init__(phantom_dir, shape)
+        super().__init__(phantom_dir, shape, age=age)
 
     def load_phantom(self, phantom_dir):
         'sets ._phantom, and .dx, .dy, .dz, .nx, .ny, .nz'
@@ -709,10 +711,9 @@ from {phantom_dir}')
         self.pdw = resize(self.pdw, shape).numpy()
         self.t1w = resize(self.t1w, shape).numpy()
 
-        # resize additional 
+        # resize additional
         self.head_mask = resize(self.head_mask, shape).numpy().astype(bool)
         self.skull = resize(self.skull, shape).numpy()
-        
         new_shape = self.csf.shape
 
         new_spacings = np.array(original_shape) / np.array(new_shape) *\
@@ -770,19 +771,20 @@ from {phantom_dir}')
         phantom[sinous] = self.materials['CSF']  # approximates blood
         if self.skull_seg_method == 'pseudoct':
             phantom[self.skull] = self.pseudoct[self.skull]
+        if self.add_sutures:
+            sutures = self.get_sutures()
+            phantom[sutures] = 0  # assume water HU
         phantom[phantom < 0] = self.materials['air']
 
         # # TODO: dura map currently overlaps with new skull methods, need fix
         # phantom[self.get_dura_map()] = 50  # HU same as MIDA
         return phantom
 
-    def get_CT_number_phantom(self, add_sutures=False):
+    def get_CT_number_phantom(self):
         if len(self._lesion_coords) > 0:
             return self._phantom
         phantom = self.assign_HUs()
-        if add_sutures:
-            sutures = self.get_sutures()
-            phantom[sutures] = 0  # assume water HU
+
         return phantom
 
     def get_material_mask(self, material):
