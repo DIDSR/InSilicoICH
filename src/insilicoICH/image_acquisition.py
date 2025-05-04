@@ -162,9 +162,9 @@ class Scanner():
             img = img.numpy()
 
         self.phantom = phantom
-        if scanner_model not in available_scanners:
-            raise ValueError(f'{scanner_model} not in {available_scanners}')
-        self.scanner_model = scanner_model
+        self.scanner_model = scanner_model if scanner_model in available_scanners else 'Scanner_Default'
+        if (scanner_model not in available_scanners) and (not Path(scanner_model).exists()):
+            raise FileNotFoundError(f'{scanner_model} not in {available_scanners} and is not a file')
         self.studyname = studyname or self.patientname
         self.studyid = studyid
         self.seriesname = seriesname
@@ -186,6 +186,8 @@ class Scanner():
                                       output_dir=self.output_dir,
                                       phantom_id=phantom.patientid,
                                       materials=materials)
+        if Path(scanner_model).exists():
+            self.load_scanner_config(scanner_model)
         self.start_positions = self.calculate_start_positions()
 
     @property
@@ -195,6 +197,8 @@ class Scanner():
         return sliceThickness*self.xcist.cfg.scanner.detectorRowCount # nominal_aperature == s
 
     def load_scanner_config(self, filename: str = 'Scanner_Default'):
+        if filename in available_scanners:
+            filename = install_path / 'defaults' / filename
         cfg = xc.source_cfg(filename)
         self.xcist.cfg.scanner = cfg.scanner
         self.scanner_model = Path(filename).name

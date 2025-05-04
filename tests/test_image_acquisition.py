@@ -70,3 +70,10 @@ def test_load_scanner_config():
     new_collimation = scanner.nominal_aperature
     assert new_sid != original_sid
     assert new_collimation != original_collimation
+
+
+def test_load_custom_scanner():
+    phantom = DensitometryPhantom()
+    custom_scanner = test_dir / 'Scanner_Test'
+    scanner = Scanner(phantom, custom_scanner)
+    assert scanner.xcist.cfg.scanner.sid == 42
