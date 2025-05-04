@@ -186,10 +186,19 @@ class Scanner():
                                       output_dir=self.output_dir,
                                       phantom_id=phantom.patientid,
                                       materials=materials)
+        self.start_positions = self.calculate_start_positions()
+
+    @property
+    def nominal_aperature(self):
         M = self.xcist.cfg.scanner.sdd/self.xcist.cfg.scanner.sid
         sliceThickness = self.xcist.cfg.scanner.detectorRowSize/M
-        self.nominal_aperature = sliceThickness*self.xcist.cfg.scanner.detectorRowCount # nominal_aperature == s
-        self.start_positions = self.calculate_start_positions()
+        return sliceThickness*self.xcist.cfg.scanner.detectorRowCount # nominal_aperature == s
+
+    def load_scanner_config(self, filename: str = 'Scanner_Default'):
+        cfg = xc.source_cfg(filename)
+        self.xcist.cfg.scanner = cfg.scanner
+        self.scanner_model = Path(filename).name
+        return self
 
     def calculate_start_positions(self, startZ=None, endZ=None):
         'determine number of axial scans required to cover the phantom'
