@@ -70,9 +70,7 @@ def load_phantom(name='Densitometry', shape=None):
 
     matrix_size = max(shape) if shape else 400
     mida_age = 38
-    print(name)
-    print(type(name))
-    if float(name) == (0 or 1.0 or 2.0):
+    if float(name) in [0, 1.0, 2.0]:
         name = float(name) 
         phantom = UNC_Head(phantom_dir / 'UNC_Head_phantom', age=name, shape=shape)
     elif name == mida_age:

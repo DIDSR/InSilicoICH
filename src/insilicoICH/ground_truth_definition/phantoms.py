@@ -888,6 +888,7 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
         self.intensity = nib.load(base_dir / f'infant-{age_string}-withSkull.nii.gz').get_fdata().transpose(2, 1, 0)[:, ::-1, :]
         self.segmentation = nib.load(base_dir / f'infant-{age_string}-seg.nii.gz').get_fdata().transpose(2, 1, 0)[:, ::-1, :]
 
+        # extract segmentations from seg image
         self.gm = np.where(self.segmentation == 150, 1, 0)
         self.wm = np.where(self.segmentation == 250, 1, 0)
         self.csf = np.where(self.segmentation == 10, 1, 0)
@@ -1027,8 +1028,7 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
 
     def get_head_mask(self):
         '''obtains mask of head voxels'''
-        thresh = ski.filters.threshold_otsu(self.intensity)
-        #thresh = 35.61893018554474  #ski.filters.threshold_otsu(vol)
+        thresh = 50 # threshold manually determined; ski.filters.threshold_otsu too high 
         head_mask = self.intensity > thresh
         head_mask = binary_closing(head_mask, np.ones(3*[7]))
         head_mask = remove_small_holes(head_mask, area_threshold=1e5)
@@ -1044,7 +1044,8 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
 
         elif self.skull_seg_method == 'otsu':
             vol = self.intensity
-            thresh = 35.61893018554474  # precalculated by performing otsu across all nihpd (TODO: UPDATE FOR UNC)
+            thresh = ski.filters.threshold_otsu(self.intensity)
+            #thresh = 35.61893018554474  # precalculated by performing otsu across all nihpd (TODO: UPDATE FOR UNC)
             skull = vol < thresh
             skull = skull & ~binary_erosion(self.mask, np.ones(3*[3]))
             skull = skull & self.head_mask
