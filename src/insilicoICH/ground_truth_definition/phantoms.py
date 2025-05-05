@@ -588,6 +588,7 @@ and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
         skull_map[np.where(self._phantom == 1000)] = 1.0  # other bone voxels
         return skull_map.astype(bool)
 
+
 def minmax_scale(x, feature_range=(0, 1)):
     'adapted from sklearn https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.normalize.html'
     x_std = (x - x.min())/(x.max() - x.min())
