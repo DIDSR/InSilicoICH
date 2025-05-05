@@ -529,6 +529,7 @@ class MIDA_Head(HeadPhantom):
 #  other identifiers when adding more patients
 
     def __init__(self, phantom_dir, shape=None):
+        self.age = MIDA_Head
         if not phantom_dir.exists():
             raise FileNotFoundError(f'''
 MIDA head phantom files not found in {phantom_dir}
@@ -634,7 +635,7 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
 `load_phantom` for details on how to add their locations.
 ''')
             download_and_extract_archive(NIHPD_Head.url, phantom_dir)
-        super().__init__(phantom_dir, shape)
+        super().__init__(phantom_dir, shape, age=age, patient_name=self.patient_name)
 
     def load_phantom(self, phantom_dir):
         'sets ._phantom, and .dx, .dy, .dz, .nx, .ny, .nz'
@@ -866,7 +867,7 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
 `load_phantom` for details on how to add their locations.
 ''')
             download_and_extract_archive(UNC_Head.url, phantom_dir, remove_finished=True)
-        super().__init__(phantom_dir, shape)
+        super().__init__(phantom_dir, shape, age=age, patient_name=self.patient_name)
 
     def load_phantom(self, phantom_dir):
         'sets ._phantom, and .dx, .dy, .dz, .nx, .ny, .nz'
@@ -894,17 +895,18 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
         self.csf = np.where(self.segmentation == 10, 1, 0)
         self.mask = np.where(self.segmentation > 0, 1, 0)
 
-        try:
-            src_dir = Path(__file__).parents[0]
-            self.pseudoct = nib.load(
-                src_dir / f'UNC_pseudoCT/UNC_{age_string}_pct.nii'
-                ).get_fdata().transpose(2, 1, 0)[:, ::-1, :]
-            self.pseudoct = self.pseudoct[::-1]
-        except FileNotFoundError:
-            # if pseudoct can't be loaded, default to
-            # otsu skull segmentation method
-            self.skull_seg_method = 'otsu'
-            print('pseudo-CT images not found; defaulting to otsu segmentation method')
+        if self.skull_seg_method == 'pseudoCT':
+            try:
+                src_dir = Path(__file__).parents[0]
+                self.pseudoct = nib.load(
+                    src_dir / f'UNC_pseudoCT/UNC_{age_string}_pct.nii'
+                    ).get_fdata().transpose(2, 1, 0)[:, ::-1, :]
+                self.pseudoct = self.pseudoct[::-1]
+            except FileNotFoundError:
+                # if pseudoct can't be loaded, default to
+                # otsu skull segmentation method
+                self.skull_seg_method = 'otsu'
+                print('pseudo-CT images not found; defaulting to otsu segmentation method')
 
         self.gm = self.gm[::-1]
         self.wm = self.wm[::-1]
@@ -1037,15 +1039,13 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
     def get_skull_map(self):
         '''obtains mask of skull voxels'''
         if self.skull_seg_method == 'pseudoct':
-            print('using pseudoct method')
             # currently, pesudoCT images are generated outside of the repository, TODO: integrate code
             threshold = 300  # units: HU
             skull = np.where(self.pseudoct > threshold, 1, 0)
 
         elif self.skull_seg_method == 'otsu':
             vol = self.intensity
-            thresh = ski.filters.threshold_otsu(self.intensity)
-            #thresh = 35.61893018554474  # precalculated by performing otsu across all nihpd (TODO: UPDATE FOR UNC)
+            thresh = ski.filters.threshold_otsu(self.intensity) # TODO: SEPARATE THRESHOLD FOR AGE 0, Otsu not working well
             skull = vol < thresh
             skull = skull & ~binary_erosion(self.mask, np.ones(3*[3]))
             skull = skull & self.head_mask

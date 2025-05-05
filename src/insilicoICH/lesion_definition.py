@@ -60,6 +60,17 @@ def elliptical_lesion(shape: tuple | list,
 
 def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None):
 
+    if phantom.__class__.__name__ == 'MIDA_Head':
+        phantom_name = phantom.__class__.__name__
+        skull_map = phantom.get_skull_map()
+        mask = skull_map
+    elif phantom.__class__.__name__ == 'NIHPD_Head' or 'UNC_Head':
+        phantom_name = phantom.__class__.__name__
+        skull_map = ski.morphology.binary_dilation(phantom.get_skull_map(), np.ones(3*[5]))
+        mask = phantom.mask
+    else:
+        skull_map = phantom.get_skull_map()
+
     random = np.random.default_rng(seed)
 
     num_slices = coverage_from_volume(volume=desired_volume,
@@ -73,24 +84,16 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
 
     HU_array = phantom.get_CT_number_phantom()
 
-    # TODO: better logic for hemorrhage starting slice
-    init_slice = int(random.choice(np.linspace(0, int(HU_array.shape[0]/3), int(HU_array.shape[0]/3) + 1)))
+    # TODO: better logic for hemorrhage starting slice (especially UNC)
+    if phantom_name == 'UNC_Head':
+        init_slice = 90
+    else:
+        init_slice = int(random.choice(np.linspace(0, int(HU_array.shape[0]/3), int(HU_array.shape[0]/3) + 1)))
 
     # initialize arrays, maps, and masks
     new_volume = np.copy(HU_array)
     boundary = phantom.get_dura_map()
     hemorrhage_mask = np.zeros_like(boundary)
-
-    if phantom.__class__.__name__ == 'MIDA_Head':
-        phantom_name = 'MIDA_Head'
-        skull_map = phantom.get_skull_map()
-        mask = skull_map
-    elif phantom.__class__.__name__ == 'NIHPD_Head':
-        phantom_name = 'NIHPD_Head'
-        skull_map = ski.morphology.binary_dilation(phantom.get_skull_map(), np.ones(3*[5]))
-        mask = phantom.mask
-    else:
-        skull_map = phantom.get_skull_map()
 
     distances = [(desired_distance-5)/phantom.spacings[2], (desired_distance+5)/phantom.spacings[2]]
 
@@ -307,7 +310,7 @@ def warp_slice(axial_slice, skull_slice, mask, src, dst, hematoma_type, phantom_
         skull_idx = np.argwhere(skull_boundary == True)
         skull_sample = np.argwhere(skull_boundary != 0)
 
-    elif phantom_name == 'NIHPD_Head':
+    elif phantom_name == 'NIHPD_Head' or 'UNC_Head':
         # use brain mask to define anchor points
         skull_boundary = ski.segmentation.find_boundaries(mask, mode='outer', background=0)
         skull_idx = np.argwhere(skull_boundary == True)
