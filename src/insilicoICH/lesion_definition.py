@@ -104,6 +104,11 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
     iter_flag = True
     slice_counter = slice_idx = 0
     while iter_flag:
+
+        current_vol = ((phantom.dx * phantom.dy * phantom.dz) * hemorrhage_mask.sum())/1000
+        if current_vol > desired_volume:
+            iter_flag = False
+
         if slice_counter == 0:  # need to do the slice in the middle of the hemorrhage, same as before
 
             tol = 2000
