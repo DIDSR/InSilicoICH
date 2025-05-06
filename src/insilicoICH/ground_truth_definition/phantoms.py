@@ -337,7 +337,7 @@ class LesionPhantom(Phantom):
         self._phantom = img_w_lesion
         self._lesion.append(lesion_image)
         self._lesion_coords.append(lesion_coords)
-        self.lesion_intensity.append(intensity)
+        self.lesion_intensity.append(float(intensity))
         return self
 
     def apply_transform(self, transform: RandAffine | Affine, seed=None):
