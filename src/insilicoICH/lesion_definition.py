@@ -105,9 +105,9 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
     slice_counter = slice_idx = 0
     while iter_flag:
 
-        current_vol = ((phantom.dx * phantom.dy * phantom.dz) * hemorrhage_mask.sum())/1000
-        if current_vol > desired_volume:
-            iter_flag = False
+        # current_vol = ((phantom.dx * phantom.dy * phantom.dz) * hemorrhage_mask.sum())/1000
+        # if current_vol > desired_volume:
+        #     iter_flag = False
 
         if slice_counter == 0:  # need to do the slice in the middle of the hemorrhage, same as before
 
@@ -147,7 +147,8 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
                 connect_points(start=orig_start,
                                end=orig_end,
                                boundary=temp_boundary,
-                               hematoma_type=hematoma_type)
+                               hematoma_type=hematoma_type,
+                               initial_slice=True)
 
             if mass_effect:
                 try:
@@ -187,9 +188,14 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
             distance_from_start = np.zeros(len(dura_idx))
             distance_from_end = np.zeros(len(dura_idx))
 
-            for i in range(len(dura_idx)):
-                distance_from_start[i] = math.sqrt((orig_start[0] - dura_idx[i][0])**2 + (orig_start[1] - dura_idx[i][1])**2)
-                distance_from_end[i] = math.sqrt((orig_end[0] - dura_idx[i][0])**2 + (orig_end[1] - dura_idx[i][1])**2)
+            if abs(slice_idx) == 1:
+                for i in range(len(dura_idx)):
+                    distance_from_start[i] = math.sqrt((orig_start[0] - dura_idx[i][0])**2 + (orig_start[1] - dura_idx[i][1])**2)
+                    distance_from_end[i] = math.sqrt((orig_end[0] - dura_idx[i][0])**2 + (orig_end[1] - dura_idx[i][1])**2)
+            else:
+                for i in range(len(dura_idx)):
+                    distance_from_start[i] = math.sqrt((new_start[0] - dura_idx[i][0])**2 + (new_start[1] - dura_idx[i][1])**2)
+                    distance_from_end[i] = math.sqrt((new_end[0] - dura_idx[i][0])**2 + (new_end[1] - dura_idx[i][1])**2)
 
             new_start = dura_idx[np.argmin(distance_from_start)]
             new_end = dura_idx[np.argmin(distance_from_end)]
@@ -198,7 +204,18 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
                 connect_points(start=new_start,
                                end=new_end,
                                boundary=temp_boundary,
-                               hematoma_type=hematoma_type)
+                               hematoma_type=hematoma_type,
+                               initial_slice=False)
+            
+            # print(f'slice: {init_slice-slice_idx}')
+            # print(len(boundary_coords))
+            
+            try:
+                new_start = boundary_coords[1:len(boundary_coords)-1][0]
+                new_end = boundary_coords[1:len(boundary_coords)-1][-1]
+            except:
+                new_start = dura_idx[np.argmin(distance_from_start)]
+                new_end = dura_idx[np.argmin(distance_from_end)]
         
             if mass_effect:
                 try:
@@ -232,7 +249,7 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
     return hemorrhage_mask.astype(bool), new_volume
 
 
-def connect_points(start, end, boundary, hematoma_type):
+def connect_points(start, end, boundary, hematoma_type, initial_slice=False):
     '''
     Creates two lines connecting start and end points:
     1. Line following existing dura (borders skull)
@@ -256,7 +273,7 @@ def connect_points(start, end, boundary, hematoma_type):
     successful_bezier = False
     # init bezier parameters:
     if hematoma_type == 'EDH':
-        bezier_weight = 0.14  # weight should probably be below 0.2 to avoid ballooning too much, but line breaks if below 0.04....
+        bezier_weight = 0.06  # changed from 0.14, # weight should probably be below 0.2 to avoid ballooning too much, but line breaks if below 0.04....
         bezier_middle = (int(rows/2), int(cols/2))  # center of the image, should probably randomize it somewhere along center later
     elif hematoma_type == 'SDH':
         bezier_weight = 0.5
