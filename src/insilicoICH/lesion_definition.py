@@ -67,14 +67,15 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
                                       slice_thickness=phantom.dz)
     ab = (desired_volume*2000)/(num_slices * phantom.dz)  # using ABC/2 formula (although /2000 for mL and mm)
     if hematoma_type == 'EDH':
-        desired_distance = math.sqrt(3*ab) # assume that length of epidural hemorrhage is about 3 times the width
+        desired_distance = math.sqrt(4*ab) # assume that length of epidural hemorrhage is about 4 times the width
     elif hematoma_type == 'SDH':
-        desired_distance = math.sqrt(7*ab) # assume that length of epidural hemorrhage is about 7 times the width
+        desired_distance = math.sqrt(10*ab) # assume that length of epidural hemorrhage is about 11 times the width
 
     HU_array = phantom.get_CT_number_phantom()
 
     # TODO: better logic for hemorrhage starting slice
-    init_slice = int(random.choice(np.linspace(0, int(HU_array.shape[0]/3), int(HU_array.shape[0]/3) + 1)))
+    init_slice = int(random.choice(np.linspace(0, int(HU_array.shape[0]/2), int(HU_array.shape[0]/2) + 1)))
+    print(init_slice)
 
     # initialize arrays, maps, and masks
     new_volume = np.copy(HU_array)
@@ -134,7 +135,8 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
                     orig_end = end_point
                 except:
                     count += 1
-                    init_slice = int(random.choice(np.linspace(0, int(HU_array.shape[0]/3), int(HU_array.shape[0]/3) + 1)))
+                    init_slice = int(random.choice(np.linspace(0, int(HU_array.shape[0]/2), int(HU_array.shape[0]/2) + 1)))
+                    print(init_slice)
                     if count == tol:
                         failure_occured = True
                 else:
@@ -211,8 +213,8 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
             # print(len(boundary_coords))
             
             try:
-                new_start = boundary_coords[1:len(boundary_coords)-1][0]
-                new_end = boundary_coords[1:len(boundary_coords)-1][-1]
+                new_start = boundary_coords[1:-1][0]
+                new_end = boundary_coords[1:-1][-1]
             except:
                 new_start = dura_idx[np.argmin(distance_from_start)]
                 new_end = dura_idx[np.argmin(distance_from_end)]
@@ -276,7 +278,7 @@ def connect_points(start, end, boundary, hematoma_type, initial_slice=False):
         bezier_weight = 0.06  # changed from 0.14, # weight should probably be below 0.2 to avoid ballooning too much, but line breaks if below 0.04....
         bezier_middle = (int(rows/2), int(cols/2))  # center of the image, should probably randomize it somewhere along center later
     elif hematoma_type == 'SDH':
-        bezier_weight = 0.5
+        bezier_weight = 2 # previously 0.5
         bezier_middle = boundary_coords[round(len(boundary_coords)/2)]  # use the middle point of the dura line
     else:
         bezier_weight = 0.0
