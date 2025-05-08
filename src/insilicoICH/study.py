@@ -12,6 +12,7 @@ import numpy as np
 import ast
 import pydicom
 import pandas as pd
+import SimpleITK as sitk
 from dotenv import load_dotenv
 from scipy.ndimage import center_of_mass
 from monai.transforms import RandAffine
@@ -19,6 +20,7 @@ from monai.transforms import RandAffine
 from .image_acquisition import Scanner, read_dicom
 from .ground_truth_definition.phantoms import (NIHPD_Head,
                                                MIDA_Head,
+                                               Phantom,
                                                possible_ages)
 from .ground_truth_definition import iq_phantoms
 
@@ -80,6 +82,10 @@ def load_phantom(name='Densitometry', shape=None):
         phantom = iq_phantoms.LowContrastDetectabilityPhantom(matrix_size=matrix_size)
     elif name == 'ACRPhantom':
         phantom = iq_phantoms.ACRPhantom(matrix_size=matrix_size)
+    elif Path(name).exists():
+        img = sitk.ReadImage(name)
+        phantom = Phantom(sitk.GetArrayFromImage(img),
+                          spacings=img.GetSpacing()[::-1])
     else:
         name = float(name)
         phantom = NIHPD_Head(phantom_dir / 'NIHPD_Head_Phantom',
