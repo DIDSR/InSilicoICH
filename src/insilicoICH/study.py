@@ -233,7 +233,7 @@ class Study:
             center_x_list.append(slice_x)
             center_y_list.append(slice_y)
             center_z_list.append(slice_z)
-            lesion_volume_list.append(vol_ml)
+            lesion_volume_list.append([float(vol_ml)])
 
         metadata = pd.DataFrame({'Name': names,
                                  'Age': ages,
