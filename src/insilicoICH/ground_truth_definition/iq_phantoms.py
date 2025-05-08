@@ -89,19 +89,22 @@ class ACRPhantom(Phantom):
     Module 3: Uniformity and Noise
     https://accreditationsupport.acr.org/support/solutions/articles/11000053945-phantom-overview-ct-revised-3-21-2025-
     '''
-    def __init__(self, matrix_size=400, bg_value=90, patient_name='ACR phantom', patientid=0):
+    def __init__(self, matrix_size=400, bg_value=90, patient_name='ACR phantom',
+                 mod_thickness=40, patientid=0):
         self.matrix_size = matrix_size
+        self.mod_thickness = mod_thickness
         self.bg_value = bg_value
         self.large_radius_ratio = 0.85
         self.diameter = 200
-        module_length = 40
         self.air_HU = -1000
         lcd_mod = self.low_contrast_detectability_module()
-        accuracy_mod = self.CT_number_accuracy_module()
+        accuracy_mod = self.CT_number_with_ramp_module(z_range=mod_thickness)
         uniformity_mod = self.uniformity_module()
-        img = np.concatenate((accuracy_mod, lcd_mod, uniformity_mod))
+        img = np.concatenate((accuracy_mod,
+                              np.stack(mod_thickness*[lcd_mod]),
+                              np.stack(mod_thickness*[uniformity_mod])))
         diameter_pix = self.matrix_size*self.large_radius_ratio - 0.05
-        spacings = [module_length, self.diameter/diameter_pix, self.diameter/diameter_pix]
+        spacings = [1, self.diameter/diameter_pix, self.diameter/diameter_pix]
         super().__init__(img, spacings, patient_name, patientid, age=0)
 
     def low_contrast_detectability_module(self):
@@ -113,7 +116,7 @@ class ACRPhantom(Phantom):
         scale_px_per_mm = diameter_pix / self.diameter
 
         group_radii = [
-            6 * scale_px_per_mm / 2.0, # 6mm diameter -> 3mm radius
+            6 * scale_px_per_mm / 2.0,  # 6mm diameter -> 3mm radius
             5 * scale_px_per_mm / 2.0,
             4 * scale_px_per_mm / 2.0,
             3 * scale_px_per_mm / 2.0,
@@ -147,7 +150,6 @@ class ACRPhantom(Phantom):
                                     large_circle_value=self.bg_value,
                                     bg_value=0)
         img = img + lrg + mid
-        img = img[None]
         return img
 
     def CT_number_accuracy_module(self):
@@ -161,8 +163,92 @@ class ACRPhantom(Phantom):
                                     small_circle_values=values,
                                     bg_value=self.air_HU,
                                     start_angle_offset_deg=45)
-        img = img[None]
         return img
+
+    def CT_number_with_ramp_module(self, z_range=20, bar_value=2000):
+        accuracy_phantom = self.CT_number_accuracy_module()
+
+        slices = []
+        for z in range(z_range):
+            phantom_image = self.make_wire_ramp_slice(bg_value=0,
+                                                      phantom_body_value=0,
+                                                      bar_value=bar_value,
+                                                      y_offset=z)
+            slices.append(phantom_image + accuracy_phantom)
+        return np.stack(slices)
+
+    def make_wire_ramp_slice(self, bg_value=-1000, phantom_body_value=0, bar_value=2000, y_offset=0):
+
+        bar_center_y_mm = 70
+        bar_pattern_center_mm = (5, bar_center_y_mm - y_offset) # Center of the bar pattern at the phantom center
+        bar_thickness_mm = 0.5
+        bar_spacing_mm = 1
+        bar_pattern_horizontal_extent_mm = 10.0 # Estimated horizontal extent of the bar pattern
+        bar_pattern_vertical_extent_mm = 0.1
+        # Create the phantom image
+        bp1_upper = create_ct_phantom_with_bars(
+            self.matrix_size,
+            self.large_radius_ratio,
+            self.diameter,
+            bar_pattern_center_mm,
+            bar_thickness_mm,
+            bar_spacing_mm,
+            bar_pattern_horizontal_extent_mm,
+            bar_pattern_vertical_extent_mm,
+            phantom_body_value=phantom_body_value,
+            bg_value=bg_value,
+            bar_value=bar_value
+        )
+
+        bar_pattern_center_mm = (-5, bar_center_y_mm + bar_spacing_mm - y_offset)
+
+        bp2_upper = create_ct_phantom_with_bars(
+            self.matrix_size,
+            self.large_radius_ratio,
+            self.diameter,
+            bar_pattern_center_mm,
+            bar_thickness_mm,
+            bar_spacing_mm,
+            bar_pattern_horizontal_extent_mm,
+            bar_pattern_vertical_extent_mm,
+            bg_value=0,
+            bar_value=bar_value,
+            phantom_body_value=0
+        )
+
+        bar_pattern_center_mm = (5, self.mod_thickness - bar_center_y_mm - y_offset)
+
+        bp1_lower = create_ct_phantom_with_bars(
+            self.matrix_size,
+            self.large_radius_ratio,
+            self.diameter,
+            bar_pattern_center_mm,
+            bar_thickness_mm,
+            bar_spacing_mm,
+            bar_pattern_horizontal_extent_mm,
+            bar_pattern_vertical_extent_mm,
+            bg_value=0,
+            bar_value=bar_value,
+            phantom_body_value=0
+        )
+
+        bar_pattern_center_mm = (-5, self.mod_thickness -bar_center_y_mm - bar_spacing_mm - y_offset)
+
+        bp2_lower = create_ct_phantom_with_bars(
+            self.matrix_size,
+            self.large_radius_ratio,
+            self.diameter,
+            bar_pattern_center_mm,
+            bar_thickness_mm,
+            bar_spacing_mm,
+            bar_pattern_horizontal_extent_mm,
+            bar_pattern_vertical_extent_mm,
+            bg_value=0,
+            bar_value=bar_value,
+            phantom_body_value=0
+        )
+
+        return bp1_upper + bp2_upper + bp1_lower + bp2_lower
 
     def uniformity_module(self):
         img = create_circle_phantom(self.matrix_size,
@@ -170,8 +256,119 @@ class ACRPhantom(Phantom):
                                     num_small_circles=0,
                                     large_circle_value=0,
                                     bg_value=self.air_HU)
-        img = img[None]
         return img
+
+
+def create_ct_phantom_with_bars(matrix_size, phantom_diameter_ratio, phantom_diameter_mm, bar_pattern_center_mm, bar_thickness_mm, bar_spacing_mm, bar_pattern_horizontal_extent_mm, bar_pattern_vertical_extent_mm = 2, phantom_body_value=0, bar_value = 2000, bg_value=-1000):
+    """
+    Creates a 2D NumPy array representing a circular CT phantom with a central
+    horizontal bar pattern at a specified location.
+
+    Args:
+        matrix_size (int or tuple): The size of the image matrix in pixels (e.g., 512 or (512, 512)).
+        phantom_diameter_ratio (float): The ratio of the phantom diameter to the matrix size.
+                                        The physical size of the matrix will be phantom_diameter_mm / phantom_diameter_ratio.
+        phantom_diameter_mm (float): The diameter of the circular phantom in millimeters.
+        bar_pattern_center_mm (tuple): The (x, y) coordinates of the bar pattern center in millimeters,
+                                       relative to the center of the phantom (0,0).
+        bar_thickness_mm (float): The thickness of each horizontal bar in millimeters.
+        bar_spacing_mm (float): The spacing between horizontal bars in millimeters.
+        bar_pattern_horizontal_extent_mm (float): The horizontal extent (width) of the bar pattern in millimeters.
+
+
+    Returns:
+        numpy.ndarray: A 2D NumPy array representing the phantom image.
+                       Values can represent different materials (e.g., 0 for background, 1 for phantom, 2 for bars).
+    """
+    if isinstance(matrix_size, int):
+        matrix_size = (matrix_size, matrix_size)
+
+    image_rows, image_cols = matrix_size
+
+    # Calculate the physical size of the matrix in mm
+    matrix_physical_size_mm = phantom_diameter_mm / phantom_diameter_ratio
+
+    # Calculate the resolution in mm per pixel
+    resolution_mm_per_pixel_x = matrix_physical_size_mm / image_cols
+    resolution_mm_per_pixel_y = matrix_physical_size_mm / image_rows
+
+    # Assuming square pixels for simplicity in this pattern
+    if abs(resolution_mm_per_pixel_x - resolution_mm_per_pixel_y) > 1e-9:
+        print("Warning: Pixel resolution is not square.")
+    resolution_mm_per_pixel = resolution_mm_per_pixel_x # Use x resolution as the primary
+
+
+    # Calculate image center in pixels
+    center_pixel_x = image_cols // 2
+    center_pixel_y = image_rows // 2
+
+    # Create an empty canvas (representing air or background)
+    phantom_image = np.full((image_rows, image_cols), bg_value, dtype=np.int16)
+
+    # Draw the circular phantom
+    # Calculate phantom radius in pixels
+    phantom_radius_pixels = (phantom_diameter_mm / 2) / resolution_mm_per_pixel
+
+    y, x = np.ogrid[:image_rows, :image_cols]
+    distance_from_center = np.sqrt((x - center_pixel_x)**2 + (y - center_pixel_y)**2)
+    phantom_image[distance_from_center <= phantom_radius_pixels] = phantom_body_value  # Represent phantom material
+
+    # --- Draw the horizontal bar pattern ---
+
+    # Convert bar pattern center from mm (relative to phantom center) to pixels (relative to image array origin)
+    bar_pattern_center_pixel_x = center_pixel_x + bar_pattern_center_mm[0] / resolution_mm_per_pixel
+    bar_pattern_center_pixel_y = center_pixel_y - bar_pattern_center_mm[1] / resolution_mm_per_pixel # y increases downwards in array
+
+    # Calculate bar thickness and spacing in pixels
+    bar_thickness_pixels = bar_thickness_mm / resolution_mm_per_pixel
+    bar_spacing_pixels = bar_spacing_mm / resolution_mm_per_pixel
+    pattern_pitch_pixels = bar_thickness_pixels + bar_spacing_pixels
+
+    # Calculate the horizontal extent of the bar pattern in pixels
+    bar_pattern_horizontal_extent_pixels = bar_pattern_horizontal_extent_mm / resolution_mm_per_pixel
+    bar_pattern_start_x_pixel = bar_pattern_center_pixel_x - bar_pattern_horizontal_extent_pixels / 2
+    bar_pattern_end_x_pixel = bar_pattern_center_pixel_x + bar_pattern_horizontal_extent_pixels / 2
+
+    bar_pattern_vertical_extent_pixels = bar_pattern_vertical_extent_mm / resolution_mm_per_pixel
+
+    # Calculate the y-coordinates of the top edge of the bars relative to the pattern center (0,0) in pixels
+    bar_top_edges_relative_pixels = []
+
+    # Add bars upwards from the center
+    y_offset = bar_spacing_pixels / 2 # Start with half a space from the center
+    while y_offset < bar_pattern_vertical_extent_pixels / 2 + bar_spacing_pixels: # Add as long as the bar's bottom is within the extent + buffer
+        bar_top_edges_relative_pixels.append(y_offset + bar_thickness_pixels/2) # Top edge of the bar
+        y_offset += pattern_pitch_pixels
+
+    # Add bars downwards from the center
+    y_offset = -bar_spacing_pixels / 2
+    while abs(y_offset) < bar_pattern_vertical_extent_pixels / 2 + bar_spacing_pixels:
+         bar_top_edges_relative_pixels.append(y_offset - bar_thickness_pixels/2) # Top edge of the bar
+         y_offset -= pattern_pitch_pixels
+
+    # Sort the top edge positions
+    bar_top_edges_relative_pixels.sort()
+
+
+    # Draw horizontal bars based on calculated top edges
+    for bar_top_edge_relative_pixels in bar_top_edges_relative_pixels:
+        bar_top_pixel = int(bar_pattern_center_pixel_y - bar_top_edge_relative_pixels)
+        bar_bottom_pixel = int(bar_pattern_center_pixel_y - bar_top_edge_relative_pixels + bar_thickness_pixels)
+
+        # Ensure the bar is within the image bounds and the circular phantom's central area
+        for r in range(max(0, bar_top_pixel), min(image_rows, bar_bottom_pixel)):
+             for c in range(max(0, int(bar_pattern_start_x_pixel)), min(image_cols, int(bar_pattern_end_x_pixel))):
+                # Check if the pixel is within the circular phantom
+                distance = np.sqrt((c - center_pixel_x)**2 + (r - center_pixel_y)**2)
+                if distance <= phantom_radius_pixels:
+                     # Check if the pixel is within the horizontal bounds of the bar pattern
+                     if c >= bar_pattern_start_x_pixel and c < bar_pattern_end_x_pixel:
+                          phantom_image[r, c] = bar_value # Represent bar material
+
+    return phantom_image
+
+
+
 
 
 def create_circle_phantom(

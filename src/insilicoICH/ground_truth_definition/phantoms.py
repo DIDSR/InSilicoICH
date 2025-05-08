@@ -341,7 +341,7 @@ class LesionPhantom(Phantom):
         self._phantom = img_w_lesion
         self._lesion.append(lesion_image)
         self._lesion_coords.append(lesion_coords)
-        self.lesion_intensity.append(intensity)
+        self.lesion_intensity.append(float(intensity))
         return self
 
     def apply_transform(self, transform: RandAffine | Affine, seed=None):
@@ -625,6 +625,7 @@ and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
         skull_map[np.where(self._phantom == 1000)] = 1.0  # other bone voxels
         return skull_map.astype(bool)
 
+
 def minmax_scale(x, feature_range=(0, 1)):
     'adapted from sklearn https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.normalize.html'
     x_std = (x - x.min())/(x.max() - x.min())
@@ -651,13 +652,15 @@ class NIHPD_Head(HeadPhantom):
     ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
     relative_head_size = dict(zip(ages, [0.8, 0.82, 0.85, 0.87, 0.9, 0.95]))
     url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
+
     def __init__(self, phantom_dir, age: float, symmetric=False, shape=None,
-                 skull_seg_method='otsu'):
+                 skull_seg_method='otsu', add_sutures=True):
         phantom_dir = Path(phantom_dir)
         self.age = age
         self.patient_name = f'{age} yr NIHPD Head'
         self.symmetric = symmetric
         self.skull_seg_method = skull_seg_method
+        self.add_sutures = add_sutures
         if not phantom_dir.exists():
             print(f'''
 `PHANTOM_DIRECTORY` {phantom_dir} not found, now downloading NIHPD phantoms
@@ -746,10 +749,9 @@ from {phantom_dir}')
         self.pdw = resize(self.pdw, shape).numpy()
         self.t1w = resize(self.t1w, shape).numpy()
 
-        # resize additional 
+        # resize additional
         self.head_mask = resize(self.head_mask, shape).numpy().astype(bool)
         self.skull = resize(self.skull, shape).numpy()
-        
         new_shape = self.csf.shape
 
         new_spacings = np.array(original_shape) / np.array(new_shape) *\
@@ -807,19 +809,20 @@ from {phantom_dir}')
         phantom[sinous] = self.materials['CSF']  # approximates blood
         if self.skull_seg_method == 'pseudoct':
             phantom[self.skull] = self.pseudoct[self.skull]
+        if self.add_sutures:
+            sutures = self.get_sutures()
+            phantom[sutures] = 0  # assume water HU
         phantom[phantom < 0] = self.materials['air']
 
         # # TODO: dura map currently overlaps with new skull methods, need fix
         # phantom[self.get_dura_map()] = 50  # HU same as MIDA
         return phantom
 
-    def get_CT_number_phantom(self, add_sutures=False):
+    def get_CT_number_phantom(self):
         if len(self._lesion_coords) > 0:
             return self._phantom
         phantom = self.assign_HUs()
-        if add_sutures:
-            sutures = self.get_sutures()
-            phantom[sutures] = 0  # assume water HU
+
         return phantom
 
     def get_material_mask(self, material):

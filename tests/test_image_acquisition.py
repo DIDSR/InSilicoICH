@@ -7,7 +7,10 @@ from shutil import rmtree
 import numpy as np
 
 from insilicoICH.ground_truth_definition.phantoms import Phantom
+from insilicoICH.ground_truth_definition.iq_phantoms import DensitometryPhantom
 from insilicoICH.image_acquisition import read_dicom, Scanner
+
+test_dir = Path(__file__).parent.absolute()
 
 
 def get_effective_diameter(ground_truth_mu, pixel_width_mm):
@@ -44,7 +47,6 @@ def test_scan_shape():
     basic test of xcist simulations
     '''
     views = 100
-    test_dir = Path(__file__).parent.absolute()
 
     ct = scan_CTP404(test_dir, views)
     dcms = ct.write_to_dicom(ct.output_dir / 'test.dcm')
@@ -56,3 +58,22 @@ def test_scan_shape():
                                     ct.xcist.cfg.scanner.detectorColCount)
     assert len(dcms) == ct.recon.shape[0]
     assert dcms_in_dir == dcms
+
+
+def test_load_scanner_config():
+    phantom = DensitometryPhantom()
+    scanner = Scanner(phantom, 'Siemens_DefinitionFlash')
+    original_sid = scanner.xcist.cfg.scanner.sid
+    original_collimation = scanner.nominal_aperature
+    scanner.load_scanner_config(test_dir / 'Scanner_Test')
+    new_sid = scanner.xcist.cfg.scanner.sid
+    new_collimation = scanner.nominal_aperature
+    assert new_sid != original_sid
+    assert new_collimation != original_collimation
+
+
+def test_load_custom_scanner():
+    phantom = DensitometryPhantom()
+    custom_scanner = test_dir / 'Scanner_Test'
+    scanner = Scanner(phantom, custom_scanner)
+    assert scanner.xcist.cfg.scanner.sid == 42
