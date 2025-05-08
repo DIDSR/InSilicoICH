@@ -485,14 +485,46 @@ large, try smaller volume')
 
 class HeadPhantom(LesionPhantom):
     def __init__(self, phantom_dir, shape=None, **kwargs):
-        self.materials = {
-            'csf': 10,
-            'gray matter': 40,
-            'white matter': 30,
-            'air': -1000,
-            'CSF': 10,
-            'skull': 900
-            }
+
+        # define material HU; 0-2 yr old based on cases in
+        # https://physionet.org/content/ct-ich/1.3.1/ and 
+        # https://pubmed.ncbi.nlm.nih.gov/3652069/
+        if self.age == 0.0:
+            self.materials = {
+                'csf': 10,
+                'gray matter': 24,
+                'white matter': 14,
+                'air': -1000,
+                'CSF': 10,
+                'skull': 400
+                }
+        elif self.age == 1.0:
+            self.materials = {
+                'csf': 10,
+                'gray matter': 35,
+                'white matter': 27,
+                'air': -1000,
+                'CSF': 10,
+                'skull': 500
+                }
+        elif self.age == 2.0:
+            self.materials = {
+                'csf': 10,
+                'gray matter': 35,
+                'white matter': 27,
+                'air': -1000,
+                'CSF': 10,
+                'skull': 700
+                }
+        else:
+            self.materials = {
+                'csf': 10,
+                'gray matter': 40,
+                'white matter': 30,
+                'air': -1000,
+                'CSF': 10,
+                'skull': 900
+                }
         self.patientid = 0
         self._lesion = []
         self._lesion_coords = []
