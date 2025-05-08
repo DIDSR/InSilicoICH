@@ -69,13 +69,12 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
     if hematoma_type == 'EDH':
         desired_distance = math.sqrt(4*ab) # assume that length of epidural hemorrhage is about 4 times the width
     elif hematoma_type == 'SDH':
-        desired_distance = math.sqrt(10*ab) # assume that length of epidural hemorrhage is about 11 times the width
+        desired_distance = math.sqrt(11*ab) # assume that length of epidural hemorrhage is about 11 times the width
 
     HU_array = phantom.get_CT_number_phantom()
 
     # TODO: better logic for hemorrhage starting slice
     init_slice = int(random.choice(np.linspace(0, int(HU_array.shape[0]/2), int(HU_array.shape[0]/2) + 1)))
-    print(init_slice)
 
     # initialize arrays, maps, and masks
     new_volume = np.copy(HU_array)
@@ -106,9 +105,9 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
     slice_counter = slice_idx = 0
     while iter_flag:
 
-        # current_vol = ((phantom.dx * phantom.dy * phantom.dz) * hemorrhage_mask.sum())/1000
-        # if current_vol > desired_volume:
-        #     iter_flag = False
+        current_vol = ((phantom.dx * phantom.dy * phantom.dz) * hemorrhage_mask.sum())/1000
+        if current_vol > desired_volume:
+            iter_flag = False
 
         if slice_counter == 0:  # need to do the slice in the middle of the hemorrhage, same as before
 
@@ -136,7 +135,6 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
                 except:
                     count += 1
                     init_slice = int(random.choice(np.linspace(0, int(HU_array.shape[0]/2), int(HU_array.shape[0]/2) + 1)))
-                    print(init_slice)
                     if count == tol:
                         failure_occured = True
                 else:
@@ -209,9 +207,6 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
                                hematoma_type=hematoma_type,
                                initial_slice=False)
             
-            # print(f'slice: {init_slice-slice_idx}')
-            # print(len(boundary_coords))
-            
             try:
                 new_start = boundary_coords[1:-1][0]
                 new_end = boundary_coords[1:-1][-1]
@@ -275,7 +270,7 @@ def connect_points(start, end, boundary, hematoma_type, initial_slice=False):
     successful_bezier = False
     # init bezier parameters:
     if hematoma_type == 'EDH':
-        bezier_weight = 0.06  # changed from 0.14, # weight should probably be below 0.2 to avoid ballooning too much, but line breaks if below 0.04....
+        bezier_weight = 0.14  # changed from 0.14, # weight should probably be below 0.2 to avoid ballooning too much, but line breaks if below 0.04....
         bezier_middle = (int(rows/2), int(cols/2))  # center of the image, should probably randomize it somewhere along center later
     elif hematoma_type == 'SDH':
         bezier_weight = 2 # previously 0.5
@@ -297,10 +292,8 @@ def connect_points(start, end, boundary, hematoma_type, initial_slice=False):
 
         # check if connecting route includes start and end:
         if (connecting_route[start[0], start[1]] == 1) & (connecting_route[end[0], end[1]] == 1):
-            #print('connecting route has both start and end points')
             successful_bezier = True
         else:
-            #print('connecting route missing points, removing curve')
             if bezier_weight != 0: # if bezier curve was unsuccessful with a nonzero weight, try with 0:
                 bezier_weight = 0
             else:
@@ -318,8 +311,10 @@ def connect_points(start, end, boundary, hematoma_type, initial_slice=False):
 
 
 def warp_slice(axial_slice, skull_slice, mask, src, dst, hematoma_type, phantom_name):
-    '''perform warp of 2D slice according to hematoma boundary coordinates'''
-    # to simulate mass effect, transform will need some skull coordinates to NOT move
+    '''
+    performs warp of 2D slice according to hematoma boundary coordinates
+    while maintaining a rigid skull
+    '''
     
     if phantom_name == 'MIDA_Head':
         flood_mask = ski.segmentation.flood(skull_slice, seed_point=(0, 0))
@@ -380,18 +375,23 @@ def warp_slice(axial_slice, skull_slice, mask, src, dst, hematoma_type, phantom_
 
 def coverage_from_volume(volume, hematoma_type, slice_thickness):  # see RSNA_BHDS_explore.ipynb for logarithmic fit
     if hematoma_type == 'EDH':
-        slice_coverage = 13.942*math.log(volume) + 13.449
+        #slice_coverage = 13.942*math.log(volume) + 13.449
+        z_coverage = 10.231*math.log(volume) + 19.094
     elif hematoma_type == 'SDH':
-        slice_coverage = 17.739*math.log(volume) + 17.314
+        #z_coverage = 17.739*math.log(volume) + 17.314
+        z_coverage = 10.380*math.log(volume) + 24.480
     elif hematoma_type == 'IPH':
-        slice_coverage = 8.7064*math.log(volume) + 18.148  # for now, this is intraparenchymal
+        #z_coverage = 8.7064*math.log(volume) + 18.148  # for now, this is intraparenchymal
+        z_coverage = 6.925*math.log(volume) + 17.315
     # unused
     elif hematoma_type == 'SAH':
-        slice_coverage = 17.181*math.log(volume) + 27.42
+        #z_coverage = 17.181*math.log(volume) + 27.42
+        z_coverage = 5.383*math.log(volume) + 18.237
     elif hematoma_type == 'IVH':
-        slice_coverage = 11.341*math.log(volume) + 25.435
+        #z_coverage = 11.341*math.log(volume) + 25.45
+        z_coverage = 6.657*math.log(volume) + 20.492
     # convert units from mm to number of slices
-    slice_coverage = slice_coverage / slice_thickness
+    slice_coverage = z_coverage / slice_thickness
 
     # round to nearest odd number
     slice_coverage = math.ceil(slice_coverage)
