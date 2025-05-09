@@ -7,7 +7,6 @@ import os
 from pathlib import Path
 from shutil import rmtree
 from warnings import warn
-import os
 import numpy as np
 import ast
 import pydicom
@@ -82,14 +81,16 @@ def load_phantom(name='Densitometry', shape=None):
         phantom = iq_phantoms.LowContrastDetectabilityPhantom(matrix_size=matrix_size)
     elif name == 'ACRPhantom':
         phantom = iq_phantoms.ACRPhantom(matrix_size=matrix_size)
-    elif Path(name).exists():
+    elif isinstance(name, str) and Path(name).exists():
         img = sitk.ReadImage(name)
         phantom = Phantom(sitk.GetArrayFromImage(img),
                           spacings=img.GetSpacing()[::-1])
-    else:
+    elif isinstance(name, float | int):
         name = float(name)
         phantom = NIHPD_Head(phantom_dir / 'NIHPD_Head_Phantom',
                              age=name, shape=shape)
+    else:
+        raise ValueError(f'{name} is not in {available_phantoms} nor is it a path')
     return phantom
 
 
