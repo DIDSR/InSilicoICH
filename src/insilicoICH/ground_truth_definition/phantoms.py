@@ -4,20 +4,20 @@ module for working with phantoms
 
 from pathlib import Path
 import os
-from collections import OrderedDict
 
 import numpy as np
 import nibabel as nib
-import nrrd
+import SimpleITK as sitk
 import pandas as pd
 import skimage as ski
-from skimage.morphology import binary_closing, remove_small_holes, binary_dilation, binary_erosion
-from dotenv import load_dotenv
+from skimage.morphology import (binary_closing,
+                                remove_small_holes,
+                                binary_dilation,
+                                binary_erosion)
 from monai.transforms import Resize, RandAffine, Affine, ResizeWithPadOrCrop
 
 from scipy.ndimage import (center_of_mass,
-                           distance_transform_edt,
-                           binary_erosion)
+                           distance_transform_edt)
 
 from .utils import download_and_extract_archive
 
@@ -769,7 +769,7 @@ from {phantom_dir}')
         """
         src_dir = Path(__file__).parents[1]
         fname = src_dir / 'annotations/suture/NIHPD_Head_Phantom/labelmap.nrrd'
-        data = nrrd.read(fname)[0].transpose(2, 1, 0)[::-1, ::-1]
+        data = sitk.GetArrayFromImage(sitk.ReadImage(fname)).transpose(2, 1, 0)[::-1, ::-1]
         skull = self.get_skull_map()
         dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
         if (dx < 0) | (dy < 0) | (dz < 0):

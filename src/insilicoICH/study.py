@@ -7,11 +7,11 @@ import os
 from pathlib import Path
 from shutil import rmtree
 from warnings import warn
-import os
 import numpy as np
 import ast
 import pydicom
 import pandas as pd
+import SimpleITK as sitk
 from dotenv import load_dotenv
 from scipy.ndimage import center_of_mass
 from monai.transforms import RandAffine
@@ -20,6 +20,7 @@ from .image_acquisition import Scanner, read_dicom
 from .ground_truth_definition.phantoms import (UNC_Head,
                                                NIHPD_Head,
                                                MIDA_Head,
+                                               Phantom,
                                                possible_ages)
 from .ground_truth_definition import iq_phantoms
 
@@ -84,10 +85,16 @@ def load_phantom(name='Densitometry', shape=None):
         phantom = iq_phantoms.LowContrastDetectabilityPhantom(matrix_size=matrix_size)
     elif name == 'ACRPhantom':
         phantom = iq_phantoms.ACRPhantom(matrix_size=matrix_size)
-    else:
+    elif isinstance(name, str) and Path(name).exists():
+        img = sitk.ReadImage(name)
+        phantom = Phantom(sitk.GetArrayFromImage(img),
+                          spacings=img.GetSpacing()[::-1])
+    elif isinstance(name, float | int):
         name = float(name)
         phantom = NIHPD_Head(phantom_dir / 'NIHPD_Head_Phantom',
                              age=name, shape=shape)
+    else:
+        raise ValueError(f'{name} is not in {available_phantoms} nor is it a path')
     return phantom
 
 
