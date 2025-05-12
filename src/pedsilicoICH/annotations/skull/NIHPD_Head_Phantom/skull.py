@@ -7,6 +7,8 @@ class Skull(object):
     def __init__(self):
         self.mesh_brainmask = None
         self.mesh_skull = None
+        self.seg_skull = None
+        self.skull_parameters = None
 
     def compute_normals(self, mesh):
         pass

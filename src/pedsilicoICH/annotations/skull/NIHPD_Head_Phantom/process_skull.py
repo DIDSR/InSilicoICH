@@ -8,6 +8,7 @@ import numpy as np
 import pyvista as pv
 import vtk
 from skull import Skull
+from pyransac3d import Sphere
 
 main_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), *[".."] * 5))
 sys.path.append(main_directory)
@@ -17,6 +18,7 @@ class SkullProcess(Skull):
     def __init__(self, path_mesh_brainmask: str):
         super().__init__()
         self.mesh_brain = self.load_mesh(path_mesh_brainmask)
+        self.skull_center = None
 
     def load_mesh(self, path_mesh_brainmask: str):
         return pv.read(path_mesh_brainmask)
@@ -83,6 +85,51 @@ class SkullProcess(Skull):
         # Convert back to PolyData if needed
         return grid.extract_surface()
 
+    def extract_primary_skull_mesh(self, maxIteration=1000):
+        """
+        Removes the skull mesh from the lower hemisphere. (not in use. function needs to be updated)
+        """
+        grid = self.mesh_skull.cast_to_unstructured_grid()
+
+        np_points = np.array(
+            [grid.GetPoint(i) for i in range(grid.GetNumberOfPoints())]
+        )
+
+        # Detect a sphere using RANSAC
+        sphere = Sphere()
+        # thresh=0.01, maxIteration=1000
+        self.skull_center, radius, inliers = sphere.fit(
+            np_points, maxIteration=maxIteration
+        )
+        z_center = self.skull_center[2]
+
+        # Get cell centers
+        cell_centers = grid.cell_centers()
+        z_centers = cell_centers.points[:, 2]
+
+        # Find indices where cell center z < sphere center z
+        offset_relative_radii = 0  # future use
+        cell_ids_below = np.where(
+            z_centers < (z_center - offset_relative_radii * radius)
+        )[0]
+
+        # Remove those cells
+        grid.remove_cells(cell_ids_below, inplace=True)
+        self.mesh_skull = grid.extract_surface()
+
+    def remove_voxel_spherical_coordi(self):
+        # Define line segment
+        start = self.skull_center
+        stop = np.add(self.skull_center, [0, 0, 100])
+
+        # Perform ray trace
+        points, ind = self.mesh_skull.ray_trace(start, stop)
+
+        # Optional: remove intersected cells from the mesh
+        if ind.size > 0:
+            non_intersected = np.setdiff1d(np.arange(self.mesh_skull.n_cells), ind)
+            self.mesh_skull = self.mesh_skull.extract_cells(non_intersected)
+
     def extract_skull(self) -> None:
         """
         Calculate surface normals and remove certain cells (mesh).
@@ -126,6 +173,9 @@ if __name__ == "__main__":
 
     object_skull_process = SkullProcess(path_mesh_brainmask=path_mesh_brainmask)
     object_skull_process.extract_skull()
+    object_skull_process.extract_primary_skull_mesh()
+    object_skull_process.remove_voxel_spherical_coordi()
+
     object_skull_process.save_mesh(
         mesh=object_skull_process.mesh_skull,
         filepath=os.path.join(
