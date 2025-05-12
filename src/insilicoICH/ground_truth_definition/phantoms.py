@@ -1080,10 +1080,16 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
 
         elif self.skull_seg_method == 'otsu':
             vol = self.intensity
-            thresh = ski.filters.threshold_otsu(self.intensity) # TODO: SEPARATE THRESHOLD FOR AGE 0, Otsu not working well
+            #thresh = ski.filters.threshold_otsu(self.intensity) # TODO: SEPARATE THRESHOLD FOR AGE 0, Otsu not working well
+            if self.age == 0.0:
+                thresh = 100
+            elif self.age == 1.0:
+                thresh = 160
+            elif self.age == 2.0:
+                thresh = 150
             skull = vol < thresh
-            skull = skull & ~binary_erosion(self.mask, np.ones(3*[3]))
-            skull = skull & self.head_mask
+            skull = skull & ~self.mask
+            skull = skull & binary_erosion(binary_erosion(self.head_mask, np.ones(3*[3])), np.ones(3*[3]))
             skull = skull*(-1*(1-self.mask))
         elif self.skull_seg_method == 'old': # old method for posterity (gives VERY thick skull...)
             skull = (self.mask == 0)*self.intensity / self.intensity.max()
