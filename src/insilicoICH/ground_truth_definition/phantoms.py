@@ -485,46 +485,14 @@ large, try smaller volume')
 
 class HeadPhantom(LesionPhantom):
     def __init__(self, phantom_dir, shape=None, **kwargs):
-
-        # define material HU; 0-2 yr old based on cases in
-        # https://physionet.org/content/ct-ich/1.3.1/ and 
-        # https://pubmed.ncbi.nlm.nih.gov/3652069/
-        if self.age == 0.0:
-            self.materials = {
-                'csf': 10,
-                'gray matter': 24,
-                'white matter': 14,
-                'air': -1000,
-                'CSF': 10,
-                'skull': 400
-                }
-        elif self.age == 1.0:
-            self.materials = {
-                'csf': 10,
-                'gray matter': 35,
-                'white matter': 27,
-                'air': -1000,
-                'CSF': 10,
-                'skull': 500
-                }
-        elif self.age == 2.0:
-            self.materials = {
-                'csf': 10,
-                'gray matter': 35,
-                'white matter': 27,
-                'air': -1000,
-                'CSF': 10,
-                'skull': 700
-                }
-        else:
-            self.materials = {
-                'csf': 10,
-                'gray matter': 40,
-                'white matter': 30,
-                'air': -1000,
-                'CSF': 10,
-                'skull': 900
-                }
+        self.materials = {
+            'csf': 10,
+            'gray matter': 40,
+            'white matter': 30,
+            'air': -1000,
+            'CSF': 10,
+            'skull': 900
+            }
         self.patientid = 0
         self._lesion = []
         self._lesion_coords = []
@@ -873,7 +841,7 @@ from {phantom_dir}')
             skull[skull > 0] = 1
         return skull.astype(bool)
 
-class UNC_Head(HeadPhantom):
+class UNC_Head(NIHPD_Head):
     '''
     loads MR brain atlas of mean `age`, downloaded from
     <https://www.nitrc.org/projects/pediatricatlas> and saved in `phantom_dir`
@@ -891,7 +859,6 @@ class UNC_Head(HeadPhantom):
                  skull_seg_method='otsu'):
         phantom_dir = Path(phantom_dir)
         self.age = age
-        self.patient_name = f'{age} yr UNC Head'
         self.skull_seg_method = skull_seg_method
         if not phantom_dir.exists():
             print(f'''
@@ -902,7 +869,39 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
 `load_phantom` for details on how to add their locations.
 ''')
             download_and_extract_archive(UNC_Head.url, phantom_dir, remove_finished=True)
-        super().__init__(phantom_dir, shape, age=age, patient_name=self.patient_name)
+        super().__init__(phantom_dir, shape=shape, age=age)
+        self.patient_name = f'{age} yr UNC Head'
+
+        # define material HU; 0-2 yr old based on cases in
+        # https://physionet.org/content/ct-ich/1.3.1/ and 
+        # https://pubmed.ncbi.nlm.nih.gov/3652069/
+        if self.age == 0.0:
+            self.materials = {
+                'csf': 10,
+                'gray matter': 24,
+                'white matter': 14,
+                'air': -1000,
+                'CSF': 10,
+                'skull': 400
+                }
+        if self.age == 1.0:
+            self.materials = {
+                'csf': 10,
+                'gray matter': 35,
+                'white matter': 27,
+                'air': -1000,
+                'CSF': 10,
+                'skull': 500
+                }
+        if self.age == 2.0:
+            self.materials = {
+                'csf': 10,
+                'gray matter': 35,
+                'white matter': 27,
+                'air': -1000,
+                'CSF': 10,
+                'skull': 700
+                }
 
     def load_phantom(self, phantom_dir):
         'sets ._phantom, and .dx, .dy, .dz, .nx, .ny, .nz'
@@ -968,50 +967,16 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
         self.mask = resize(self.mask, shape).numpy()
         self.intensity = resize(self.t1w, shape).numpy()
 
-        # resize additional 
+        # resize additional
         self.head_mask = resize(self.head_mask, shape).numpy().astype(bool)
         self.skull = resize(self.skull, shape).numpy()
-        
+
         new_shape = self.csf.shape
 
         new_spacings = np.array(original_shape) / np.array(new_shape) *\
             [self.dz, self.dx, self.dy]
         self.dz, self.dx, self.dy = new_spacings
         self.nz, self.nx, self.ny = shape
-
-    def get_sutures(self, thickness=2, thresh=30):
-        """
-        returns suture mask to the self skull
-
-        :param thickness: thickness in pixels of the suture
-        :returns: boolean suture mask that can be used to set skull suture
-            values
-        """
-        src_dir = Path(__file__).parents[1]
-        fname = src_dir / 'annotations/suture/NIHPD_Head_Phantom/labelmap.nrrd'
-        data = sitk.GetArrayFromImage(sitk.ReadImage(fname)).transpose(2, 1, 0)[::-1, ::-1]
-        skull = self.get_skull_map()
-        dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
-        if (dx < 0) | (dy < 0) | (dz < 0):
-            resizewithcrop = ResizeWithPadOrCrop(spatial_size=skull.shape)
-            data = resizewithcrop(data[None])[0].numpy()
-            dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
-
-        dx1 = dx2 = dx//2
-        if dx % 2 == 1:
-            dx2 += 1
-        dy1 = dy2 = dy//2
-        if dy % 2 == 1:
-            dy2 += 1
-        dz1 = dz2 = dz//2
-        if dz % 2 == 1:
-            dz2 += 1
-        data = np.pad(data, ((dx1, dx2), (dy1, dy2), (dz1, dz2))) > 0
-        suture_dist = distance_transform_edt(~data)
-        sutures = skull & (suture_dist < thresh)
-        sutures = ski.morphology.skeletonize(sutures)
-        sutures = ski.morphology.dilation(sutures, np.ones(3*[thickness]))
-        return sutures
 
     def assign_HUs(self, feature_range=(-100, 100)):
         phantom = self.csf*self.materials['CSF'] +\
@@ -1043,25 +1008,6 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
             sutures = self.get_sutures()
             phantom[sutures] = 0  # assume water HU
         return phantom
-
-    def get_material_mask(self, material):
-        if material not in self.materials:
-            raise ValueError(f'{material} not in {self.materials.keys()}')
-        if material == 'white matter':
-            mask = self.wm > 0.3
-
-        if material == 'gray matter':
-            mask = self.gm > 0.3
-
-        if material == 'CSF':
-            mask = self.csf > 0.3
-        return mask.astype(int)
-
-    def get_dura_map(self):
-        '''obtains approximate dura map using inside boundary of brain mask'''
-        return ski.segmentation.find_boundaries(self.mask,
-                                                mode='inner',
-                                                background=0)
 
     def get_head_mask(self):
         '''obtains mask of head voxels'''
