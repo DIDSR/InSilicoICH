@@ -9,6 +9,7 @@ import pyvista as pv
 import vtk
 from skull import Skull
 from pyransac3d import Sphere
+import random
 
 main_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), *[".."] * 5))
 sys.path.append(main_directory)
@@ -117,18 +118,40 @@ class SkullProcess(Skull):
         grid.remove_cells(cell_ids_below, inplace=True)
         self.mesh_skull = grid.extract_surface()
 
-    def remove_voxel_spherical_coordi(self):
+    def remove_voxel_spherical_coordi(self, center=None, direction=None):
+        """
+        Remove the mesh intersecting the gien vector.
+        """
         # Define line segment
-        start = self.skull_center
-        stop = np.add(self.skull_center, [0, 0, 100])
+        start = center
+        stop = np.add(self.skull_center, direction)
 
         # Perform ray trace
+        self.mesh_skull = self.mesh_skull.extract_surface()
         points, ind = self.mesh_skull.ray_trace(start, stop)
 
-        # Optional: remove intersected cells from the mesh
         if ind.size > 0:
             non_intersected = np.setdiff1d(np.arange(self.mesh_skull.n_cells), ind)
             self.mesh_skull = self.mesh_skull.extract_cells(non_intersected)
+
+    def add_fracture(self):
+        """
+        Add fracture by removing meshes with given procedure.
+        """
+        phi_degree = 30
+        theta_degree = 0
+
+        # Degrees to shift to next point
+        delta_shift_degree = 0.1
+        n_iterations = 1000
+
+        for i in range(n_iterations):
+            direction = pv.spherical_to_cartesian(1, np.deg2rad(phi_degree), np.deg2rad(theta_degree))
+            self.remove_voxel_spherical_coordi(self.skull_center, np.multiply(direction, 100))
+
+            # phi_degree += delta_shift_degree * random.uniform(-1, 1) + phi_degree
+            theta_degree += 0.1#delta_shift_degree * random.uniform(-1, 1) + theta_degree
+
 
     def extract_skull(self) -> None:
         """
@@ -174,7 +197,7 @@ if __name__ == "__main__":
     object_skull_process = SkullProcess(path_mesh_brainmask=path_mesh_brainmask)
     object_skull_process.extract_skull()
     object_skull_process.extract_primary_skull_mesh()
-    object_skull_process.remove_voxel_spherical_coordi()
+    object_skull_process.add_fracture()
 
     object_skull_process.save_mesh(
         mesh=object_skull_process.mesh_skull,
