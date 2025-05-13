@@ -118,20 +118,30 @@ class SkullProcess(Skull):
         grid.remove_cells(cell_ids_below, inplace=True)
         self.mesh_skull = grid.extract_surface()
 
-    def remove_voxel_spherical_coordi(self, center=None, direction=None):
+    def remove_voxel_spherical_coordi(self, list_start=None, list_direction=None):
         """
         Remove the mesh intersecting the gien vector.
         """
         # Define line segment
-        start = center
-        stop = np.add(self.skull_center, direction)
+        list_stop = [
+            np.add(start, direction)
+            for start, direction in zip(list_start, list_direction)
+        ]
+
+        list_point_intersect = []
+        list_indice_intersect = []
 
         # Perform ray trace
-        self.mesh_skull = self.mesh_skull.extract_surface()
-        points, ind = self.mesh_skull.ray_trace(start, stop)
+        for start, stop in zip(list_start, list_stop):
+            points, inds = self.mesh_skull.ray_trace(start, stop)
+            list_indice_intersect.extend(inds)
 
-        if ind.size > 0:
-            non_intersected = np.setdiff1d(np.arange(self.mesh_skull.n_cells), ind)
+        self.mesh_skull = self.mesh_skull.extract_surface()
+
+        if len(list_indice_intersect) > 0:
+            non_intersected = np.setdiff1d(
+                np.arange(self.mesh_skull.n_cells), list_indice_intersect
+            )
             self.mesh_skull = self.mesh_skull.extract_cells(non_intersected)
 
     def add_fracture(self):
@@ -142,16 +152,27 @@ class SkullProcess(Skull):
         theta_degree = 0
 
         # Degrees to shift to next point
-        delta_shift_degree = 0.1
-        n_iterations = 1000
+        delta_shift_degree_phi = 0.5
+        delta_shift_degree_theta = 0.3
+        n_iterations = 300
+
+        list_start = []
+        list_direction = []
 
         for i in range(n_iterations):
-            direction = pv.spherical_to_cartesian(1, np.deg2rad(phi_degree), np.deg2rad(theta_degree))
-            self.remove_voxel_spherical_coordi(self.skull_center, np.multiply(direction, 100))
+            direction = pv.spherical_to_cartesian(
+                1, np.deg2rad(phi_degree), np.deg2rad(theta_degree)
+            )
+            list_start.append(self.skull_center)
+            list_direction.append(np.multiply(direction, 100))
 
-            # phi_degree += delta_shift_degree * random.uniform(-1, 1) + phi_degree
-            theta_degree += 0.1#delta_shift_degree * random.uniform(-1, 1) + theta_degree
+            # phi_degree = 30 + delta_shift_degree_phi * random.uniform(-1, 1)
+            # theta_degree += delta_shift_degree_theta
 
+            phi_degree += delta_shift_degree_phi * random.randint(-1, 1)
+            theta_degree += delta_shift_degree_theta
+
+        self.remove_voxel_spherical_coordi(list_start, list_direction)
 
     def extract_skull(self) -> None:
         """
@@ -176,7 +197,7 @@ class SkullProcess(Skull):
 
         # Find cells where phi > threshold_degree
         cells_to_remove = np.where(phi_degrees > threshold_degree)[0]
-        print("Number of cells removed =", len(cells_to_remove))
+        # print("Number of cells removed =", len(cells_to_remove))
 
         # Remove the identified cells
         mesh.remove_cells(cells_to_remove, inplace=True)
