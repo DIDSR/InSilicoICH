@@ -15,7 +15,7 @@ dependencies = [
   "scipy",
   "monai==1.3.2",
   "pandas",
-  "pynrrd",
+  "SimpleITK",
   "pydicom",
   "pytest",
   "requests",
