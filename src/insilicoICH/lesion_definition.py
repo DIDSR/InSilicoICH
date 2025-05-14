@@ -69,7 +69,7 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
     if hematoma_type == 'EDH':
         desired_distance = math.sqrt(4*ab) # assume that length of epidural hemorrhage is about 4 times the width
     elif hematoma_type == 'SDH':
-        desired_distance = math.sqrt(11*ab) # assume that length of epidural hemorrhage is about 11 times the width
+        desired_distance = math.sqrt(11*ab) # assume that length of subdural hemorrhage is about 11 times the width
 
     HU_array = phantom.get_CT_number_phantom()
 
@@ -268,12 +268,11 @@ def connect_points(start, end, boundary, hematoma_type, initial_slice=False):
 
     # Define second line (Bezier curve)
     successful_bezier = False
-    # init bezier parameters:
     if hematoma_type == 'EDH':
-        bezier_weight = 0.14  # changed from 0.14, # weight should probably be below 0.2 to avoid ballooning too much, but line breaks if below 0.04....
-        bezier_middle = (int(rows/2), int(cols/2))  # center of the image, should probably randomize it somewhere along center later
+        bezier_weight = 0.14  # weight should probably be below 0.2 to avoid ballooning too much, but will break if 0.04....
+        bezier_middle = (int(rows/2), int(cols/2))  # defined as center of the image (roughly center of brain)
     elif hematoma_type == 'SDH':
-        bezier_weight = 2 # previously 0.5
+        bezier_weight = 2
         bezier_middle = boundary_coords[round(len(boundary_coords)/2)]  # use the middle point of the dura line
     else:
         bezier_weight = 0.0
@@ -299,8 +298,7 @@ def connect_points(start, end, boundary, hematoma_type, initial_slice=False):
             else:
                 sys.exit('Unable to create bezier curve with weight=0')
 
-    # returned coordinate list isn't ordered from start point to end point
-    # below is rudimentary but should order from start point to end point as long as weight < 1
+    # re-order coordinates by distance from start point
     connect_coords = connect_coords.tolist()
     connect_coords.sort(key=lambda p: math.dist(p, [start[0], start[1]]))
     connect_coords = np.array(connect_coords)
@@ -373,22 +371,21 @@ def warp_slice(axial_slice, skull_slice, mask, src, dst, hematoma_type, phantom_
     return warped_slice
 
 
-def coverage_from_volume(volume, hematoma_type, slice_thickness):  # see RSNA_BHDS_explore.ipynb for logarithmic fit
+def coverage_from_volume(volume, hematoma_type, slice_thickness):
+    '''
+    The hemorrhage masks from the BHSD dataset were used to define a logarithmic
+    relationship between hemorrhage volume and slice coverage (in z).
+    '''
     if hematoma_type == 'EDH':
-        #slice_coverage = 13.942*math.log(volume) + 13.449
         z_coverage = 10.231*math.log(volume) + 19.094
     elif hematoma_type == 'SDH':
-        #z_coverage = 17.739*math.log(volume) + 17.314
         z_coverage = 10.380*math.log(volume) + 24.480
     elif hematoma_type == 'IPH':
-        #z_coverage = 8.7064*math.log(volume) + 18.148  # for now, this is intraparenchymal
         z_coverage = 6.925*math.log(volume) + 17.315
-    # unused
+    # currently unused
     elif hematoma_type == 'SAH':
-        #z_coverage = 17.181*math.log(volume) + 27.42
         z_coverage = 5.383*math.log(volume) + 18.237
     elif hematoma_type == 'IVH':
-        #z_coverage = 11.341*math.log(volume) + 25.45
         z_coverage = 6.657*math.log(volume) + 20.492
     # convert units from mm to number of slices
     slice_coverage = z_coverage / slice_thickness
