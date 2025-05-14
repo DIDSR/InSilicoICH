@@ -130,8 +130,8 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
                     close_voxel_list = np.where(np.logical_and(distance_idx > distances[0], distance_idx < distances[1]))
                     end_point = dura_idx[random.choice(close_voxel_list[0])]
 
-                    orig_start = start_point
-                    orig_end = end_point
+                    orig_start = new_start = start_point
+                    orig_end = new_end = end_point
                 except:
                     count += 1
                     init_slice = int(random.choice(np.linspace(0, int(HU_array.shape[0]/2), int(HU_array.shape[0]/2) + 1)))
