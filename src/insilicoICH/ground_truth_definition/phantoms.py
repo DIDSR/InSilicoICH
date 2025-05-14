@@ -853,7 +853,7 @@ class UNC_Head(NIHPD_Head):
     1. Feng Shi, Pew-Thian Yap, Guorong Wu, Hongjun Jia, John H. Gilmore, Weili Lin, Dinggang Shen,
         "Infant Brain Atlases from Neonates to 1- and 2-year-olds", PLoS ONE, 6(4): e18746, 2011
     '''
-    ages = [0, 1.0, 2.0]
+    ages = [0.0, 1.0, 2.0]
     url = 'https://www.nitrc.org/frs/download.php/14897/UNCInfant012Atlases-2022-10-21.zip'
     def __init__(self, phantom_dir, age: float, symmetric=False, shape=None,
                  skull_seg_method='otsu'):
@@ -909,7 +909,7 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
 
         base_dir = phantom_dir / 'UNCInfant012Atlases-2022-10-21'
 
-        if age == 0:
+        if age == 0.0:
             age_string = 'neo'
         elif age == 1.0:
             age_string = '1yr'
@@ -1011,7 +1011,7 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
 
     def get_head_mask(self):
         '''obtains mask of head voxels'''
-        thresh = 50 # threshold manually determined; ski.filters.threshold_otsu too high 
+        thresh = 50  # threshold manually determined; ski.filters.threshold_otsu too high 
         head_mask = self.intensity > thresh
         head_mask = binary_closing(head_mask, np.ones(3*[7]))
         head_mask = remove_small_holes(head_mask, area_threshold=1e5)
@@ -1042,5 +1042,6 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
             skull[skull < 0.1] = 0
             skull[skull > 0] = 1
         return skull.astype(bool)
+
 
 possible_ages = UNC_Head.ages + NIHPD_Head.ages + [MIDA_Head.age]
