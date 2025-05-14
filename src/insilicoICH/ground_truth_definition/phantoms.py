@@ -114,6 +114,10 @@ def insert_with_mass_effect(self, img, lesion, boundary, strength=1):
         phantom_name = 'NIHPD_Head'
         skull_map = ski.morphology.binary_dilation(self.get_skull_map(), np.ones(3*[5]))
         mask = self.mask
+    elif self.__class__.__name__ == 'UNC_Head':
+        phantom_name = 'UNC_Head'
+        skull_map = ski.morphology.binary_dilation(self.get_skull_map(), np.ones(3*[5]))
+        mask = self.mask
     else:
         skull_map = self.get_skull_map()
 
@@ -525,6 +529,7 @@ class MIDA_Head(HeadPhantom):
 #  other identifiers when adding more patients
 
     def __init__(self, phantom_dir, shape=None):
+        self.age = MIDA_Head
         if not phantom_dir.exists():
             raise FileNotFoundError(f'''
 MIDA head phantom files not found in {phantom_dir}
@@ -633,7 +638,7 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
 `load_phantom` for details on how to add their locations.
 ''')
             download_and_extract_archive(NIHPD_Head.url, phantom_dir)
-        super().__init__(phantom_dir, shape, age=age)
+        super().__init__(phantom_dir, shape, age=age, patient_name=self.patient_name)
 
     def load_phantom(self, phantom_dir):
         'sets ._phantom, and .dx, .dy, .dz, .nx, .ny, .nz'
@@ -836,4 +841,207 @@ from {phantom_dir}')
             skull[skull > 0] = 1
         return skull.astype(bool)
 
-possible_ages = NIHPD_Head.ages + [MIDA_Head.age]
+class UNC_Head(NIHPD_Head):
+    '''
+    loads MR brain atlas of mean `age`, downloaded from
+    <https://www.nitrc.org/projects/pediatricatlas> and saved in `phantom_dir`
+
+    :param phantom_dir: str, directory holding .nii files from
+        https://www.nitrc.org/projects/pediatricatlas
+    :param age: float, mean age of the atlas phantom to load. Options
+        include neonate (0), 1-, and 2-year-old
+    1. Feng Shi, Pew-Thian Yap, Guorong Wu, Hongjun Jia, John H. Gilmore, Weili Lin, Dinggang Shen,
+        "Infant Brain Atlases from Neonates to 1- and 2-year-olds", PLoS ONE, 6(4): e18746, 2011
+    '''
+    ages = [0.0, 1.0, 2.0]
+    url = 'https://www.nitrc.org/frs/download.php/14897/UNCInfant012Atlases-2022-10-21.zip'
+    def __init__(self, phantom_dir, age: float, symmetric=False, shape=None,
+                 skull_seg_method='otsu'):
+        phantom_dir = Path(phantom_dir)
+        self.age = age
+        self.skull_seg_method = skull_seg_method
+        if not phantom_dir.exists():
+            print(f'''
+`PHANTOM_DIRECTORY` {phantom_dir} not found, now downloading UNC phantoms
+from {UNC_Head.url}
+
+If you have already downloaded NIHPD and MIDA head phantoms, please see
+`load_phantom` for details on how to add their locations.
+''')
+            download_and_extract_archive(UNC_Head.url, phantom_dir, remove_finished=True)
+        super().__init__(phantom_dir, shape=shape, age=age)
+        self.patient_name = f'{age} yr UNC Head'
+
+        # define material HU; 0-2 yr old based on cases in
+        # https://physionet.org/content/ct-ich/1.3.1/ and 
+        # https://pubmed.ncbi.nlm.nih.gov/3652069/
+        if self.age == 0.0:
+            self.materials = {
+                'csf': 10,
+                'gray matter': 24,
+                'white matter': 14,
+                'air': -1000,
+                'CSF': 10,
+                'skull': 400
+                }
+        if self.age == 1.0:
+            self.materials = {
+                'csf': 10,
+                'gray matter': 35,
+                'white matter': 27,
+                'air': -1000,
+                'CSF': 10,
+                'skull': 500
+                }
+        if self.age == 2.0:
+            self.materials = {
+                'csf': 10,
+                'gray matter': 35,
+                'white matter': 27,
+                'air': -1000,
+                'CSF': 10,
+                'skull': 700
+                }
+
+    def load_phantom(self, phantom_dir):
+        'sets ._phantom, and .dx, .dy, .dz, .nx, .ny, .nz'
+        age = self.age
+
+        base_dir = phantom_dir / 'UNCInfant012Atlases-2022-10-21'
+
+        if age == 0.0:
+            age_string = 'neo'
+        elif age == 1.0:
+            age_string = '1yr'
+        elif age == 2.0:
+            age_string = '2yr'
+
+        nib_img = nib.load(base_dir / f'infant-{age_string}.nii.gz')
+        header = nib_img.header
+        self.dx, self.dy, self.dz = header['pixdim'][1:4]
+
+        self.intensity = nib.load(base_dir / f'infant-{age_string}-withSkull.nii.gz').get_fdata().transpose(2, 1, 0)[:, ::-1, :]
+        self.segmentation = nib.load(base_dir / f'infant-{age_string}-seg.nii.gz').get_fdata().transpose(2, 1, 0)[:, ::-1, :]
+
+        # extract segmentations from seg image
+        self.gm = np.where(self.segmentation == 150, 1, 0)
+        self.wm = np.where(self.segmentation == 250, 1, 0)
+        self.csf = np.where(self.segmentation == 10, 1, 0)
+        self.mask = np.where(self.segmentation > 0, 1, 0)
+
+        if self.skull_seg_method == 'pseudoCT':
+            try:
+                src_dir = Path(__file__).parents[0]
+                self.pseudoct = nib.load(
+                    src_dir / f'UNC_pseudoCT/UNC_{age_string}_pct.nii'
+                    ).get_fdata().transpose(2, 1, 0)[:, ::-1, :]
+                self.pseudoct = self.pseudoct[::-1]
+            except FileNotFoundError:
+                # if pseudoct can't be loaded, default to
+                # otsu skull segmentation method
+                self.skull_seg_method = 'otsu'
+                print('pseudo-CT images not found; defaulting to otsu segmentation method')
+
+        self.gm = self.gm[::-1]
+        self.wm = self.wm[::-1]
+        self.csf = self.csf[::-1]
+        self.mask = self.mask[::-1].astype(bool)
+        self.intensity = self.intensity[::-1]
+
+        self.nz, self.nx, self.ny = self.csf.shape
+
+        self.head_mask = self.get_head_mask()
+        self.skull = self.get_skull_map()
+        self._phantom = self.get_CT_number_phantom()
+
+        spacings = self.dz, self.dx, self.dy
+        return self._phantom, spacings
+
+    def resize(self, shape=None):
+        original_shape = self.csf.shape
+
+        # resize original images
+        self.csf = resize(self.csf, shape).numpy()
+        self.gm = resize(self.gm, shape).numpy()
+        self.wm = resize(self.wm, shape).numpy()
+        self.mask = resize(self.mask, shape).numpy()
+        self.intensity = resize(self.t1w, shape).numpy()
+
+        # resize additional
+        self.head_mask = resize(self.head_mask, shape).numpy().astype(bool)
+        self.skull = resize(self.skull, shape).numpy()
+
+        new_shape = self.csf.shape
+
+        new_spacings = np.array(original_shape) / np.array(new_shape) *\
+            [self.dz, self.dx, self.dy]
+        self.dz, self.dx, self.dy = new_spacings
+        self.nz, self.nx, self.ny = shape
+
+    def assign_HUs(self, feature_range=(-100, 100)):
+        phantom = self.csf*self.materials['CSF'] +\
+                    self.gm*self.materials['gray matter'] +\
+                    self.wm*self.materials['white matter'] +\
+                    self.skull*self.materials['skull']
+        # fills remaining tissues with scaled intensity to approximate
+        phantom[phantom < self.materials['CSF']] = minmax_scale(
+            self.intensity[phantom < self.materials['CSF']], feature_range)
+        skin = binary_erosion(self.head_mask, np.ones(3*[3])) ^ binary_dilation(self.head_mask, np.ones(3*[3]))
+        phantom[skin] = minmax_scale(self.intensity[skin], feature_range)     
+        phantom[self.head_mask & (phantom < 0)] = minmax_scale(
+            self.intensity[self.head_mask & (phantom < 0)], feature_range)
+        sinous = (phantom < 0) & self.head_mask
+        phantom[sinous] = self.materials['CSF']  # approximates blood
+        if self.skull_seg_method == 'pseudoct':
+            phantom[self.skull] = self.pseudoct[self.skull]
+        phantom[phantom < 0] = self.materials['air']
+
+        # # TODO: dura map currently overlaps with new skull methods, need fix
+        # phantom[self.get_dura_map()] = 50  # HU same as MIDA
+        return phantom
+
+    def get_CT_number_phantom(self, add_sutures=False):
+        if len(self._lesion_coords) > 0:
+            return self._phantom
+        phantom = self.assign_HUs()
+        if add_sutures:
+            sutures = self.get_sutures()
+            phantom[sutures] = 0  # assume water HU
+        return phantom
+
+    def get_head_mask(self):
+        '''obtains mask of head voxels'''
+        thresh = 50  # threshold manually determined; ski.filters.threshold_otsu too high 
+        head_mask = self.intensity > thresh
+        head_mask = binary_closing(head_mask, np.ones(3*[7]))
+        head_mask = remove_small_holes(head_mask, area_threshold=1e5)
+        return head_mask
+
+    def get_skull_map(self):
+        '''obtains mask of skull voxels'''
+        if self.skull_seg_method == 'pseudoct':
+            # currently, pesudoCT images are generated outside of the repository, TODO: integrate code
+            threshold = 300  # units: HU
+            skull = np.where(self.pseudoct > threshold, 1, 0)
+
+        elif self.skull_seg_method == 'otsu':
+            vol = self.intensity
+            #thresh = ski.filters.threshold_otsu(self.intensity) # TODO: SEPARATE THRESHOLD FOR AGE 0, Otsu not working well
+            if self.age == 0.0:
+                thresh = 100
+            elif self.age == 1.0:
+                thresh = 160
+            elif self.age == 2.0:
+                thresh = 150
+            skull = vol < thresh
+            skull = skull & ~self.mask
+            skull = skull & binary_erosion(binary_erosion(self.head_mask, np.ones(3*[3])), np.ones(3*[3]))
+            skull = skull*(-1*(1-self.mask))
+        elif self.skull_seg_method == 'old': # old method for posterity (gives VERY thick skull...)
+            skull = (self.mask == 0)*self.intensity / self.intensity.max()
+            skull[skull < 0.1] = 0
+            skull[skull > 0] = 1
+        return skull.astype(bool)
+
+
+possible_ages = UNC_Head.ages + NIHPD_Head.ages + [MIDA_Head.age]
