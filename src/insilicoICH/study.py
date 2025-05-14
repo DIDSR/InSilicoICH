@@ -59,7 +59,7 @@ def load_vol(file_list):
 available_phantoms = possible_ages + [o for o in dir(iq_phantoms) if (not o.startswith('__')) and o not in ['np', 'create_circle_phantom', 'Phantom', 'create_resolution_phantom', 'create_ct_phantom_with_bars']]
 
 
-def load_phantom(name='Densitometry', shape=None):
+def load_phantom(name='DensitometryPhantom', shape=None):
     '''
     Loads appropriate phantom based on age as a keyword
 
@@ -71,10 +71,8 @@ def load_phantom(name='Densitometry', shape=None):
 
     matrix_size = max(shape) if shape else 400
     mida_age = 38
-    if float(name) in [0, 1.0, 2.0]:
-        name = float(name) 
-        phantom = UNC_Head(phantom_dir / 'UNC_Head_phantom', age=name, shape=shape)
-    elif name == mida_age:
+
+    if name == mida_age:
         phantom = MIDA_Head(phantom_dir / 'MIDA_Head_Phantom',
                             shape=shape)
     elif name == 'WirePhantom':
@@ -91,8 +89,11 @@ def load_phantom(name='Densitometry', shape=None):
                           spacings=img.GetSpacing()[::-1])
     elif isinstance(name, float | int):
         name = float(name)
-        phantom = NIHPD_Head(phantom_dir / 'NIHPD_Head_Phantom',
-                             age=name, shape=shape)
+        if name in [0.0, 1.0, 2.0]:
+            phantom = UNC_Head(phantom_dir / 'UNC_Head_phantom', age=name, shape=shape)
+        else:
+            phantom = NIHPD_Head(phantom_dir / 'NIHPD_Head_Phantom',
+                                 age=name, shape=shape)
     else:
         raise ValueError(f'{name} is not in {available_phantoms} nor is it a path')
     return phantom
