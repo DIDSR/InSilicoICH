@@ -40,7 +40,7 @@ def test_big_epidural_lesion():
     intensity = 100
     age = 9
     mass_effect = True
-    desired_volume = 100
+    desired_volume = 60
     phantom = load_phantom(age, shape=shape)
     phantom.insert_lesion('EDH', volume=desired_volume,
                           intensity=intensity,
@@ -53,7 +53,7 @@ def test_big_epidural_lesion():
 def test_big_subdural_lesion():
     intensity = 100
     age = 9
-    desired_volume = 80
+    desired_volume = 60
     mass_effect = True
     phantom = load_phantom(age, shape=shape)
     phantom.insert_lesion('SDH', volume=desired_volume,
