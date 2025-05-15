@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 import matplotlib.pyplot as plt
 import numpy as np
 
-from pedsilicoICH.study import Scanner, load_phantom
+from insilicoICH.study import Scanner, load_phantom
 
 
 # https://radiopaedia.org/articles/windowing-ct?lang=us
@@ -85,7 +85,7 @@ def plot_montage(imgs, params, fname):
 
 def test_lesion_characteristics(age=15.75, views=100,
                                 name='tests/images.png'):
-    lesion_types = ['epidural', 'subdural', 'round']
+    lesion_types = ['EDH', 'SDH', 'IPH']
     mass_effect = True
 
     name = Path(name)
@@ -99,13 +99,14 @@ def test_lesion_characteristics(age=15.75, views=100,
     imgs = []
     params = []
     for lesion_type in lesion_types:
-        volumes = np.linspace(0.1, 8, 3) if lesion_type == 'round'\
+        volumes = np.linspace(0.1, 8, 3) if lesion_type == 'IPH'\
             else np.linspace(1, 20, 3)
         intensities = np.linspace(70, 50, 3)
 
         for intensity, volume in zip(intensities, volumes):
             print(f'{intensity} HU, {volume} mL')
-            phantom = load_phantom(age, name=lesion_type, shape=None)
+            phantom = load_phantom(age, shape=None)
+            phantom.patient_name = lesion_type
             phantom.insert_lesion(lesion_type=lesion_type, volume=volume,
                                   intensity=intensity,
                                   mass_effect=mass_effect, seed=336)

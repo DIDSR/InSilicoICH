@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from pedsilicoICH.image_acquisition import read_dicom
-from pedsilicoICH.ground_truth_definition.phantoms import get_transformation_src_dst
-from pedsilicoICH.lesion_definition import warp_slice
+from insilicoICH.image_acquisition import read_dicom
+from insilicoICH.ground_truth_definition.phantoms import get_transformation_src_dst
+from insilicoICH.lesion_definition import warp_slice
 
 from ipywidgets import interact, IntSlider
 
