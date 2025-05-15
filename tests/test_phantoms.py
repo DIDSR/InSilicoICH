@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from monai.transforms import RandAffine
 import numpy as np
 
-from insilicoICH.ground_truth_definition.utils import download_and_extract_archive
+from insilicoICH.phantoms.utils import download_and_extract_archive
 from insilicoICH import load_phantom
 
 unc_ages = [0, 1.0, 2.0]
