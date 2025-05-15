@@ -30,7 +30,6 @@ classifiers = [
 [tool.setuptools]
 include-package-data = true
 
-
 [tool.setuptools.packages.find]
 where = ["src"]
 
@@ -42,3 +41,6 @@ Issues = "https://github.com/DIDSR/InSilicoICH/issues"
 generate = "insilicoICH.pipeline:insilicoich_cli"
 insilicoich = "insilicoICH.pipeline:insilicoich_cli" # keeping for now for backwards compatibility
 recruit = "insilicoICH.recruit_study:recruitment_cli"
+
+[project.entry-points."insilicoich"] # Must match PROJECT_NAME
+head_phantoms = "insilicoICH.phantoms.head_phantoms"

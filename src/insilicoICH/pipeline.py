@@ -65,7 +65,7 @@ def insilicoich(input_csv, output_directory=None, keep_raw=False):
                 edema = None
                 volume = None
                 mass_effect = None
-        seed = int(patient['CaseSeed']) if not np.isnan(patient['CaseSeed']) else None 
+        seed = int(patient['CaseSeed']) if not np.isnan(patient['CaseSeed']) else None
         patient_name = f'case_{patientid:03}'
         study = run_study(output_directory,
                           patient_name,
