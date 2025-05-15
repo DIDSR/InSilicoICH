@@ -130,9 +130,6 @@ class SkullProcess(Skull):
 
         list_indice_intersect = []
 
-        # self.get_angular_spacing_specific_cell_trace_radian(self.mesh_skull, list_start[0], list_stop[0])
-        # return
-
         # Perform ray trace
         for start, stop in zip(list_start, list_stop):
             points, inds = self.mesh_skull.ray_trace(start, stop)
@@ -173,7 +170,6 @@ class SkullProcess(Skull):
                 pt = mesh.cell_centers().points[neighbor]
                 pt_rel_origin = np.subtract(pt, start)
                 r, phi, theta = pv.cartesian_to_spherical(*pt_rel_origin)
-                # print("r, phi, theta", r, np.rad2deg(phi), np.rad2deg(theta))
                 list_neighbor_phi_radian.append(phi)
                 list_neighbor_theta_radian.append(theta)
 
@@ -192,11 +188,6 @@ class SkullProcess(Skull):
             average_list_angular_spacing_degree_theta = np.rad2deg(
                 np.average(list_angular_spacing_radian_theta)
             )
-
-            # print(
-            #     average_list_angular_spacing_degree_phi,
-            #     average_list_angular_spacing_degree_theta,
-            # )
 
             return (
                 average_list_angular_spacing_degree_phi,
