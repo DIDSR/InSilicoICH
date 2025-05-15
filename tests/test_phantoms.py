@@ -8,7 +8,7 @@ from monai.transforms import RandAffine
 import numpy as np
 
 from insilicoICH.phantoms.utils import download_and_extract_archive
-from insilicoICH import load_phantom
+from insilicoICH import load_phantom, available_phantoms
 
 unc_ages = [0, 1.0, 2.0]
 nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
@@ -105,3 +105,12 @@ def test_IPH_volume_accuracy():
             corrected = check_volumes(inputs=inputs, complexity=complexity,
                                       overlap=overlap, seed=seed)
             assert rmse(inputs, corrected) < 20
+
+
+def test_load_phantoms():
+    '''
+    tests that all phantoms load successfully
+    '''
+    for name, phantom_class in available_phantoms.items():
+        phantom = phantom_class()
+        print(f'{name} {phantom}')

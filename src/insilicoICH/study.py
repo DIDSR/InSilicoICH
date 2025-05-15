@@ -16,9 +16,6 @@ from monai.transforms import RandAffine
 
 from .image_acquisition import Scanner, read_dicom
 from .phantoms.base_phantoms import Phantom
-from .phantoms.head_phantoms import (MIDA_Head,
-                                     NIHPD_Head,
-                                     UNC_Head)
 
 import pluggy
 from . import hooks  # Your hooks.py
@@ -55,7 +52,6 @@ def load_vol(file_list):
 
 
 available_phantoms = get_phantoms_dict()
-# + [o for o in dir(iq_phantoms) if (not o.startswith('__')) and o not in ['np', 'create_circle_phantom', 'Phantom', 'create_resolution_phantom', 'create_ct_phantom_with_bars']]
 
 
 def load_phantom(name='Densitometry Phantom', shape=None):
