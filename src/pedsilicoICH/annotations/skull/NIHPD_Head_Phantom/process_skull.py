@@ -128,8 +128,10 @@ class SkullProcess(Skull):
             for start, direction in zip(list_start, list_direction)
         ]
 
-        list_point_intersect = []
         list_indice_intersect = []
+
+        # self.get_angular_spacing_specific_cell_trace_radian(self.mesh_skull, list_start[0], list_stop[0])
+        # return
 
         # Perform ray trace
         for start, stop in zip(list_start, list_stop):
@@ -144,6 +146,63 @@ class SkullProcess(Skull):
             )
             self.mesh_skull = self.mesh_skull.extract_cells(non_intersected)
 
+    def get_angular_spacing_specific_cell_trace_degree(self, mesh, start, stop):
+        """
+        Get angular spacing for shifting the angle for removing mesh to add fracture.
+        (start is the center of skull here)
+        """
+        # Perform ray tracing
+        points, ind = mesh.ray_trace(start, stop)
+
+        if len(ind) == 0:
+            print("No intersection found.")
+        else:
+            hit_cell_index = ind[0]
+
+            # Details about the target cell
+            center_hit_cell = mesh.cell_centers().points[hit_cell_index]
+            cell_center_rel_origin = np.subtract(center_hit_cell, start)
+            r_hit_cell, phi_hit_cell, theta_hit_cell = pv.cartesian_to_spherical(
+                *cell_center_rel_origin
+            )
+
+            list_neighbor_phi_radian = []
+            list_neighbor_theta_radian = []
+            neighbors = mesh.cell_neighbors(hit_cell_index)
+            for i, neighbor in enumerate(neighbors):
+                pt = mesh.cell_centers().points[neighbor]
+                pt_rel_origin = np.subtract(pt, start)
+                r, phi, theta = pv.cartesian_to_spherical(*pt_rel_origin)
+                # print("r, phi, theta", r, np.rad2deg(phi), np.rad2deg(theta))
+                list_neighbor_phi_radian.append(phi)
+                list_neighbor_theta_radian.append(theta)
+
+            list_angular_spacing_radian_phi = [
+                np.absolute(np.subtract(neighbor_phi, phi_hit_cell))
+                for neighbor_phi in list_neighbor_phi_radian
+            ]
+            list_angular_spacing_radian_theta = [
+                np.absolute(np.subtract(neighbor_theta, theta_hit_cell))
+                for neighbor_theta in list_neighbor_theta_radian
+            ]
+
+            average_list_angular_spacing_degree_phi = np.rad2deg(
+                np.average(list_angular_spacing_radian_phi)
+            )
+            average_list_angular_spacing_degree_theta = np.rad2deg(
+                np.average(list_angular_spacing_radian_theta)
+            )
+
+            # print(
+            #     average_list_angular_spacing_degree_phi,
+            #     average_list_angular_spacing_degree_theta,
+            # )
+
+            return (
+                average_list_angular_spacing_degree_phi,
+                average_list_angular_spacing_degree_theta,
+            )
+
     def add_fracture(self):
         """
         Add fracture by removing meshes with given procedure.
@@ -152,8 +211,22 @@ class SkullProcess(Skull):
         theta_degree = 0
 
         # Degrees to shift to next point
-        delta_shift_degree_phi = 0.5
-        delta_shift_degree_theta = 0.3
+        direction = pv.spherical_to_cartesian(
+            1, np.deg2rad(phi_degree), np.deg2rad(theta_degree)
+        )
+        delta_shift_degree_phi, delta_shift_degree_theta = (
+            self.get_angular_spacing_specific_cell_trace_degree(
+                self.mesh_skull,
+                self.skull_center,
+                np.add(self.skull_center, np.multiply(direction, 100)),
+            )
+        )
+
+        # Allow some duplicates for better continuity
+        delta_shift_degree_phi *= 0.8
+        delta_shift_degree_theta *= 0.8
+
+        # Number of iterations to try removing cells to remove (depends on direction, may have duplicates (less number of removals))
         n_iterations = 300
 
         list_start = []
@@ -166,9 +239,11 @@ class SkullProcess(Skull):
             list_start.append(self.skull_center)
             list_direction.append(np.multiply(direction, 100))
 
-            # phi_degree = 30 + delta_shift_degree_phi * random.uniform(-1, 1)
-            # theta_degree += delta_shift_degree_theta
+            # Ideal case (need to be corrected)
+            # phi_degree += delta_shift_degree_phi * random.randint(-1, 1)
+            # theta_degree += delta_shift_degree_theta * random.randint(-1, 1)
 
+            # Sample fracture
             phi_degree += delta_shift_degree_phi * random.randint(-1, 1)
             theta_degree += delta_shift_degree_theta
 

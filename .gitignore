@@ -35,3 +35,4 @@ lesions.png
 *.8*
 *.9*
 *.vtk
+src/pedsilicoICH/annotations/skull/NIHPD_Head_Phantom/assets/mesh_skull.vtk
