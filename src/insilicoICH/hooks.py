@@ -21,8 +21,8 @@ class PhantomSpecs:
         """
         Plugins implement this hook to register their Phantom subclasses.
 
-        Each implementation returns a list of Phantom subclasses they provide.
-        The main application will collect these lists.
-        Return an empty list or None if a plugin has no types to register.
+        Each implementation returns a dict of Phantom subclasses they provide.
+        The main application will collect these dicts.
+        Return an empty dict or None if a plugin has no types to register.
         """
-        return []  # Default implementation returns an empty list
+        return {}  # Default implementation returns an empty list

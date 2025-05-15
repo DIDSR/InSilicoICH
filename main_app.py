@@ -3,7 +3,7 @@ import pluggy
 from insilicoICH import hooks  # Your hooks.py
 
 
-def main():
+def get_phantoms_dict():
     pm = pluggy.PluginManager(hooks.PROJECT_NAME)
     pm.add_hookspecs(hooks.PhantomSpecs)
     num_loaded = pm.load_setuptools_entrypoints(group=hooks.PROJECT_NAME)
@@ -12,23 +12,21 @@ def main():
     # --- Call the hook to get all registered phantom types ---
     # The hook returns a list of lists (one list per plugin implementation that returned something)
     list_of_results = pm.hook.register_phantom_types()
-
     # Flatten the list of lists and filter out None or empty lists from plugins
-    discovered_phantom_classes = []
+    discovered_phantom_classes = {}
     for result_list in list_of_results:
         if result_list:  # Check if the plugin returned a non-empty list
-            for phantom_cls in result_list:
-                if phantom_cls not in discovered_phantom_classes: # Avoid duplicates if somehow registered twice
-                     discovered_phantom_classes.append(phantom_cls)
+            discovered_phantom_classes.update(result_list)
 
     print("Discovered Phantom Types (Classes):")
-    for cls in discovered_phantom_classes:
-        print(f"- {cls.__name__} (from module: {cls.__module__})")
+    for cls_name, cls in discovered_phantom_classes.items():
+        print(f"- {cls_name} - {cls}")
 
     # Get just the names for your list
-    phantom_type_names = [cls.__name__ for cls in discovered_phantom_classes]
-    print("\nList of Discovered Phantom Names:")
+    phantom_type_names = discovered_phantom_classes.keys()
+    print(f"\nDiscovered {len(phantom_type_names)} Phantom Names:")
     print(phantom_type_names)
+    return discovered_phantom_classes
 
 
 if __name__ == "__main__":

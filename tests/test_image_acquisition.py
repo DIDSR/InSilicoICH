@@ -10,6 +10,7 @@ from insilicoICH.phantoms.base_phantoms import Phantom
 from insilicoICH.study import Scanner, load_phantom
 from insilicoICH.image_acquisition import read_dicom, Scanner
 
+
 test_dir = Path(__file__).parent.absolute()
 
 

@@ -4,12 +4,16 @@ module for working with phantoms
 
 from pathlib import Path
 import os
+from functools import partial
 
 import numpy as np
 import nibabel as nib
 import SimpleITK as sitk
 import pandas as pd
 import skimage as ski
+from dotenv import load_dotenv
+from warnings import warn
+
 from skimage.morphology import (binary_closing,
                                 remove_small_holes,
                                 binary_dilation,
@@ -21,6 +25,33 @@ from scipy.ndimage import distance_transform_edt
 from .base_phantoms import LesionPhantom, resize, get_mean_age
 from .utils import download_and_extract_archive
 from ..hooks import hookimpl
+
+
+load_dotenv()
+if 'PHANTOM_DIRECTORY' in os.environ:
+    phantom_dir = Path(os.environ['PHANTOM_DIRECTORY'])
+else:
+    phantom_dir = Path(__file__).parents[2]
+    warn(f'''
+The environment variable `PHANTOM_DIRECTORY` has not been set, this is needed
+to locate stored base phantom files for the NIHPD and MIDA head phantoms.
+
+If these phantom files cannot be located, NIHPD phantoms will be downloaded to
+your working directory: {phantom_dir}
+
+MIDA phantom files need to be downloaded manually and added to this directory,
+see `MIDA_Head_Phantom` for details.
+
+Please do one of the following:
+
+1. create a file called `.env` in this project's working directory and add:
+
+`PHANTOM_DIRECTORY=/path/to/phantoms`
+
+or
+
+2. in your terminal `export PHANTOM_DIRECTORY=/path/to_phantoms`
+''')
 
 
 class HeadPhantom(LesionPhantom):
@@ -65,11 +96,12 @@ class HeadPhantom(LesionPhantom):
 
 
 class MIDA_Head(HeadPhantom):
-    age = 38  # add 38 as the median US adult age to represent MIDA, consider
+    name = 'MIDA Head'
+    ages = [38]  # add 38 as the median US adult age to represent MIDA, consider
 #  other identifiers when adding more patients
 
-    def __init__(self, phantom_dir, shape=None):
-        self.age = MIDA_Head.age
+    def __init__(self, phantom_dir, shape=None, age=None):
+        self.age = age or MIDA_Head.ages[0]
         if not phantom_dir.exists():
             raise FileNotFoundError(f'''
 MIDA head phantom files not found in {phantom_dir}
@@ -80,7 +112,7 @@ To use MIDA head phantoms, please download them from:
 and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
 ''')
         super().__init__(phantom_dir, shape, age=self.age)
-        self.patient_name = 'Adult MIDA Head'
+        self.patient_name = f'{age} yr {MIDA_Head.name}'
         self.material_lut = self._load_material_LUT()
 
     def load_phantom(self, phantom_dir):
@@ -158,6 +190,7 @@ class NIHPD_Head(HeadPhantom):
         NeuroImage. 2011;54(1):313-327. doi:10.1016/j.neuroimage.2010.07.033
     '''
     ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
+    name = 'NIHPD Head'
     relative_head_size = dict(zip(ages, [0.8, 0.82, 0.85, 0.87, 0.9, 0.95]))
     url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
 
@@ -165,7 +198,7 @@ class NIHPD_Head(HeadPhantom):
                  skull_seg_method='otsu', add_sutures=True):
         phantom_dir = Path(phantom_dir)
         self.age = age
-        self.patient_name = f'{age} yr NIHPD Head'
+        self.patient_name = f'{age} yr {NIHPD_Head.name}'
         self.symmetric = symmetric
         self.skull_seg_method = skull_seg_method
         self.add_sutures = add_sutures
@@ -381,6 +414,7 @@ from {phantom_dir}')
             skull[skull > 0] = 1
         return skull.astype(bool)
 
+
 class UNC_Head(NIHPD_Head):
     '''
     loads MR brain atlas of mean `age`, downloaded from
@@ -394,7 +428,9 @@ class UNC_Head(NIHPD_Head):
         "Infant Brain Atlases from Neonates to 1- and 2-year-olds", PLoS ONE, 6(4): e18746, 2011
     '''
     ages = [0.0, 1.0, 2.0]
+    name = 'UNC Head'
     url = 'https://www.nitrc.org/frs/download.php/14897/UNCInfant012Atlases-2022-10-21.zip'
+
     def __init__(self, phantom_dir, age: float, symmetric=False, shape=None,
                  skull_seg_method='otsu'):
         phantom_dir = Path(phantom_dir)
@@ -410,7 +446,7 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
 ''')
             download_and_extract_archive(UNC_Head.url, phantom_dir, remove_finished=True)
         super().__init__(phantom_dir, shape=shape, age=age)
-        self.patient_name = f'{age} yr UNC Head'
+        self.patient_name = f'{age} yr {UNC_Head.name}'
 
         # define material HU; 0-2 yr old based on cases in
         # https://physionet.org/content/ct-ich/1.3.1/ and 
@@ -584,9 +620,14 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
         return skull.astype(bool)
 
 
-possible_ages = UNC_Head.ages + NIHPD_Head.ages + [MIDA_Head.age]
+possible_ages = UNC_Head.ages + NIHPD_Head.ages + MIDA_Head.ages
 
 
 @hookimpl
 def register_phantom_types():
-    return [MIDA_Head, NIHPD_Head, UNC_Head]
+    head_phantoms = {}
+    for head_phantom, sub_dir in zip([UNC_Head, NIHPD_Head, MIDA_Head],
+                                     ['UNC_Head_phantom', 'NIHPD_Head_Phantom', 'MIDA_Head_Phantom']):
+        head_phantoms.update({f"{o} yr {head_phantom.name}": partial(head_phantom, age=o, phantom_dir=phantom_dir / sub_dir)
+                              for o in head_phantom.ages})
+    return head_phantoms
