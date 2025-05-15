@@ -10,6 +10,7 @@ import numpy as np
 from insilicoICH.ground_truth_definition.utils import download_and_extract_archive
 from insilicoICH import load_phantom
 
+unc_ages = [0, 1.0, 2.0]
 nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
 
 load_dotenv()
@@ -22,8 +23,13 @@ file with PHANTOM_DIRECTORY=/path/to/phantoms
 ''')
     phantom_dir = Path(__file__).parent.absolute()
 
+unc_dir = phantom_dir / 'UNC_Head_Phantom'
 nihpd_dir = phantom_dir / 'NIHPD_Head_Phantom'
 mida_dir = phantom_dir / 'MIDA_Head_Phantom'
+
+if not unc_dir.exists():
+    url = 'https://www.nitrc.org/frs/download.php/14897/UNCInfant012Atlases-2022-10-21.zip'
+    download_and_extract_archive(url, unc_dir)
 
 if not nihpd_dir.exists():
     url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
@@ -40,7 +46,7 @@ def test_big_epidural_lesion():
     intensity = 100
     age = 9
     mass_effect = True
-    desired_volume = 100
+    desired_volume = 60
     phantom = load_phantom(age, shape=shape)
     phantom.insert_lesion('EDH', volume=desired_volume,
                           intensity=intensity,
@@ -53,7 +59,7 @@ def test_big_epidural_lesion():
 def test_big_subdural_lesion():
     intensity = 100
     age = 9
-    desired_volume = 80
+    desired_volume = 60
     mass_effect = True
     phantom = load_phantom(age, shape=shape)
     phantom.insert_lesion('SDH', volume=desired_volume,

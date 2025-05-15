@@ -106,6 +106,10 @@ def insert_with_mass_effect(self, img, lesion, boundary, strength=1):
         phantom_name = 'NIHPD_Head'
         skull_map = ski.morphology.binary_dilation(self.get_skull_map(), np.ones(3*[5]))
         mask = self.mask
+    elif self.__class__.__name__ == 'UNC_Head':
+        phantom_name = 'UNC_Head'
+        skull_map = ski.morphology.binary_dilation(self.get_skull_map(), np.ones(3*[5]))
+        mask = self.mask
     else:
         skull_map = self.get_skull_map()
 
