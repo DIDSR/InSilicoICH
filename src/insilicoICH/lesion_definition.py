@@ -311,31 +311,14 @@ def connect_points(start, end, boundary, hematoma_type, initial_slice=False):
     return filled_array, boundary_coords, connect_coords
 
 
-def warp_slice(axial_slice, skull_slice, mask, src, dst, hematoma_type, phantom_name):
+def warp_slice(axial_slice, skull_slice, mask, src, dst, hematoma_type, anchor_points=None):
     '''
     performs warp of 2D slice according to hematoma boundary coordinates
     while maintaining a rigid skull
     '''
-    
-    if phantom_name == 'MIDA_Head':
-        flood_mask = ski.segmentation.flood(skull_slice, seed_point=(0, 0))
-        skull_slice[flood_mask] = 1
-        brain_mask = np.where(skull_slice == 1, 0, 1)
-    
-        # using the entire inner boundary of the skull mask seems to work great as anchor points
-        skull_boundary = ski.segmentation.find_boundaries(skull_slice, mode='inner', background=0)
-        skull_idx = np.argwhere(skull_boundary == True)
-        skull_sample = np.argwhere(skull_boundary != 0)
-
-    elif phantom_name == 'NIHPD_Head' or 'UNC_Head':
-        # use brain mask to define anchor points
-        skull_boundary = ski.segmentation.find_boundaries(mask, mode='outer', background=0)
-        skull_idx = np.argwhere(skull_boundary == True)
-        skull_sample = np.argwhere(skull_boundary != 0)
-        brain_mask = mask
 
     # initialize warp source and destination with skull indices in both (shouldn't move!)
-    warp_src = warp_dst = skull_sample # initialize warp_src and warp_dst with the skull boundary voxels
+    warp_src = warp_dst = anchor_points # initialize warp_src and warp_dst with the skull boundary voxels
 
     src_subset = src[np.round(np.linspace(0, len(src)-1, 5)).astype(int)] # subsample points from the src points
     dst_subset = dst[np.round(np.linspace(0, len(dst)-1, 5)).astype(int)] # subsample points from the dst points
@@ -359,7 +342,7 @@ def warp_slice(axial_slice, skull_slice, mask, src, dst, hematoma_type, phantom_
     if (np.mean(warped_slice) > -10) & (np.mean(warped_slice) < 10):
         warped_slice = axial_slice
     else: # if warp was successful, check for spurious hyperdense voxels from warp and replace 
-        masked_axial = axial_slice*brain_mask
+        masked_axial = axial_slice*mask
         # new code to try to "fix" skull warping into brain
         problem_voxels = np.argwhere((skull_slice != 1) & (warped_slice > 50))
         for index in problem_voxels:
@@ -369,7 +352,7 @@ def warp_slice(axial_slice, skull_slice, mask, src, dst, hematoma_type, phantom_
                 warped_slice[index[0], index[1]] = masked_axial[masked_axial!=0].mean()
 
         # finally, replace all voxels outside brain with original voxels
-        warped_slice = np.where(brain_mask==1, warped_slice, axial_slice)
+        warped_slice = np.where(mask==1, warped_slice, axial_slice)
 
     return warped_slice
 

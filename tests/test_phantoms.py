@@ -70,6 +70,20 @@ def test_big_subdural_lesion():
     assert rmse(desired_volume, measured_volume) < 56
 
 
+def test_big_intraparenchymal_lesion():
+    intensity = 100
+    age = 9
+    desired_volume = 60
+    mass_effect = True
+    phantom = load_phantom(age, shape=shape)
+    phantom.insert_lesion('IPH', volume=desired_volume,
+                          intensity=intensity,
+                          mass_effect=mass_effect,
+                          seed=seed)
+    measured_volume = phantom.get_lesion_volume()
+    assert rmse(desired_volume, measured_volume) < 56
+
+
 def test_transforms(threshold=-685):
     for age in [6.5]:
         phantom = load_phantom(age)
@@ -114,3 +128,5 @@ def test_load_phantoms():
     for name, phantom_class in available_phantoms.items():
         phantom = phantom_class()
         print(f'{name} {phantom}')
+
+test_big_subdural_lesion()

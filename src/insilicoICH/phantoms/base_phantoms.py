@@ -97,37 +97,37 @@ def get_transformation_src_dst(lesion: np.ndarray[bool],
     return src, dst
 
 
-def insert_with_mass_effect(self, img, lesion, boundary, strength=1):
-    if self.__class__.__name__ == 'MIDA_Head':
-        phantom_name = 'MIDA_Head'
-        skull_map = self.get_skull_map()
-        mask = skull_map
-    elif self.__class__.__name__ == 'NIHPD_Head':
-        phantom_name = 'NIHPD_Head'
-        skull_map = ski.morphology.binary_dilation(self.get_skull_map(), np.ones(3*[5]))
-        mask = self.mask
-    elif self.__class__.__name__ == 'UNC_Head':
-        phantom_name = 'UNC_Head'
-        skull_map = ski.morphology.binary_dilation(self.get_skull_map(), np.ones(3*[5]))
-        mask = self.mask
-    else:
-        skull_map = self.get_skull_map()
+# def insert_with_mass_effect(self, img, lesion, boundary, strength=1): # this needs to be brought in as a method since its different for each class
+#     if isinstance(self):
+#         phantom_name = 'MIDA_Head'
+#         skull_map = self.get_skull_map()
+#         mask = skull_map
+#     elif self.__class__.__name__ == 'NIHPD_Head':
+#         phantom_name = 'NIHPD_Head'
+#         skull_map = ski.morphology.binary_dilation(self.get_skull_map(), np.ones(3*[5]))
+#         mask = self.mask
+#     elif self.__class__.__name__ == 'UNC_Head':
+#         phantom_name = 'UNC_Head'
+#         skull_map = ski.morphology.binary_dilation(self.get_skull_map(), np.ones(3*[5]))
+#         mask = self.mask
+#     else:
+#         skull_map = self.get_skull_map()
 
-    if img.ndim == 2:
-        img = img[None]
-    assert img.ndim == 3
+#     if img.ndim == 2:
+#         img = img[None]
+#     assert img.ndim == 3
 
-    warped = np.zeros_like(img)
-    for idx in range(lesion.shape[0]):
-        if not lesion[idx].any():
-            continue
-        src, dst = get_transformation_src_dst(lesion[idx], strength)
-        dst_coords = np.argwhere(dst)
-        src_coords = np.argwhere(src)
-        warped[idx] = warp_slice(axial_slice=img[idx], skull_slice=boundary[idx], mask=mask[idx],
-                                 src=src_coords, dst=dst_coords, hematoma_type='IPH',
-                                 phantom_name=phantom_name)
-    return warped
+#     warped = np.zeros_like(img)
+#     for idx in range(lesion.shape[0]):
+#         if not lesion[idx].any():
+#             continue
+#         src, dst = get_transformation_src_dst(lesion[idx], strength)
+#         dst_coords = np.argwhere(dst)
+#         src_coords = np.argwhere(src)
+#         warped[idx] = warp_slice(axial_slice=img[idx], skull_slice=boundary[idx], mask=mask[idx],
+#                                  src=src_coords, dst=dst_coords, hematoma_type='IPH',
+#                                  phantom_name=phantom_name)
+#     return warped
 
 
 def get_mean_age(age_range: str):
@@ -259,7 +259,14 @@ class LesionPhantom(Phantom):
         self.lesion_type = []
         self.lesion_intensity = []  # HU
         self.mass_effect = False
-        self.exclusion_mask = np.zeros(self.shape, dtype=bool)
+        self.warp_exclusion_mask = self.get_warp_exclusion_mask()
+        self.warp_inclusion_mask = self.get_warp_inclusion_mask()
+
+    def get_warp_exclusion_mask(self):
+        return np.zeros(self.shape, dtype=bool)
+
+    def get_warp_inclusion_mask(self):
+        return np.ones(self.shape, dtype=bool)
 
     def resize(self, shape: tuple, **kwargs) -> None:
         '''
@@ -268,7 +275,8 @@ class LesionPhantom(Phantom):
         :param shape: tuple, new shape for the phantom array
         '''
         super().resize(shape, **kwargs)
-        self.exclusion_mask = resize(self.exclusion_mask, shape, **kwargs).astype(bool)
+        self.warp_exclusion_mask = resize(self.warp_exclusion_mask, shape, **kwargs).astype(bool)
+        self.warp_inclusion_mask = resize(self.warp_inclusion_mask, shape, **kwargs).astype(bool)
 
     def get_lesion_volume(self, unit='mL'):
         '''
@@ -446,15 +454,33 @@ large, try smaller volume')
         if mass_effect:
             if mass_effect is True:
                 mass_effect = 0.5
-            warped = insert_with_mass_effect(self, img,
-                                             lesion_mask,
-                                             self.exclusion_mask,
-                                             strength=mass_effect)
+            warped = self.insert_with_mass_effect(img,
+                                                  lesion_mask,
+                                                  strength=mass_effect)
             warped[lesion_mask] = img_w_lesion[lesion_mask]
             img_w_lesion[lesion_mask.sum(axis=(1, 2)) > 0] =\
                 warped[lesion_mask.sum(axis=(1, 2)) > 0]
 
         return img_w_lesion, lesion_mask, (z, x, y)
+
+    def insert_with_mass_effect(self, img, lesion, strength=1):
+        if img.ndim == 2:
+            img = img[None]
+        assert img.ndim == 3
+
+        warped = np.zeros_like(img)
+        for idx in range(lesion.shape[0]):
+            if not lesion[idx].any():
+                continue
+            src, dst = get_transformation_src_dst(lesion[idx], strength)
+            dst_coords = np.argwhere(dst)
+            src_coords = np.argwhere(src)
+            warped[idx] = warp_slice(axial_slice=img[idx],
+                                     skull_slice=self.warp_exclusion_mask[idx],
+                                     mask=self.warp_inclusion_mask[idx],
+                                     src=src_coords, dst=dst_coords, hematoma_type='IPH',
+                                     anchor_points=self.warp_exclusion_mask)
+        return warped
 
     def _add_dural_lesion(self, volume, lesion_type, intensity,
                           seed=None, mass_effect=True):
