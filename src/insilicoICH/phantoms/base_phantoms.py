@@ -97,39 +97,6 @@ def get_transformation_src_dst(lesion: np.ndarray[bool],
     return src, dst
 
 
-# def insert_with_mass_effect(self, img, lesion, boundary, strength=1): # this needs to be brought in as a method since its different for each class
-#     if isinstance(self):
-#         phantom_name = 'MIDA_Head'
-#         skull_map = self.get_skull_map()
-#         mask = skull_map
-#     elif self.__class__.__name__ == 'NIHPD_Head':
-#         phantom_name = 'NIHPD_Head'
-#         skull_map = ski.morphology.binary_dilation(self.get_skull_map(), np.ones(3*[5]))
-#         mask = self.mask
-#     elif self.__class__.__name__ == 'UNC_Head':
-#         phantom_name = 'UNC_Head'
-#         skull_map = ski.morphology.binary_dilation(self.get_skull_map(), np.ones(3*[5]))
-#         mask = self.mask
-#     else:
-#         skull_map = self.get_skull_map()
-
-#     if img.ndim == 2:
-#         img = img[None]
-#     assert img.ndim == 3
-
-#     warped = np.zeros_like(img)
-#     for idx in range(lesion.shape[0]):
-#         if not lesion[idx].any():
-#             continue
-#         src, dst = get_transformation_src_dst(lesion[idx], strength)
-#         dst_coords = np.argwhere(dst)
-#         src_coords = np.argwhere(src)
-#         warped[idx] = warp_slice(axial_slice=img[idx], skull_slice=boundary[idx], mask=mask[idx],
-#                                  src=src_coords, dst=dst_coords, hematoma_type='IPH',
-#                                  phantom_name=phantom_name)
-#     return warped
-
-
 def get_mean_age(age_range: str):
     return (float(age_range.split('-')[1])+float(age_range.split('-')[0]))/2
 
@@ -472,15 +439,19 @@ large, try smaller volume')
         for idx in range(lesion.shape[0]):
             if not lesion[idx].any():
                 continue
-            src, dst = get_transformation_src_dst(lesion[idx], strength)
-            dst_coords = np.argwhere(dst)
-            src_coords = np.argwhere(src)
+            src_coords, dst_coords = self.get_warp_coordinates(lesion, idx)
             warped[idx] = warp_slice(axial_slice=img[idx],
-                                     skull_slice=self.warp_exclusion_mask[idx],
-                                     mask=self.warp_inclusion_mask[idx],
-                                     src=src_coords, dst=dst_coords, hematoma_type='IPH',
-                                     anchor_points=self.warp_exclusion_mask)
+                                     exclusion_mask=self.warp_exclusion_mask[idx],
+                                     inclusion_mask=self.warp_inclusion_mask[idx],
+                                     src=src_coords, dst=dst_coords, hematoma_type='IPH')
         return warped
+
+    def get_warp_coordinates(self, lesion, idx):
+        # get lesion coordinates
+        src, dst = get_transformation_src_dst(lesion[idx])
+        warp_dst = np.argwhere(dst)
+        warp_src = np.argwhere(src)
+        return warp_src, warp_dst
 
     def _add_dural_lesion(self, volume, lesion_type, intensity,
                           seed=None, mass_effect=True):
