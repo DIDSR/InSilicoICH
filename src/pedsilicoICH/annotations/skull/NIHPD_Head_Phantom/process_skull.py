@@ -214,14 +214,19 @@ class SkullProcess(Skull):
         )
 
         # Allow some duplicates for better continuity
-        delta_shift_degree_phi *= 0.8
-        delta_shift_degree_theta *= 0.8
+        continuity_factor = 1
+        delta_shift_degree_phi *= continuity_factor
+        delta_shift_degree_theta *= continuity_factor
 
         # Number of iterations to try removing cells to remove (depends on direction, may have duplicates (less number of removals))
-        n_iterations = 300
+        n_iterations = 1000
 
         list_start = []
         list_direction = []
+
+        switch_wait = 50
+        list_switch = [0, 1, 2, 3]
+        list_index_counter = 0
 
         for i in range(n_iterations):
             direction = pv.spherical_to_cartesian(
@@ -230,13 +235,23 @@ class SkullProcess(Skull):
             list_start.append(self.skull_center)
             list_direction.append(np.multiply(direction, 100))
 
-            # Ideal case (need to be corrected)
-            # phi_degree += delta_shift_degree_phi * random.randint(-1, 1)
-            # theta_degree += delta_shift_degree_theta * random.randint(-1, 1)
-
-            # Sample fracture
-            phi_degree += delta_shift_degree_phi * random.randint(-1, 1)
-            theta_degree += delta_shift_degree_theta
+            if i % switch_wait == 0:
+                list_index_counter += 1
+                pointer = list_switch[random.randint(0, len(list_switch) - 1)]
+            
+            if pointer == 0:
+                phi_degree += delta_shift_degree_phi * random.choice([-1, 1])
+            elif pointer == 1:
+                theta_degree += delta_shift_degree_theta * random.choice([-1, 1])
+            elif pointer == 2:
+                phi_degree += delta_shift_degree_phi * random.choice([-1, 1])
+                theta_degree += delta_shift_degree_theta
+            elif pointer == 3:
+                phi_degree += delta_shift_degree_phi
+                theta_degree += delta_shift_degree_theta * random.choice([-1, 1])
+            elif pointer == 4:
+                phi_degree += delta_shift_degree_phi * random.choice([-1, 1])
+                theta_degree += delta_shift_degree_theta * random.choice([-1, 1])
 
         self.remove_voxel_spherical_coordi(list_start, list_direction)
 
