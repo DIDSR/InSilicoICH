@@ -144,7 +144,7 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
                     count = tol
             if failure_occured:
                 raise RuntimeError(f'lesion insertion failed with requested volume: {desired_volume} mL, try a smaller volume')
-            
+
             # connect the start and end points of the hemorrhage 
             filled_array, boundary_coords, connect_coords =\
                 connect_points(start=orig_start,
@@ -155,12 +155,12 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
 
             if mass_effect:
                 try:
-                    warped_slice = warp_slice(HU_array[init_slice, :],
-                                              skull_map[init_slice, :],
-                                              mask[init_slice, :],
-                                              boundary_coords, connect_coords,
-                                              hematoma_type,
-                                              phantom_name)
+                    warped_slice = warp_slice(HU_array[init_slice],
+                                              skull_map[init_slice],
+                                              mask[init_slice],
+                                              boundary_coords,
+                                              connect_coords,
+                                              hematoma_type)
                     new_volume[init_slice, :, :] = warped_slice
                 except ValueError:
                     Warning(f'Failed to perform mass effect insertion for\
@@ -209,22 +209,21 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
                                boundary=temp_boundary,
                                hematoma_type=hematoma_type,
                                initial_slice=False)
-            
             try:
                 new_start = boundary_coords[1:-1][0]
                 new_end = boundary_coords[1:-1][-1]
             except:
                 new_start = dura_idx[np.argmin(distance_from_start)]
                 new_end = dura_idx[np.argmin(distance_from_end)]
-        
+
             if mass_effect:
                 try:
-                    warped_slice = warp_slice(HU_array[init_slice-slice_idx, :],
-                                                skull_map[init_slice-slice_idx, :],
-                                                mask[init_slice-slice_idx, :],
-                                                boundary_coords, connect_coords, 
-                                                hematoma_type,
-                                                phantom_name)
+                    warped_slice = warp_slice(HU_array[init_slice-slice_idx],
+                                              skull_map[init_slice-slice_idx],
+                                              mask[init_slice-slice_idx],
+                                              boundary_coords,
+                                              connect_coords,
+                                              hematoma_type)
                     new_volume[init_slice-slice_idx] = warped_slice
                 except ValueError:
                     Warning(f'Failed to perform mass effect insertion for\
