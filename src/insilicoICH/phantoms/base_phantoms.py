@@ -436,13 +436,15 @@ large, try smaller volume')
         assert img.ndim == 3
 
         warped = np.zeros_like(img)
+        exclusion_mask = self.get_warp_exclusion_mask()
+        inclusion_mask = self.get_warp_inclusion_mask()
         for idx in range(lesion.shape[0]):
             if not lesion[idx].any():
                 continue
             src_coords, dst_coords = self.get_warp_coordinates(lesion, idx)
             warped[idx] = warp_slice(axial_slice=img[idx],
-                                     exclusion_mask=self.warp_exclusion_mask[idx],
-                                     inclusion_mask=self.warp_inclusion_mask[idx],
+                                     exclusion_mask=exclusion_mask[idx],
+                                     inclusion_mask=inclusion_mask[idx],
                                      src=src_coords, dst=dst_coords, hematoma_type='IPH')
         return warped
 

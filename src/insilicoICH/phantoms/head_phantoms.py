@@ -359,8 +359,11 @@ from {phantom_dir}')
         return warp_src, warp_dst
 
     def get_warp_exclusion_mask(self):
-        skull_boundary = ski.segmentation.find_boundaries(self.mask, mode='outer', background=0)
-        return skull_boundary
+        '''
+        approximates the skull as the outer boundary of the brain mask
+        '''
+        return ski.segmentation.find_boundaries(self.mask.astype(bool),
+                                                mode='outer', background=0)
 
     def resize(self, shape=None):
         original_shape = self.csf.shape
