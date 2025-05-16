@@ -147,14 +147,10 @@ and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
         src, dst = get_transformation_src_dst(lesion[idx], strength=strength)
         src = np.argwhere(src)
         dst = np.argwhere(dst)
-        skull_slice = self.get_skull_map()[idx]
-        flood_mask = ski.segmentation.flood(skull_slice, seed_point=(0, 0))
-        skull_slice[flood_mask] = 1
-        self.warp_inclusion_mask[idx] = np.where(skull_slice == 1, 0, 1)
-
+        skull_slice = self.warp_exclusion_mask[idx]
         # using the entire inner boundary of the skull mask seems to work great as anchor points
         skull_boundary = ski.segmentation.find_boundaries(skull_slice, mode='inner', background=0)
-        skull_sample = np.argwhere(skull_boundary != 0)
+        skull_sample = np.argwhere(skull_boundary)
 
         warp_src = warp_dst = skull_sample  # initialize warp_src and warp_dst with the skull boundary voxels
 
@@ -332,15 +328,14 @@ from {phantom_dir}')
         spacings = self.dz, self.dx, self.dy
         return self._phantom, spacings
 
-    def get_warp_coordinates(self, lesion, idx):
+    def get_warp_coordinates(self, lesion, idx, strength=1):
         # get lesion coordinates
-        src, dst = get_transformation_src_dst(lesion)
-
+        src, dst = get_transformation_src_dst(lesion[idx], strength=strength)
+        src = np.argwhere(src)
+        dst = np.argwhere(dst)
         # use brain mask to define anchor points
-        skull_boundary = ski.segmentation.find_boundaries(self.mask,
-                                                          mode='outer',
-                                                          background=0)
-        skull_sample = np.argwhere(skull_boundary != 0)
+        skull_boundary = self.warp_exclusion_mask[idx]
+        skull_sample = np.argwhere(skull_boundary)
 
         warp_src = warp_dst = skull_sample  # initialize warp_src and warp_dst with the skull boundary voxels
 
@@ -365,7 +360,7 @@ from {phantom_dir}')
 
     def get_warp_exclusion_mask(self):
         skull_boundary = ski.segmentation.find_boundaries(self.mask, mode='outer', background=0)
-        return np.argwhere(skull_boundary != 0)
+        return skull_boundary
 
     def resize(self, shape=None):
         original_shape = self.csf.shape
