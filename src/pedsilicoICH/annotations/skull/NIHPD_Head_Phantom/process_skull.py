@@ -219,12 +219,12 @@ class SkullProcess(Skull):
         delta_shift_degree_theta *= continuity_factor
 
         # Number of iterations to try removing cells to remove (depends on direction, may have duplicates (less number of removals))
-        n_iterations = 300
+        n_iterations = 3000
 
         list_start = []
         list_direction = []
 
-        list_switch = [2, 3]# [0, 1, 2, 3]
+        list_switch = [2, 3]
 
         switch_counter = 1
         list_reset_counter_wait = [10, 20, 30, 40, 50]
@@ -237,8 +237,6 @@ class SkullProcess(Skull):
             )
             list_start.append(self.skull_center)
             list_direction.append(np.multiply(direction, 100))
-
-            print("pointer=", pointer, ":", switch_counter, "/", list_reset_counter_wait[list_reset_counter_wait_index])
 
             if switch_counter % list_reset_counter_wait[list_reset_counter_wait_index] == 0:
                 list_reset_counter_wait_index = random.randint(0, len(list_reset_counter_wait) - 1)
