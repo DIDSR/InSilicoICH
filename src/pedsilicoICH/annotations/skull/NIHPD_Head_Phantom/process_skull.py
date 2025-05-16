@@ -214,7 +214,7 @@ class SkullProcess(Skull):
         )
 
         # Allow some duplicates for better continuity
-        continuity_factor = 1
+        continuity_factor = .8
         delta_shift_degree_phi *= continuity_factor
         delta_shift_degree_theta *= continuity_factor
 
@@ -224,8 +224,8 @@ class SkullProcess(Skull):
         list_start = []
         list_direction = []
 
-        switch_wait = 50
-        list_switch = [0, 1, 2, 3]
+        switch_wait = 20
+        list_switch = [2, 3]# [0, 1, 2, 3]
         list_index_counter = 0
 
         for i in range(n_iterations):
