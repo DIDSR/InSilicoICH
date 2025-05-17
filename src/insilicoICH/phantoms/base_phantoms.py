@@ -212,6 +212,8 @@ class LesionPhantom(Phantom):
     '''
     A Phantom object with methods for inserting lesions.
     '''
+    lesion_types = ['IPH', 'SDH', 'EDH']
+
     def __init__(self, img: np.ndarray, spacings: tuple = (1, 1, 1), **kwargs):
         '''
         Initializes a LesionPhantom object.
