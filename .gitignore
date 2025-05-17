@@ -11,7 +11,7 @@ build
 
 batchmode_CT_dataset_pipeline.sge
 run_batchmode.sh
-*.csv
+# *.csv
 *.raw
 *.air
 *.offset
