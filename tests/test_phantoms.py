@@ -129,7 +129,7 @@ def test_load_phantoms():
     tests that all phantoms load successfully
     '''
     for name, phantom_class in available_phantoms.items():
-        if isinstance(phantom_class, partial) and issubclass(phantom_class,
+        if isinstance(phantom_class, partial) and issubclass(phantom_class.func,
                                                              MIDA_Head):
             continue
         phantom = phantom_class()
