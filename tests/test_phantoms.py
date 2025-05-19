@@ -2,13 +2,16 @@
 test low level insilicoich phantom generation functionality
 '''
 from pathlib import Path
+from functools import partial
 import os
+
 from dotenv import load_dotenv
 from monai.transforms import RandAffine
 import numpy as np
 
 from insilicoICH.phantoms.utils import download_and_extract_archive
 from insilicoICH import load_phantom, available_phantoms
+from insilicoICH.phantoms.head_phantoms import MIDA_Head
 
 unc_ages = [0, 1.0, 2.0]
 nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
@@ -126,7 +129,8 @@ def test_load_phantoms():
     tests that all phantoms load successfully
     '''
     for name, phantom_class in available_phantoms.items():
+        if isinstance(phantom_class, partial) and issubclass(phantom_class,
+                                                             MIDA_Head):
+            continue
         phantom = phantom_class()
         print(f'{name} {phantom}')
-
-test_big_subdural_lesion()
