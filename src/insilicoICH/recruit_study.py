@@ -76,7 +76,6 @@ or csv filepath')
     pitch_list = pitch if isinstance(pitch, list | tuple) else [pitch]
     edema_list = list(range(*edema))  # IPH only
 
-    print(seed)
     if isinstance(seed, float):
         raise ValueError('seed cannot be float, set to False or integer')
     elif (not seed) & isinstance(seed, bool):  # check if seed is bool and False
