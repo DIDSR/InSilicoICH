@@ -352,7 +352,8 @@ class LesionPhantom(Phantom):
                          edema: bool | int = False,
                          complexity: int = 3,
                          overlap: float = 0.4,
-                         seed: int | None = None) -> tuple:
+                         seed: int | None = None,
+                         **kwargs) -> tuple:
         '''
         adds round lesion to img in random location within mask of size radius
         and intensity level intensity
