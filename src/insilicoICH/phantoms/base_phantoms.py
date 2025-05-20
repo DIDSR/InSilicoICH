@@ -212,7 +212,25 @@ class LesionPhantom(Phantom):
     '''
     A Phantom object with methods for inserting lesions.
     '''
-    lesion_types = ['IPH', 'SDH', 'EDH']
+    lesion_types = {'IPH': {
+        'volume': [0, 100],
+        'intensity': [-100, 100],
+        'mass_effect': [True, False],
+        'seed': None
+        },
+                    'SDH': {
+        'volume': [0, 100],
+        'intensity': [-100, 100],
+        'mass_effect': [True, False],
+        'seed': None
+        },
+                    'EDH': {
+        'volume': [0, 100],
+        'intensity': [-100, 100],
+        'mass_effect': [True, False],
+        'seed': None
+        }
+                    }
 
     def __init__(self, img: np.ndarray, spacings: tuple = (1, 1, 1), **kwargs):
         '''
