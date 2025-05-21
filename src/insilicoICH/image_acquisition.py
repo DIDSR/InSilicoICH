@@ -459,8 +459,6 @@ class Scanner():
             raise ValueError(f'{kernel} not in {self.kernels}')
         else:
             self.xcist.cfg.recon.kernelType = kernel
-        if sliceThickness:
-            self.xcist.recon.sliceThickness = sliceThickness
 
         if sliceIncrement:
             self.xcist.recon.sliceThickness = sliceIncrement  # XCIST is mislabeled, recon.sliceThickness gives slice s
