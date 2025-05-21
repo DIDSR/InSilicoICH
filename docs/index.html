@@ -20,6 +20,7 @@
     <ul class="tabs">
         <li content="description" class="active">Description</li>
         <li content="demo">Demo</li>
+        <li content="docs" class="active">Docs</li>
     </ul>
     <div class="content" content="description"></div>
     <div class="content" content="demo">
@@ -39,6 +40,18 @@
             </tfoot>
         </table>
     </div>
+
+    <div class="content" content="docs">
+        <div id="externalHtmlContent"></div>
+    </div>
+    
+    <script>
+        fetch('docs.html')
+            .then(response => response.text())
+            .then(html => {
+                document.getElementById('externalHtmlContent').innerHTML = html;
+            });
+    </script>
 </body>
 
 </html>

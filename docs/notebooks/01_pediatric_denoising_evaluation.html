@@ -1,0 +1,1771 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Evaluating Denoising Efficiency &#8212; pediatricIQphantoms 0.0.2 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d1102ebc" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=12dfc556" />
+    <link rel="stylesheet" type="text/css" href="../_static/tabs.css?v=a5c4661c" />
+    <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
+    <script src="../_static/documentation_options.js?v=e3a6060d"></script>
+    <script src="../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@jupyter-widgets/html-manager@^1.0.1/dist/embed-amd.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="API" href="../api.html" />
+    <link rel="prev" title="Running Simulations" href="00_running_simulations.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="Evaluating-Denoising-Efficiency">
+<h1>Evaluating Denoising Efficiency<a class="headerlink" href="#Evaluating-Denoising-Efficiency" title="Link to this heading">¶</a></h1>
+<section id="Introduction">
+<h2>Introduction<a class="headerlink" href="#Introduction" title="Link to this heading">¶</a></h2>
+<p>Simulated using MIRT as described in <a class="reference external" href="https://onlinelibrary.wiley.com/doi/abs/10.1002/mp.16901">Nelson et al., 2023</a> where the acquisition parameters are meant to simulate the Siemens Somatom Definition AS+, which is one of the scanners used in developing the <a class="reference external" href="https://aapm.onlinelibrary.wiley.com/doi/full/10.1002/mp.12345">Low Dose CT Grand Challenge Dataset</a>. However I still need to be careful that this is an approximation and there still may be mismatch between the real and simulated
+scans, though <a class="reference external" href="http://onlinelibrary.wiley.com/doi/abs/10.1002/mp.15430">Zeng et al., 2022</a> validated the simulations with physical scans based on MTF and NPS performance measures.</p>
+<p><strong>Question</strong>: Data augmentation is a common approach for dealing with limited datasets. Can data augmentation techniques be used to make up for limited pediatric data?</p>
+<p><strong>Hypothesis</strong>: Noise textures from pediatric-sized phantom scans can be used as an effective data augmentation to improve denoising model generalizability to pediatric patients.</p>
+<p><em>Purpose</em> to test our hypothesis that training with noise augmentation can improve performance in pediatric patients. This notebook presents the results in terms of denoising efficiency, which we define in two ways depending on the data available.</p>
+<p>If even that doesn’t exist you can select a region that is assumed to be uniform and compare measured standard deviation <span class="math notranslate nohighlight">\(\sigma\)</span> in the region:</p>
+<div class="math notranslate nohighlight">
+\[\sigma = \sqrt{\frac{1}{N} \sum_{i=1}^N (x_i' - \mu)^2},\text{ where } \mu = \frac{1}{N} \sum_{i=1}^N x'_i\]</div>
+<p>here we assume a uniform region such that that <span class="math notranslate nohighlight">\(\bar{x}\)</span> is assumed to be the true value for an unbiased measurement in a uniform region</p>
+<p>We can thus define noise reduction both in terms of noise std [HU] and RMSE as:</p>
+<div class="math notranslate nohighlight">
+\[\text{Noise Reduction} = 100\% \times \frac{(\text{FBP} - \text{denoised})}{\text{FBP}}\]</div>
+<p>Defining noise reduction relative to the original FBP noise level</p>
+</section>
+<section id="Noise-Reduction-in-Uniform-Phantoms">
+<h2>Noise Reduction in Uniform Phantoms<a class="headerlink" href="#Noise-Reduction-in-Uniform-Phantoms" title="Link to this heading">¶</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">seaborn</span> <span class="k">as</span> <span class="nn">sns</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">pydicom</span>
+<span class="kn">from</span> <span class="nn">torchvision.datasets.utils</span> <span class="kn">import</span> <span class="n">download_and_extract_archive</span>
+
+<span class="n">base_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s1">&#39;data&#39;</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="ow">not</span> <span class="n">base_dir</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+    <span class="n">url</span> <span class="o">=</span><span class="s1">&#39;https://zenodo.org/records/11267694/files/pediatricIQphantoms.zip&#39;</span>
+    <span class="n">download_and_extract_archive</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">download_root</span><span class="o">=</span><span class="n">base_dir</span><span class="p">)</span>
+<span class="n">base_dir</span> <span class="o">=</span> <span class="n">base_dir</span> <span class="o">/</span> <span class="s1">&#39;pediatricIQphantoms&#39;</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="o">!</span>ls<span class="w"> </span>data/pediatricIQphantoms/
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+CTP404  metadata.csv  MITA-LCD  uniform
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">base_dir</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+PosixPath(&#39;/home/brandon.nelson/Dev/Regulatory_Science_Tools/pediatricIQphantoms/examples/data/pediatricIQphantoms&#39;)
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">meta</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">base_dir</span> <span class="o">/</span> <span class="s1">&#39;metadata.csv&#39;</span><span class="p">)</span>
+<span class="n">meta</span> <span class="o">=</span> <span class="n">meta</span><span class="p">[</span><span class="n">meta</span><span class="o">.</span><span class="n">phantom</span> <span class="o">==</span> <span class="s1">&#39;uniform&#39;</span><span class="p">]</span>
+<span class="n">meta</span><span class="o">.</span><span class="n">file</span> <span class="o">=</span> <span class="n">meta</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">o</span><span class="p">:</span> <span class="n">base_dir</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span> <span class="o">/</span> <span class="n">o</span><span class="p">)</span>
+<span class="n">meta</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>Name</th>
+      <th>effective diameter [cm]</th>
+      <th>age [year]</th>
+      <th>pediatric subgroup</th>
+      <th>phantom</th>
+      <th>scanner</th>
+      <th>Dose [%]</th>
+      <th>recon</th>
+      <th>kernel</th>
+      <th>FOV [cm]</th>
+      <th>file</th>
+      <th>patientid</th>
+      <th>studyid</th>
+      <th>series</th>
+      <th>repeat</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>3544</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>3545</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>3546</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>2</td>
+    </tr>
+    <tr>
+      <th>3547</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>3</td>
+    </tr>
+    <tr>
+      <th>3548</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>4</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nb">sorted</span><span class="p">(</span><span class="n">meta</span><span class="p">[</span><span class="s1">&#39;FOV [cm]&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+[12.0, 14.0, 17.0, 20.0, 24.0, 32.0, 34.0, 39.0]
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">utils</span> <span class="kn">import</span> <span class="n">browse_studies</span><span class="p">,</span> <span class="n">study_viewer</span>
+<span class="n">browse_studies</span><span class="p">(</span><span class="n">meta</span><span class="p">,</span> <span class="n">phantom</span><span class="o">=</span><span class="s1">&#39;uniform&#39;</span><span class="p">,</span> <span class="n">fov</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">dose</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">recon</span><span class="o">=</span><span class="s1">&#39;fbp&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_01_pediatric_denoising_evaluation_8_0.png" src="../_images/notebooks_01_pediatric_denoising_evaluation_8_0.png" />
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">study_viewer</span><span class="p">(</span><span class="n">meta</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "244ff3ee71be44fb89000afca3a1591f", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+</section>
+<section id="Apply-a-denoiser">
+<h2>Apply a denoiser<a class="headerlink" href="#Apply-a-denoiser" title="Link to this heading">¶</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">denoising.networks</span> <span class="kn">import</span> <span class="n">RED_CNN</span>
+
+<span class="k">def</span> <span class="nf">read_dicom</span><span class="p">(</span><span class="n">dcm_file</span><span class="p">):</span>
+    <span class="n">dcm</span> <span class="o">=</span> <span class="n">pydicom</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="n">dcm_file</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">dcm</span><span class="o">.</span><span class="n">pixel_array</span> <span class="o">+</span> <span class="nb">float</span><span class="p">(</span><span class="n">dcm</span><span class="o">.</span><span class="n">RescaleIntercept</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">load_model</span><span class="p">(</span><span class="n">save_path</span><span class="p">,</span> <span class="n">iter_</span><span class="o">=</span><span class="mi">13000</span><span class="p">,</span> <span class="n">multi_gpu</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="n">REDCNN</span> <span class="o">=</span> <span class="n">RED_CNN</span><span class="p">()</span>
+    <span class="n">f</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">save_path</span><span class="p">,</span> <span class="s1">&#39;REDCNN_</span><span class="si">{}</span><span class="s1">iter.ckpt&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">iter_</span><span class="p">))</span>
+    <span class="n">REDCNN</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">REDCNN</span>
+
+<span class="n">denoising_model</span>  <span class="o">=</span> <span class="n">load_model</span><span class="p">(</span><span class="s1">&#39;denoising/models/redcnn&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">meta</span><span class="o">.</span><span class="n">studyid</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+array([64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80,
+       81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95])
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">vol</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">read_dicom</span><span class="p">(</span><span class="n">o</span><span class="p">)</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">meta</span><span class="p">[</span><span class="n">meta</span><span class="p">[</span><span class="s1">&#39;studyid&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">64</span><span class="p">]</span><span class="o">.</span><span class="n">file</span><span class="p">])</span>
+<span class="n">vol</span><span class="o">.</span><span class="n">shape</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+(200, 512, 512)
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span> <span class="k">else</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cpu&quot;</span><span class="p">)</span>
+
+<span class="n">denoising_model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+<span class="n">batch_size</span> <span class="o">=</span> <span class="mi">32</span> <span class="c1">#play around with an inference batch size that fits on your gpu</span>
+
+<span class="n">denoised</span> <span class="o">=</span> <span class="n">denoising_model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">batch_size</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+100%|█████████████████████████████████████████████████████████████████████████████████████| 7/7 [00:19&lt;00:00,  2.75s/it]
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">meta</span><span class="p">[(</span><span class="n">meta</span><span class="p">[</span><span class="s1">&#39;Dose [%]&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">25</span><span class="p">)]</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+</pre></div>
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>Name</th>
+      <th>effective diameter [cm]</th>
+      <th>age [year]</th>
+      <th>pediatric subgroup</th>
+      <th>phantom</th>
+      <th>scanner</th>
+      <th>Dose [%]</th>
+      <th>recon</th>
+      <th>kernel</th>
+      <th>FOV [cm]</th>
+      <th>file</th>
+      <th>patientid</th>
+      <th>studyid</th>
+      <th>series</th>
+      <th>repeat</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>3544</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>3545</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>3546</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>2</td>
+    </tr>
+    <tr>
+      <th>3547</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>3</td>
+    </tr>
+    <tr>
+      <th>3548</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>4</td>
+    </tr>
+    <tr>
+      <th>...</th>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+    </tr>
+    <tr>
+      <th>6553</th>
+      <td>35.0 cm uniform</td>
+      <td>35.0</td>
+      <td>39.000000</td>
+      <td>adult</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>39.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>23.0</td>
+      <td>92</td>
+      <td>simulation</td>
+      <td>195</td>
+    </tr>
+    <tr>
+      <th>6554</th>
+      <td>35.0 cm uniform</td>
+      <td>35.0</td>
+      <td>39.000000</td>
+      <td>adult</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>39.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>23.0</td>
+      <td>92</td>
+      <td>simulation</td>
+      <td>196</td>
+    </tr>
+    <tr>
+      <th>6555</th>
+      <td>35.0 cm uniform</td>
+      <td>35.0</td>
+      <td>39.000000</td>
+      <td>adult</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>39.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>23.0</td>
+      <td>92</td>
+      <td>simulation</td>
+      <td>197</td>
+    </tr>
+    <tr>
+      <th>6556</th>
+      <td>35.0 cm uniform</td>
+      <td>35.0</td>
+      <td>39.000000</td>
+      <td>adult</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>39.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>23.0</td>
+      <td>92</td>
+      <td>simulation</td>
+      <td>198</td>
+    </tr>
+    <tr>
+      <th>6557</th>
+      <td>35.0 cm uniform</td>
+      <td>35.0</td>
+      <td>39.000000</td>
+      <td>adult</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>39.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>23.0</td>
+      <td>92</td>
+      <td>simulation</td>
+      <td>199</td>
+    </tr>
+  </tbody>
+</table>
+<p>1600 rows × 15 columns</p>
+</div></div>
+</div>
+<p>metae you could just apply the denoiser to each row individually, that would not be an efficient use of the gpu which work well with mini batches (if using a gpu, if using cpu it shouldn’t matter)</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">count</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">studyids</span> <span class="o">=</span> <span class="n">meta</span><span class="p">[(</span><span class="n">meta</span><span class="p">[</span><span class="s1">&#39;Dose [%]&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">25</span><span class="p">)]</span><span class="o">.</span><span class="n">studyid</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
+<span class="k">for</span> <span class="n">study</span> <span class="ow">in</span> <span class="n">studyids</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;denoising batch: </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s1">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">studyids</span><span class="p">)</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">vol</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">read_dicom</span><span class="p">(</span><span class="n">o</span><span class="p">)</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">meta</span><span class="p">[</span><span class="n">meta</span><span class="p">[</span><span class="s1">&#39;studyid&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">study</span><span class="p">]</span><span class="o">.</span><span class="n">file</span><span class="p">])</span>
+    <span class="n">denoised</span> <span class="o">=</span> <span class="n">denoising_model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">batch_size</span><span class="p">)</span> <span class="c1"># replace with your own model here &lt;--</span>
+    <span class="c1"># save result</span>
+    <span class="n">slice_idx</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">meta</span><span class="p">[</span><span class="n">meta</span><span class="p">[</span><span class="s1">&#39;studyid&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">study</span><span class="p">]</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+        <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">row</span><span class="p">)</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+        <span class="n">new_row</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="n">dcm</span> <span class="o">=</span> <span class="n">pydicom</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">file</span><span class="p">)</span>
+        <span class="n">new_row</span><span class="o">.</span><span class="n">recon</span> <span class="o">=</span> <span class="s1">&#39;RED-CNN&#39;</span>
+        <span class="n">dcm</span><span class="o">.</span><span class="n">ConvolutionKernel</span> <span class="o">=</span> <span class="n">new_row</span><span class="o">.</span><span class="n">recon</span>
+        <span class="n">dcm</span><span class="o">.</span><span class="n">PixelData</span> <span class="o">=</span> <span class="n">denoised</span><span class="p">[</span><span class="n">slice_idx</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s1">&#39;int16&#39;</span><span class="p">)</span> <span class="o">-</span> <span class="nb">int</span><span class="p">(</span><span class="n">dcm</span><span class="o">.</span><span class="n">RescaleIntercept</span><span class="p">)</span>
+        <span class="n">slice_idx</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">save_file</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">file</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;fbp&#39;</span><span class="p">,</span> <span class="n">new_row</span><span class="o">.</span><span class="n">recon</span><span class="p">))</span>
+        <span class="n">save_file</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">pydicom</span><span class="o">.</span><span class="n">write_file</span><span class="p">(</span><span class="n">save_file</span><span class="p">,</span> <span class="n">dcm</span><span class="p">)</span>
+
+        <span class="n">new_row</span><span class="o">.</span><span class="n">file</span> <span class="o">=</span> <span class="n">save_file</span>
+        <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">new_row</span><span class="p">)</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+    <span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+denoising batch: 0/8
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+100%|█████████████████████████████████████████████████████████████████████████████████████| 7/7 [00:03&lt;00:00,  1.80it/s]
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+denoising batch: 1/8
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+100%|█████████████████████████████████████████████████████████████████████████████████████| 7/7 [00:03&lt;00:00,  1.79it/s]
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+denoising batch: 2/8
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+100%|█████████████████████████████████████████████████████████████████████████████████████| 7/7 [00:03&lt;00:00,  1.79it/s]
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+denoising batch: 3/8
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+100%|█████████████████████████████████████████████████████████████████████████████████████| 7/7 [00:03&lt;00:00,  1.80it/s]
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+denoising batch: 4/8
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+100%|█████████████████████████████████████████████████████████████████████████████████████| 7/7 [00:03&lt;00:00,  1.80it/s]
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+denoising batch: 5/8
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+100%|█████████████████████████████████████████████████████████████████████████████████████| 7/7 [00:03&lt;00:00,  1.80it/s]
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+denoising batch: 6/8
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+100%|█████████████████████████████████████████████████████████████████████████████████████| 7/7 [00:03&lt;00:00,  1.80it/s]
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+denoising batch: 7/8
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+100%|█████████████████████████████████████████████████████████████████████████████████████| 7/7 [00:03&lt;00:00,  1.80it/s]
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">results</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
+</pre></div>
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>Name</th>
+      <th>effective diameter [cm]</th>
+      <th>age [year]</th>
+      <th>pediatric subgroup</th>
+      <th>phantom</th>
+      <th>scanner</th>
+      <th>Dose [%]</th>
+      <th>recon</th>
+      <th>kernel</th>
+      <th>FOV [cm]</th>
+      <th>file</th>
+      <th>patientid</th>
+      <th>studyid</th>
+      <th>series</th>
+      <th>repeat</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>RED-CNN</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>RED-CNN</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>2</td>
+    </tr>
+    <tr>
+      <th>...</th>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+    </tr>
+    <tr>
+      <th>3195</th>
+      <td>35.0 cm uniform</td>
+      <td>35.0</td>
+      <td>39.0</td>
+      <td>adult</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>RED-CNN</td>
+      <td>D45</td>
+      <td>39.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>23.0</td>
+      <td>92</td>
+      <td>simulation</td>
+      <td>197</td>
+    </tr>
+    <tr>
+      <th>3196</th>
+      <td>35.0 cm uniform</td>
+      <td>35.0</td>
+      <td>39.0</td>
+      <td>adult</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>39.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>23.0</td>
+      <td>92</td>
+      <td>simulation</td>
+      <td>198</td>
+    </tr>
+    <tr>
+      <th>3197</th>
+      <td>35.0 cm uniform</td>
+      <td>35.0</td>
+      <td>39.0</td>
+      <td>adult</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>RED-CNN</td>
+      <td>D45</td>
+      <td>39.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>23.0</td>
+      <td>92</td>
+      <td>simulation</td>
+      <td>198</td>
+    </tr>
+    <tr>
+      <th>3198</th>
+      <td>35.0 cm uniform</td>
+      <td>35.0</td>
+      <td>39.0</td>
+      <td>adult</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>39.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>23.0</td>
+      <td>92</td>
+      <td>simulation</td>
+      <td>199</td>
+    </tr>
+    <tr>
+      <th>3199</th>
+      <td>35.0 cm uniform</td>
+      <td>35.0</td>
+      <td>39.0</td>
+      <td>adult</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>RED-CNN</td>
+      <td>D45</td>
+      <td>39.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>23.0</td>
+      <td>92</td>
+      <td>simulation</td>
+      <td>199</td>
+    </tr>
+  </tbody>
+</table>
+<p>3200 rows × 15 columns</p>
+</div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">browse_studies</span><span class="p">(</span><span class="n">results</span><span class="p">,</span> <span class="n">phantom</span><span class="o">=</span><span class="s1">&#39;uniform&#39;</span><span class="p">,</span> <span class="n">fov</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">dose</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span> <span class="n">recon</span><span class="o">=</span><span class="s1">&#39;RED-CNN&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_01_pediatric_denoising_evaluation_19_0.png" src="../_images/notebooks_01_pediatric_denoising_evaluation_19_0.png" />
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[16]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">study_viewer</span><span class="p">(</span><span class="n">results</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "f2feb4b5ef8e42e3b97db0cc2a617f10", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[17]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">utils</span> <span class="kn">import</span> <span class="n">make_montage</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">dpi</span><span class="o">=</span><span class="mi">300</span><span class="p">)</span>
+<span class="n">make_montage</span><span class="p">(</span><span class="n">results</span><span class="p">,</span> <span class="n">roi_diameter</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">fovs</span><span class="o">=</span><span class="p">[</span><span class="mi">12</span><span class="p">,</span> <span class="mi">24</span><span class="p">],</span> <span class="n">wwwl</span><span class="o">=</span><span class="p">(</span><span class="mi">150</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_01_pediatric_denoising_evaluation_21_0.png" src="../_images/notebooks_01_pediatric_denoising_evaluation_21_0.png" />
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">utils</span> <span class="kn">import</span> <span class="n">measure_roi_std</span>
+<span class="o">%</span><span class="k">timeit</span> measure_roi_std(results.file.iloc[1])
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+33.6 ms ± 3.09 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[19]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nb">len</span><span class="p">(</span><span class="n">results</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[19]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+3200
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[20]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="mi">31</span><span class="o">/</span><span class="mi">1000</span><span class="o">*</span><span class="mi">3200</span><span class="o">/</span><span class="mi">60</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[20]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+1.6533333333333333
+</pre></div></div>
+</div>
+<p>This takes about 1-2 min to make all of the noise measurements across 3200 images</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[21]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;noise std [HU]&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">measure_roi_std</span><span class="p">)</span>
+<span class="n">results</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[21]:
+</pre></div>
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>Name</th>
+      <th>effective diameter [cm]</th>
+      <th>age [year]</th>
+      <th>pediatric subgroup</th>
+      <th>phantom</th>
+      <th>scanner</th>
+      <th>Dose [%]</th>
+      <th>recon</th>
+      <th>kernel</th>
+      <th>FOV [cm]</th>
+      <th>file</th>
+      <th>patientid</th>
+      <th>studyid</th>
+      <th>series</th>
+      <th>repeat</th>
+      <th>noise std [HU]</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>0</td>
+      <td>47.516051</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>RED-CNN</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>0</td>
+      <td>29.654145</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>1</td>
+      <td>47.171546</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>RED-CNN</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>1</td>
+      <td>28.723187</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>2</td>
+      <td>48.069435</td>
+    </tr>
+    <tr>
+      <th>...</th>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+    </tr>
+    <tr>
+      <th>3195</th>
+      <td>35.0 cm uniform</td>
+      <td>35.0</td>
+      <td>39.0</td>
+      <td>adult</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>RED-CNN</td>
+      <td>D45</td>
+      <td>39.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>23.0</td>
+      <td>92</td>
+      <td>simulation</td>
+      <td>197</td>
+      <td>9.838235</td>
+    </tr>
+    <tr>
+      <th>3196</th>
+      <td>35.0 cm uniform</td>
+      <td>35.0</td>
+      <td>39.0</td>
+      <td>adult</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>39.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>23.0</td>
+      <td>92</td>
+      <td>simulation</td>
+      <td>198</td>
+      <td>45.688956</td>
+    </tr>
+    <tr>
+      <th>3197</th>
+      <td>35.0 cm uniform</td>
+      <td>35.0</td>
+      <td>39.0</td>
+      <td>adult</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>RED-CNN</td>
+      <td>D45</td>
+      <td>39.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>23.0</td>
+      <td>92</td>
+      <td>simulation</td>
+      <td>198</td>
+      <td>9.570121</td>
+    </tr>
+    <tr>
+      <th>3198</th>
+      <td>35.0 cm uniform</td>
+      <td>35.0</td>
+      <td>39.0</td>
+      <td>adult</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>39.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>23.0</td>
+      <td>92</td>
+      <td>simulation</td>
+      <td>199</td>
+      <td>45.712969</td>
+    </tr>
+    <tr>
+      <th>3199</th>
+      <td>35.0 cm uniform</td>
+      <td>35.0</td>
+      <td>39.0</td>
+      <td>adult</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>RED-CNN</td>
+      <td>D45</td>
+      <td>39.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>23.0</td>
+      <td>92</td>
+      <td>simulation</td>
+      <td>199</td>
+      <td>9.675194</td>
+    </tr>
+  </tbody>
+</table>
+<p>3200 rows × 16 columns</p>
+</div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[22]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">seaborn</span> <span class="k">as</span> <span class="nn">sns</span>
+<span class="n">sns</span><span class="o">.</span><span class="n">lineplot</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">results</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="s1">&#39;FOV [cm]&#39;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="s1">&#39;noise std [HU]&#39;</span><span class="p">,</span> <span class="n">hue</span><span class="o">=</span><span class="s1">&#39;recon&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[22]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+&lt;Axes: xlabel=&#39;FOV [cm]&#39;, ylabel=&#39;noise std [HU]&#39;&gt;
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_01_pediatric_denoising_evaluation_27_1.png" src="../_images/notebooks_01_pediatric_denoising_evaluation_27_1.png" />
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[23]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">utils</span> <span class="kn">import</span> <span class="n">calculate_noise_reduction</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[24]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">results</span> <span class="o">=</span> <span class="n">calculate_noise_reduction</span><span class="p">(</span><span class="n">results</span><span class="p">)</span>
+<span class="n">results</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[24]:
+</pre></div>
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>Name</th>
+      <th>effective diameter [cm]</th>
+      <th>age [year]</th>
+      <th>pediatric subgroup</th>
+      <th>phantom</th>
+      <th>scanner</th>
+      <th>Dose [%]</th>
+      <th>recon</th>
+      <th>kernel</th>
+      <th>FOV [cm]</th>
+      <th>file</th>
+      <th>patientid</th>
+      <th>studyid</th>
+      <th>series</th>
+      <th>repeat</th>
+      <th>noise std [HU]</th>
+      <th>noise std [HU] reduction [%]</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>0</td>
+      <td>47.516051</td>
+      <td>-0.389835</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>RED-CNN</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>0</td>
+      <td>29.654145</td>
+      <td>37.348020</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>1</td>
+      <td>47.171546</td>
+      <td>0.338020</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>RED-CNN</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>1</td>
+      <td>28.723187</td>
+      <td>39.314907</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>11.2 cm uniform</td>
+      <td>11.2</td>
+      <td>0.083333</td>
+      <td>newborn</td>
+      <td>uniform</td>
+      <td>Siemens Somatom Definition</td>
+      <td>25.0</td>
+      <td>fbp</td>
+      <td>D45</td>
+      <td>12.0</td>
+      <td>/home/brandon.nelson/Dev/Regulatory_Science_To...</td>
+      <td>16.0</td>
+      <td>64</td>
+      <td>simulation</td>
+      <td>2</td>
+      <td>48.069435</td>
+      <td>-1.559000</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[25]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sns</span><span class="o">.</span><span class="n">lineplot</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">results</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="s1">&#39;FOV [cm]&#39;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="s1">&#39;noise std [HU] reduction [%]&#39;</span><span class="p">,</span> <span class="n">hue</span><span class="o">=</span><span class="s1">&#39;recon&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[25]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+&lt;Axes: xlabel=&#39;FOV [cm]&#39;, ylabel=&#39;noise std [HU] reduction [%]&#39;&gt;
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_01_pediatric_denoising_evaluation_30_1.png" src="../_images/notebooks_01_pediatric_denoising_evaluation_30_1.png" />
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[26]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">&#39;Subgroup&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;Newborn&#39;</span><span class="p">,</span> <span class="s1">&#39;Infant&#39;</span><span class="p">,</span> <span class="s1">&#39;Child&#39;</span><span class="p">,</span> <span class="s1">&#39;Adolescent&#39;</span><span class="p">,</span> <span class="s1">&#39;Adult&#39;</span><span class="p">],</span>
+                   <span class="s1">&#39;Diameter [cm]&#39;</span><span class="p">:[</span><span class="mf">11.5</span><span class="p">,</span> <span class="mf">16.8</span><span class="p">,</span> <span class="mf">23.2</span><span class="p">,</span> <span class="mi">34</span><span class="p">,</span> <span class="mi">38</span><span class="p">],</span>
+                   <span class="s1">&#39;Age [yrs]&#39;</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">21</span><span class="p">,</span> <span class="mi">38</span><span class="p">]})</span>
+<span class="n">f</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mf">3.5</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">150</span><span class="p">)</span>
+<span class="n">df</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="s1">&#39;Subgroup&#39;</span><span class="p">,</span><span class="n">y</span><span class="o">=</span><span class="s1">&#39;Diameter [cm]&#39;</span><span class="p">,</span> <span class="n">table</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">legend</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">get_xaxis</span><span class="p">()</span><span class="o">.</span><span class="n">set_visible</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Mean Effective Diameter [cm]&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[26]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Text(0, 0.5, &#39;Mean Effective Diameter [cm]&#39;)
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_01_pediatric_denoising_evaluation_31_1.png" src="../_images/notebooks_01_pediatric_denoising_evaluation_31_1.png" />
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[28]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">f</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">()</span>
+<span class="n">sns</span><span class="o">.</span><span class="n">barplot</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">results</span><span class="p">[</span><span class="n">results</span><span class="o">.</span><span class="n">recon</span> <span class="o">!=</span> <span class="s1">&#39;fbp&#39;</span><span class="p">],</span> <span class="n">x</span><span class="o">=</span><span class="s1">&#39;pediatric subgroup&#39;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="s1">&#39;noise std [HU] reduction [%]&#39;</span><span class="p">,</span> <span class="n">hue</span><span class="o">=</span><span class="s1">&#39;recon&#39;</span><span class="p">,</span> <span class="n">capsize</span><span class="o">=</span><span class="mf">0.15</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+<span class="n">f</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="s1">&#39;../pediatric_subgroup_performance.png&#39;</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">300</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_01_pediatric_denoising_evaluation_32_0.png" src="../_images/notebooks_01_pediatric_denoising_evaluation_32_0.png" />
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">pediatricIQphantoms</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="00_running_simulations.html">Running Simulations</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Evaluating Denoising Efficiency</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#Introduction">Introduction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Noise-Reduction-in-Uniform-Phantoms">Noise Reduction in Uniform Phantoms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Apply-a-denoiser">Apply a denoiser</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq.html">Frequently Asked Questions</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="00_running_simulations.html" title="previous chapter">Running Simulations</a></li>
+      <li>Next: <a href="../api.html" title="next chapter">API</a></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2024, Brandon Nelson, Rongping Zeng.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 7.3.7</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      
+      |
+      <a href="../_sources/notebooks/01_pediatric_denoising_evaluation.ipynb.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
