@@ -488,7 +488,7 @@ class Scanner():
         self.nsims = 1
 
         recons = []
-        starts = np.arange(0, self.xcist.recon.sliceCount, sliceIncrement)
+        starts = np.arange(0, self.xcist.recon.sliceCount, sliceIncrement, dtype=int)
         for slab_start in starts:
             recons.append(self.recon[slab_start:slab_start+sliceThickness].mean(axis=0))
         self.recon = np.stack(recons)
