@@ -6,30 +6,28 @@ notebooks/__pycache__
 .pytest_cache
 notebooks/*/*.png
 .PedsilicoICH
-src/PedSilicoICH.egg-info
+.insilicoich
 build
 
 batchmode_CT_dataset_pipeline.sge
 run_batchmode.sh
-
+*.csv
 *.raw
 *.air
 *.offset
 *.dcm
-# metadata*
-*.nii
+metadata*
 *.prep
 *.scan
 **/phantoms/*/*.json
 notebooks/*.csv
-*.cfg
 __pycache__
-*.nii
 src/InSilicoICH.egg-info
 .env
 tests/*.png
 lesions.png
 *.log
+*.zip
 *.1*
 *.2*
 *.3*

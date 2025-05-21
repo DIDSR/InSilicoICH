@@ -21,11 +21,14 @@ def recruit_patients(output_directory, views=[1000], desired_cases=1,
                                      len(LESION_TYPES)*[[0.1, 60]])),
                      attenuation=dict(zip(LESION_TYPES,
                                       len(LESION_TYPES)*[[0, 90]])),
+                     scanner='Scanner_Default',
                      kVp=[120],
                      mA=[300],
+                     pitch=[0],
                      save_name=None,
                      kernel=['soft'],
                      slice_thickness=[1],
+                     slice_increment=[1],
                      keep_raw=False, seed=None):
 
     output_directory = Path(output_directory)
@@ -71,39 +74,46 @@ or csv filepath')
     ages = [yr for yr in possible_ages if (yr >= min(age)) & (yr <= max(age))]
     kVp_list = kVp if isinstance(kVp, list | tuple) else [kVp]
     mA_list = mA if isinstance(mA, list | tuple) else [mA]
+    pitch_list = pitch if isinstance(pitch, list | tuple) else [pitch]
     edema_list = list(range(*edema))  # IPH only
 
     if isinstance(seed, float):
         raise ValueError('seed cannot be float, set to False or integer')
     elif (not seed) & isinstance(seed, bool):  # check if seed is bool and False
         random = np.random.default_rng()
+        global_seed = random.integers(0, 1e6)
+        random = np.random.default_rng(global_seed)
     elif seed & isinstance(seed, bool):  # check if seed is bool and True
         raise ValueError('seed cannot be True, set to False or integer')
     elif isinstance(seed, int):  # if not True or False, check if int:
+        global_seed = seed
         random = np.random.default_rng(seed)
     else:
         raise ValueError('seed must be False or integer')
 
-    global_seed = random.integers(0, 1e6)
+    params = {
+        'CaseID': [],
+        'Age': [],
+        'Scanner': [],
+        'kVp': [],
+        'mA': [],
+        'Pitch': [],
+        'Views': [],
+        'ScanCoverage': [],
+        'ReconKernel': [],
+        'SliceThickness(mm)': [],
+        'SliceIncrement(mm)': [],
+        'LesionAttenuation(HU)': [],
+        'Subtype': [],
+        'LesionVolume(mL)': [],
+        'Edema': [],
+        'MassEffect': [],
+        'GlobalSeed': [],
+        'CaseSeed': [],
+        'OutputDirectory': []
+    }
 
-    params = dict(age=[],
-                  kVp=[],
-                  mA=[],
-                  views=[],
-                  zspan=[],
-                  kernel=[],
-                  slice_thickness=[],
-                  intensity=[],
-                  volume=[],
-                  edema=[],
-                  subtype=[],
-                  mass_effect=[],
-                  global_seed=[],
-                  case_seed=[],
-                  output_directory=[]
-                  )
-
-    for _ in range(desired_cases):
+    for i in range(desired_cases):
         lesion_id = random.choice(subtypes)  # select a random lesion type
         if lesion_id is None:
             vol = 0
@@ -128,7 +138,7 @@ or csv filepath')
         elif lesion_id == 'IPH':
             vol = random.choice(df_volume['IPH_volume'],
                                 p=df_volume['IPH_weight'])
-            while vol > 25:
+            while vol > 50:
                 vol = random.choice(df_volume['IPH_volume'],
                                     p=df_volume['IPH_weight'])
             intensity = 0
@@ -138,21 +148,30 @@ or csv filepath')
 
             edema = random.choice(edema_list)
 
-        params['age'].append(float(random.choice(ages)))
+        if i < 1000:
+            case_string = 'case_' + str(i).zfill(3)
+        else:
+            case_string = 'case_' + str(i)
+
+        params['CaseID'].append(case_string)
+        params['Age'].append(float(random.choice(ages)))
+        params['Scanner'].append(random.choice(scanner))
         params['kVp'].append(float(random.choice(kVp_list)))
         params['mA'].append(float(random.choice(mA_list)))
-        params['views'].append(float(random.choice(views)))
-        params['zspan'].append(zspan)
-        params['kernel'].append(random.choice(kernel))
-        params['slice_thickness'].append(random.choice(slice_thickness))
-        params['intensity'].append(float(intensity))
-        params['subtype'].append(lesion_id)
-        params['volume'].append(vol)
-        params['edema'].append(edema)
-        params['mass_effect'].append(mass_effect)
-        params['global_seed'].append(global_seed)
-        params['case_seed'].append(random.integers(0, 1e6))
-        params['output_directory'].append(output_directory)
+        params['Pitch'].append(float(random.choice(pitch_list)))
+        params['Views'].append(float(random.choice(views)))
+        params['ScanCoverage'].append(zspan)
+        params['ReconKernel'].append(random.choice(kernel))
+        params['SliceThickness(mm)'].append(random.choice(slice_thickness))
+        params['SliceIncrement(mm)'].append(random.choice(slice_increment))
+        params['LesionAttenuation(HU)'].append(float(intensity))
+        params['Subtype'].append(lesion_id)
+        params['LesionVolume(mL)'].append(vol)
+        params['Edema'].append(edema)
+        params['MassEffect'].append(mass_effect)
+        params['GlobalSeed'].append(global_seed)
+        params['CaseSeed'].append(random.integers(0, 1e6))
+        params['OutputDirectory'].append(output_directory)
 
     df = pd.DataFrame(params)
     save_name = save_name or output_directory / \

@@ -105,7 +105,8 @@ def test_lesion_characteristics(age=15.75, views=100,
 
         for intensity, volume in zip(intensities, volumes):
             print(f'{intensity} HU, {volume} mL')
-            phantom = load_phantom(age, name=lesion_type, shape=None)
+            phantom = load_phantom(age, shape=None)
+            phantom.patient_name = lesion_type
             phantom.insert_lesion(lesion_type=lesion_type, volume=volume,
                                   intensity=intensity,
                                   mass_effect=mass_effect, seed=336)
