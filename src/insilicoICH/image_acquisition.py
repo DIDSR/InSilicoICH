@@ -118,6 +118,9 @@ class Scanner():
     """
     A class to hold CT simulation data and run simulations
     """
+
+    kernels = ['standard', 'soft', 'bone', 'R-L', 'S-L']
+
     def __init__(self, phantom: Phantom, scanner_model: str = "Scanner_Default",
                  studyname: str = "default",
                  studyid: int = 0, seriesname: str = "default", seriesid=0,
@@ -439,7 +442,7 @@ class Scanner():
         projections = [self.xcist.cfg.resultsName]
         return projections
 
-    def run_recon(self, fov=None, sliceThickness=None, sliceCount=None,
+    def run_recon(self, fov=None, sliceThickness=None, sliceIncrement=None,
                   mu_water=None, kernel='standard'):
         '''
         perform reconstruction and save to .recon attribute
@@ -448,14 +451,23 @@ class Scanner():
             'R-L': Ramachandran-Lakshminarayanan (R-L) filter
             'S-L' for Shepp-Logan (S-L) filter
             See: https://github.com/xcist/main/blob/master/gecatsim/cfg/Recon_Default.cfg
+        :param sliceThickness: float, thickness in mm of slice nominal width of reconstructed image along the z axis
+        :param sliceIncrement: float, Distance [mm] between two consecutive reconstructed images
+
+        See https://www.aapm.org/pubs/ctprotocols/documents/ctterminologylexicon.pdf for further definitions of terms
         '''
-        defined_kernels = ['standard', 'soft', 'bone', 'R-L', 'S-L']
-        if kernel not in defined_kernels:
-            raise ValueError(f'{kernel} not in {defined_kernels}')
+
+        if kernel not in self.kernels:
+            raise ValueError(f'{kernel} not in {self.kernels}')
         else:
             self.xcist.cfg.recon.kernelType = kernel
-        if sliceThickness:
-            self.xcist.recon.sliceThickness = sliceThickness
+
+        sliceIncrement = sliceIncrement or sliceThickness
+
+        if sliceIncrement:
+            self.xcist.recon.sliceThickness = sliceIncrement
+            # XCIST is mislabeled, recon.sliceThickness gives slice increment
+
         if mu_water:
             self.xcist.cfg.recon.mu = mu_water
         else:
@@ -476,6 +488,17 @@ class Scanner():
         self.groundtruth = None
         self.I0 = self.xcist.cfg.protocol.mA
         self.nsims = 1
+
+        recons = []
+        sliceIncrement = int(sliceIncrement) if sliceIncrement else sliceThickness
+        sliceThickness = int(sliceThickness) if sliceThickness else sliceIncrement
+        if not (sliceIncrement or sliceThickness):
+            return self
+        starts = np.arange(0, self.xcist.recon.sliceCount, sliceIncrement, dtype=int)
+        for slab_start in starts:
+            recons.append(self.recon[slab_start:slab_start+sliceThickness].mean(axis=0))
+        self.recon = np.stack(recons)
+
         return self
 
     def axial_recon(self):

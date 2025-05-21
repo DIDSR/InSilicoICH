@@ -23,7 +23,7 @@ def get_effective_diameter(ground_truth_mu, pixel_width_mm):
     return 2*np.sqrt(A/np.pi)
 
 
-def scan_CTP404(test_dir, views=100):
+def scan_CTP404(test_dir, views=100, thickness=1, increment=1):
     result_dir = test_dir / 'test_result'
     if Path(result_dir).exists():
         rmtree(result_dir)
@@ -39,7 +39,7 @@ def scan_CTP404(test_dir, views=100):
     phantom = Phantom(img, spacings=[dz, dx, dy])
     ct = Scanner(phantom, output_dir=result_dir)
     ct.run_scan(views=views)
-    ct.run_recon(sliceThickness=6)
+    ct.run_recon(sliceThickness=thickness, sliceIncrement=increment)
     return ct
 
 
@@ -49,7 +49,7 @@ def test_scan_shape():
     '''
     views = 100
 
-    ct = scan_CTP404(test_dir, views)
+    ct = scan_CTP404(test_dir, views, increment=7)
     dcms = ct.write_to_dicom(ct.output_dir / 'test.dcm')
     dcms_in_dir = list(ct.output_dir.glob('*.dcm'))
     assert ct.recon.mean() > -800

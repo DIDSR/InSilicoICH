@@ -82,6 +82,7 @@ def insilicoich(input_csv, output_directory=None, keep_raw=False):
                           zspan=patient['ScanCoverage'],
                           kernel=patient['ReconKernel'],
                           slice_thickness=patient['SliceThickness(mm)'],
+                          slice_increment=patient['SliceIncrement(mm)'],
                           keep_raw=keep_raw,
                           edema=edema,
                           seed=seed)
