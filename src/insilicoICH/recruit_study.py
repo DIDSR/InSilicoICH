@@ -80,16 +80,18 @@ or csv filepath')
         raise ValueError('seed cannot be float, set to False or integer')
     elif (not seed) & isinstance(seed, bool):  # check if seed is bool and False
         random = np.random.default_rng()
+        global_seed = random.integers(0, 1e6)
+        random = np.random.default_rng(global_seed)
     elif seed & isinstance(seed, bool):  # check if seed is bool and True
         raise ValueError('seed cannot be True, set to False or integer')
     elif isinstance(seed, int):  # if not True or False, check if int:
+        global_seed = seed
         random = np.random.default_rng(seed)
     else:
         raise ValueError('seed must be False or integer')
 
-    global_seed = random.integers(0, 1e6)
-
     params = {
+        'CaseID': [],
         'Age': [],
         'Scanner': [],
         'kVp': [],
@@ -109,7 +111,7 @@ or csv filepath')
         'OutputDirectory': []
     }
 
-    for _ in range(desired_cases):
+    for i in range(desired_cases):
         lesion_id = random.choice(subtypes)  # select a random lesion type
         if lesion_id is None:
             vol = 0
@@ -134,7 +136,7 @@ or csv filepath')
         elif lesion_id == 'IPH':
             vol = random.choice(df_volume['IPH_volume'],
                                 p=df_volume['IPH_weight'])
-            while vol > 25:
+            while vol > 50:
                 vol = random.choice(df_volume['IPH_volume'],
                                     p=df_volume['IPH_weight'])
             intensity = 0
@@ -144,6 +146,12 @@ or csv filepath')
 
             edema = random.choice(edema_list)
 
+        if i < 1000:
+            case_string = 'case_' + str(i).zfill(3)
+        else:
+            case_string = 'case_' + str(i)
+
+        params['CaseID'].append(case_string)
         params['Age'].append(float(random.choice(ages)))
         params['Scanner'].append(random.choice(scanner))
         params['kVp'].append(float(random.choice(kVp_list)))
