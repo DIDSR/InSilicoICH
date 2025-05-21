@@ -451,8 +451,10 @@ class Scanner():
             'R-L': Ramachandran-Lakshminarayanan (R-L) filter
             'S-L' for Shepp-Logan (S-L) filter
             See: https://github.com/xcist/main/blob/master/gecatsim/cfg/Recon_Default.cfg
-        :param sliceThickness: float, thickness in mm of slice
-        :param sliceIncrement: float, spacing between center of slices in mm
+        :param sliceThickness: float, thickness in mm of slice nominal width of reconstructed image along the z axis
+        :param sliceIncrement: float, Distance [mm] between two consecutive reconstructed images
+
+        See https://www.aapm.org/pubs/ctprotocols/documents/ctterminologylexicon.pdf for further definitions of terms
         '''
 
         if kernel not in self.kernels:
@@ -460,11 +462,11 @@ class Scanner():
         else:
             self.xcist.cfg.recon.kernelType = kernel
 
+        sliceIncrement = sliceIncrement or sliceThickness
+
         if sliceIncrement:
-            self.xcist.recon.sliceThickness = sliceIncrement  # XCIST is mislabeled, recon.sliceThickness gives slice s
-        else:
-            sliceIncrement = self.xcist.recon.sliceThickness
-        sliceThickness = sliceThickness or sliceIncrement
+            self.xcist.recon.sliceThickness = sliceIncrement
+            # XCIST is mislabeled, recon.sliceThickness gives slice increment
 
         if mu_water:
             self.xcist.cfg.recon.mu = mu_water
@@ -489,7 +491,7 @@ class Scanner():
 
         recons = []
         sliceIncrement = int(sliceIncrement)
-        sliceThickness = int(sliceThickness)
+        sliceThickness = int(sliceThickness) if sliceThickness else sliceIncrement
         starts = np.arange(0, self.xcist.recon.sliceCount, sliceIncrement, dtype=int)
         for slab_start in starts:
             recons.append(self.recon[slab_start:slab_start+sliceThickness].mean(axis=0))

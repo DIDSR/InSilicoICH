@@ -131,9 +131,9 @@ class Study:
     def size(self):
         return np.array(self.phantom.spacings)*self.phantom._phantom.shape
 
-    def run_study(self, output_directory=None, kVp=120, mA=200, pitch=0, views=1000,
-                  fov=250, zspan='dynamic',
-                  kernel='standard', slice_thickness=1, **kwargs):
+    def run_study(self, output_directory=None, kVp=120, mA=200, pitch=0,
+                  views=1000, fov=250, zspan='dynamic', kernel='standard',
+                  slice_thickness=1, slice_increment=None, **kwargs):
         patient_name = self.phantom.patient_name
         age = self.phantom.age
         lesion_type = self.phantom.lesion_type if hasattr(self.phantom, 'lesion_type') else None
@@ -154,7 +154,9 @@ class Study:
         views = int(views)
         ct.run_scan(startZ=startZ, endZ=endZ, views=views,
                     mA=mA, kVp=kVp, pitch=pitch)
-        ct.run_recon(fov=fov, kernel=kernel, sliceThickness=slice_thickness)
+        ct.run_recon(fov=fov, kernel=kernel,
+                     sliceThickness=slice_thickness,
+                     sliceIncrement=slice_increment)
         self.scanner = ct
         self.images = ct.recon
         if output_directory is None:
@@ -266,7 +268,7 @@ def run_study(output_directory=None, patient_name=None, scanner_model='Scanner_D
               mA=200, pitch=0, intensity=200, volume=5, lesion_type=None,
               mass_effect=True, add_positioning_augmentation=True,
               views=1000, zspan='dynamic', kernel='standard',
-              slice_thickness=1, keep_raw=False, seed=None, **kwargs) -> Study:
+              slice_thickness=1, slice_increment=None, keep_raw=False, seed=None, **kwargs) -> Study:
 
     phantom = load_phantom(age)
     if patient_name:
@@ -294,7 +296,8 @@ def run_study(output_directory=None, patient_name=None, scanner_model='Scanner_D
     scanner = Scanner(phantom, scanner_model=scanner_model, output_dir=output_directory)
     study = Study(scanner, 'pilot')
     study.run_study(kVp=kVp, mA=mA, pitch=pitch, views=views, zspan=zspan,
-                    kernel=kernel, slice_thickness=slice_thickness)
+                    kernel=kernel, slice_thickness=slice_thickness,
+                    slice_increment=slice_increment)
     study.metadata['CaseSeed'] = seed
     if keep_raw is False:
         rmtree(study.scanner.output_dir / 'phantoms')

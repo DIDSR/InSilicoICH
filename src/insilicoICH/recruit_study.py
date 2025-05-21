@@ -28,6 +28,7 @@ def recruit_patients(output_directory, views=[1000], desired_cases=1,
                      save_name=None,
                      kernel=['soft'],
                      slice_thickness=[1],
+                     slice_increment=[1],
                      keep_raw=False, seed=None):
 
     output_directory = Path(output_directory)
@@ -101,6 +102,7 @@ or csv filepath')
         'ScanCoverage': [],
         'ReconKernel': [],
         'SliceThickness(mm)': [],
+        'SliceIncrement(mm)': [],
         'LesionAttenuation(HU)': [],
         'Subtype': [],
         'LesionVolume(mL)': [],
@@ -161,6 +163,7 @@ or csv filepath')
         params['ScanCoverage'].append(zspan)
         params['ReconKernel'].append(random.choice(kernel))
         params['SliceThickness(mm)'].append(random.choice(slice_thickness))
+        params['SliceIncrement(mm)'].append(random.choice(slice_increment))
         params['LesionAttenuation(HU)'].append(float(intensity))
         params['Subtype'].append(lesion_id)
         params['LesionVolume(mL)'].append(vol)
