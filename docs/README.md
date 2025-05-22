@@ -6,10 +6,11 @@ This repository contains tools for generating synthetic non contrast CT datasets
 
 - **Paper:**
 - **Data:**
-- **Code:** <https://github.com/DIDSR/PedSilicoICH>
+- **Code:** <https://github.com/DIDSR/InSilicoICH>
 - **Demo:** 
 
 ## Motivation
+
 
 To address data availability challenges, we propose to supplement available pediatric patient computed tomography (CT) datasets with data generated in silico, generated using realistic computational human models and physics-based CT simulations. In silico data generation allows for creating examples with true labels with a fraction of the cost that is needed to label real patient data.
 
