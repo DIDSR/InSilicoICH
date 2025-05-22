@@ -1,6 +1,6 @@
 [project]
 name = "InSilicoICH"
-version = "0.2.0"
+version = "0.3.0"
 authors = [
   {name="Brandon Nelson", email="brandon.nelson@fda.hhs.gov"},
   {name="Jayse M. Weaver", email="jayse.weaver@fda.hhs.gov"}

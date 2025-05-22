@@ -286,13 +286,14 @@ class Scanner():
                            img.shape[0]*self.phantom.spacings[0]/2,
                            self.start_positions[0]+self.total_scan_length,
                            self.start_positions[0]])
-        plt.hlines(y=start_positions[0],
+        plt.hlines(y=max(start_positions[0], -self.total_scan_length/2),
                    xmin=-img.shape[0]*self.phantom.spacings[0] / 2,
                    xmax=img.shape[0]*self.phantom.spacings[0]/2, color='red')
         plt.annotate('Stop', (0, start_positions[0]-10),
                      horizontalalignment='center')
 
-        plt.hlines(y=start_positions[-1] + self.nominal_aperature,
+        plt.hlines(y=min(start_positions[-1] + self.nominal_aperature,
+                         self.total_scan_length/2),
                    xmin=-img.shape[0]*self.phantom.spacings[0]/2,
                    xmax=img.shape[0]*self.phantom.spacings[0]/2, color='red')
         plt.annotate('Start', (0, start_positions[-1] + self.nominal_aperature + 10),
