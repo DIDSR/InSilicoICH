@@ -65,7 +65,7 @@ def insilicoich(input_csv, output_directory=None, keep_raw=False):
                 edema = None
                 volume = None
                 mass_effect = None
-        seed = int(patient['CaseSeed']) if not np.isnan(patient['CaseSeed']) else None 
+        seed = int(patient['CaseSeed']) if not np.isnan(patient['CaseSeed']) else None
         patient_name = f'case_{patientid:03}'
         study = run_study(output_directory,
                           patient_name,
@@ -98,7 +98,7 @@ def flatten_dict(layered_dict):
     return config
 
 
-def insilicoich_cli():
+def insilicoich_cli(arg_list: list[str] | None = None):
     parser = ArgumentParser(
         description='Runs XCIST CT simulations of ICH models',
         epilog='''
@@ -119,7 +119,7 @@ def insilicoich_cli():
                         truth phantoms, greatly increases
                         storage requirements.
                         ''')
-    args = parser.parse_args()
+    args = parser.parse_args(arg_list)
     if args.input_csv:
         input_csv = args.input_csv
     elif not sys.stdin.isatty():

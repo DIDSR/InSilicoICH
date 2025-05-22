@@ -15,8 +15,8 @@ import gecatsim as xc
 from monai.data import MetaTensor
 
 from gecatsim.reconstruction.pyfiles import recon
-from .ground_truth_definition.phantoms import (voxelize_ground_truth,
-                                               Phantom)
+from .phantoms.base_phantoms import (voxelize_ground_truth,
+                                     Phantom)
 
 install_path = Path(__file__).parent
 available_scanners = [o.name for o in install_path.glob('defaults/*')

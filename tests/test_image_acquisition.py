@@ -6,9 +6,10 @@ from shutil import rmtree
 
 import numpy as np
 
-from insilicoICH.ground_truth_definition.phantoms import Phantom
-from insilicoICH.ground_truth_definition.iq_phantoms import DensitometryPhantom
+from insilicoICH.phantoms.base_phantoms import Phantom
+from insilicoICH.study import Scanner, load_phantom
 from insilicoICH.image_acquisition import read_dicom, Scanner
+
 
 test_dir = Path(__file__).parent.absolute()
 
@@ -61,7 +62,7 @@ def test_scan_shape():
 
 
 def test_load_scanner_config():
-    phantom = DensitometryPhantom()
+    phantom = load_phantom(6.5)
     scanner = Scanner(phantom, 'Siemens_DefinitionFlash')
     original_sid = scanner.xcist.cfg.scanner.sid
     original_collimation = scanner.nominal_aperature
@@ -73,7 +74,7 @@ def test_load_scanner_config():
 
 
 def test_load_custom_scanner():
-    phantom = DensitometryPhantom()
+    phantom = load_phantom(6.5)
     custom_scanner = test_dir / 'Scanner_Test'
     scanner = Scanner(phantom, custom_scanner)
     assert scanner.xcist.cfg.scanner.sid == 42

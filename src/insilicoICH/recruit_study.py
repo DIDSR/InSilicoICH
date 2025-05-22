@@ -1,4 +1,5 @@
 # %%
+import sys
 from pathlib import Path
 from argparse import ArgumentParser
 
@@ -6,7 +7,7 @@ import tomllib
 import pandas as pd
 import numpy as np
 
-from insilicoICH.ground_truth_definition.phantoms import possible_ages
+from insilicoICH.phantoms.head_phantoms import possible_ages
 
 # Definitions: IPH/intraparenchymal , EDH/epidural, SDH/subdural
 LESION_TYPES = ['IPH', 'EDH', 'SDH'] 
@@ -187,7 +188,7 @@ def flatten_dict(layered_dict):
     return config
 
 
-def recruitment_cli():
+def recruitment_cli(arg_list: list[str] | None = None):
     parser = ArgumentParser(
         description='''Generates full patient list to conduct study from
           provided distributions.
@@ -222,7 +223,7 @@ def recruitment_cli():
                         storage requirements.
                         ''')
     parser.add_argument('--seed', type=int, help='seed to reproduce a dataset')
-    args = parser.parse_args()
+    args = parser.parse_args(arg_list)
     pkg_dir = Path(__file__).parent
     with open(pkg_dir / 'configs/default.toml', 'rb') as f:
         config = tomllib.load(f)
@@ -244,4 +245,4 @@ def recruitment_cli():
 
 
 if __name__ == '__main__':
-    recruitment_cli()
+    recruitment_cli(sys.argv[1:])
