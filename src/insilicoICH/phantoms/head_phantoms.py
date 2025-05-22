@@ -102,7 +102,7 @@ class HeadPhantom(LesionPhantom):
 
 class MIDA_Head(HeadPhantom):
     name = 'MIDA Head'
-    ages = [38]  # add 38 as the median US adult age to represent MIDA, consider
+    ages = [38.0]  # add 38 as the median US adult age to represent MIDA, consider
 #  other identifiers when adding more patients
 
     def __init__(self, phantom_dir, shape=None, age=None):
