@@ -495,7 +495,8 @@ class Scanner():
         sliceThickness = int(sliceThickness) if sliceThickness else sliceIncrement
         if not (sliceIncrement or sliceThickness):
             return self
-        starts = np.arange(0, self.xcist.recon.sliceCount, sliceIncrement, dtype=int)
+        n_slices = self.xcist.recon.sliceCount*len(self._projections)
+        starts = np.arange(0, n_slices, sliceIncrement, dtype=int)
         for slab_start in starts:
             recons.append(self.recon[slab_start:slab_start+sliceThickness].mean(axis=0))
         self.recon = np.stack(recons)

@@ -71,5 +71,3 @@ def test_subdural_augmented_position_study():
                     views=100)
     measured_lesion_signal = study.images[study.lesion.astype(bool)].mean()
     assert measured_lesion_signal > 21
-
-test_epidural_augmented_position_study()

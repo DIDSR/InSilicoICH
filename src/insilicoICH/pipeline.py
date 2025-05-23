@@ -28,8 +28,6 @@ import numpy as np
 
 from insilicoICH.study import run_study
 
-LESION_TYPES = ['IPH', 'EDH', 'SDH']
-
 
 def insilicoich(input_csv, output_directory=None, keep_raw=False):
 
