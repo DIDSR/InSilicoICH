@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from insilicoICH.image_acquisition import read_dicom
+from VITools import read_dicom
 from insilicoICH.phantoms.base_phantoms import get_transformation_src_dst
 from insilicoICH.lesion_definition import warp_slice
 

@@ -9,39 +9,16 @@ from shutil import rmtree
 import numpy as np
 import ast
 import pydicom
-import pandas as pd
 import SimpleITK as sitk
+import pandas as pd
 from scipy.ndimage import center_of_mass
 from monai.transforms import RandAffine
 
-from .image_acquisition import Scanner, read_dicom
-from .phantoms.base_phantoms import Phantom
-
-import pluggy
-from . import hooks  # Your hooks.py
-
-
-def get_phantoms_dict():
-    pm = pluggy.PluginManager(hooks.PROJECT_NAME)
-    pm.add_hookspecs(hooks.PhantomSpecs)
-    num_loaded = pm.load_setuptools_entrypoints(group=hooks.PROJECT_NAME)
-
-    # --- Call the hook to get all registered phantom types ---
-    # The hook returns a list of lists (one list per plugin implementation that returned something)
-    list_of_results = pm.hook.register_phantom_types()
-    # Flatten the list of lists and filter out None or empty lists from plugins
-    discovered_phantom_classes = {}
-    for result_list in list_of_results:
-        if result_list:  # Check if the plugin returned a non-empty list
-            discovered_phantom_classes.update(result_list)
-    return discovered_phantom_classes
+from VITools import Scanner, read_dicom, get_available_phantoms, Phantom
 
 
 def load_vol(file_list):
     return np.stack(list(map(read_dicom, file_list)))
-
-
-available_phantoms = get_phantoms_dict()
 
 
 def load_phantom(name='Densitometry Phantom', shape=None):
@@ -53,7 +30,7 @@ def load_phantom(name='Densitometry Phantom', shape=None):
     :param shape: shape of that the ground truth phantom will be interpolated
     :param name: patient name to be saved in DICOM header
     '''
-
+    available_phantoms = get_available_phantoms()
     matrix_size = max(shape) if shape else 400
     if name in available_phantoms:
         phantom_cls = available_phantoms[name]
@@ -248,7 +225,6 @@ def run_study(output_directory=None, patient_name=None, scanner_model='Scanner_D
     phantom = load_phantom(age)
     if patient_name:
         phantom.patient_name = patient_name
-
     if lesion_type and (volume > 0) and hasattr(phantom, 'insert_lesion'):
         phantom.insert_lesion(lesion_type,
                               volume=volume,

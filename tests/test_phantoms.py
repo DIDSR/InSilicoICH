@@ -9,8 +9,10 @@ from dotenv import load_dotenv
 from monai.transforms import RandAffine
 import numpy as np
 
+from VITools import get_available_phantoms
+
 from insilicoICH.phantoms.utils import download_and_extract_archive
-from insilicoICH import load_phantom, available_phantoms
+from insilicoICH import load_phantom
 from insilicoICH.phantoms.head_phantoms import MIDA_Head
 
 unc_ages = [0, 1.0, 2.0]
@@ -128,6 +130,7 @@ def test_load_phantoms():
     '''
     tests that all phantoms load successfully
     '''
+    available_phantoms = get_available_phantoms()
     for name, phantom_class in available_phantoms.items():
         if isinstance(phantom_class, partial) and issubclass(phantom_class.func,
                                                              MIDA_Head):

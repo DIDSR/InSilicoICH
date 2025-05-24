@@ -7,7 +7,7 @@ from monai.transforms import RandAffine
 
 from insilicoICH.study import Study
 from insilicoICH import load_phantom
-from insilicoICH import Scanner
+from VITools import Scanner
 
 age = 6.5
 transform = RandAffine(prob=0.5,

@@ -1,9 +1,12 @@
 from shutil import rmtree
+from pathlib import Path
+
 import pandas as pd
-from test_image_acquisition import test_dir
 
 from insilicoICH.recruit_study import recruitment_cli
 from insilicoICH.pipeline import insilicoich_cli
+
+test_dir = Path(__file__).parent.absolute()
 
 
 def test_cli():
