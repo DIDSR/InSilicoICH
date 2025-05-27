@@ -7,7 +7,7 @@ from monai.transforms import RandAffine
 
 from insilicoICH.study import Study
 from insilicoICH import load_phantom
-from insilicoICH import Scanner
+from VITools import Scanner
 
 age = 6.5
 transform = RandAffine(prob=0.5,
@@ -71,3 +71,21 @@ def test_subdural_augmented_position_study():
                     views=100)
     measured_lesion_signal = study.images[study.lesion.astype(bool)].mean()
     assert measured_lesion_signal > 21
+
+
+def test_recon_length():
+    phantom = load_phantom(age, shape=shape)
+    scanner = Scanner(phantom)
+
+    center = 0
+    width = scanner.nominal_aperature
+    study = Study(scanner, 'test')
+    study.run_study('test', zspan=(center-width//2, center+width//2),
+                    views=10)
+    assert len(study.images) == 7
+
+    width = 2*scanner.nominal_aperature
+    study = Study(scanner, 'test')
+    study.run_study('test', zspan=(center-width//2, center+width//2),
+                    views=10)
+    assert len(study.images) == 14

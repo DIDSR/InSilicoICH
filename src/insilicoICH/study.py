@@ -6,60 +6,22 @@ ct_simulation function.
 import os
 from pathlib import Path
 from shutil import rmtree
-from warnings import warn
 import numpy as np
 import ast
 import pydicom
-import pandas as pd
 import SimpleITK as sitk
-from dotenv import load_dotenv
+import pandas as pd
 from scipy.ndimage import center_of_mass
 from monai.transforms import RandAffine
 
-from .image_acquisition import Scanner, read_dicom
-from .ground_truth_definition.phantoms import (UNC_Head,
-                                               NIHPD_Head,
-                                               MIDA_Head,
-                                               Phantom,
-                                               possible_ages)
-from .ground_truth_definition import iq_phantoms
-
-
-load_dotenv()
-if 'PHANTOM_DIRECTORY' in os.environ:
-    phantom_dir = Path(os.environ['PHANTOM_DIRECTORY'])
-else:
-    phantom_dir = Path(__file__).parents[2]
-    warn(f'''
-The environment variable `PHANTOM_DIRECTORY` has not been set, this is needed
-to locate stored base phantom files for the NIHPD and MIDA head phantoms.
-
-If these phantom files cannot be located, NIHPD phantoms will be downloaded to
-your working directory: {phantom_dir}
-
-MIDA phantom files need to be downloaded manually and added to this directory,
-see `MIDA_Head_Phantom` for details.
-
-Please do one of the following:
-
-1. create a file called `.env` in this project's working directory and add:
-
-`PHANTOM_DIRECTORY=/path/to/phantoms`
-
-or
-
-2. in your terminal `export PHANTOM_DIRECTORY=/path/to_phantoms`
-''')
+from VITools import Scanner, read_dicom, get_available_phantoms, Phantom
 
 
 def load_vol(file_list):
     return np.stack(list(map(read_dicom, file_list)))
 
 
-available_phantoms = possible_ages + [o for o in dir(iq_phantoms) if (not o.startswith('__')) and o not in ['np', 'create_circle_phantom', 'Phantom', 'create_resolution_phantom', 'create_ct_phantom_with_bars']]
-
-
-def load_phantom(name='DensitometryPhantom', shape=None):
+def load_phantom(name='Densitometry Phantom', shape=None):
     '''
     Loads appropriate phantom based on age as a keyword
 
@@ -68,34 +30,24 @@ def load_phantom(name='DensitometryPhantom', shape=None):
     :param shape: shape of that the ground truth phantom will be interpolated
     :param name: patient name to be saved in DICOM header
     '''
-
+    available_phantoms = get_available_phantoms()
     matrix_size = max(shape) if shape else 400
-    mida_age = 38
-
-    if name == mida_age:
-        phantom = MIDA_Head(phantom_dir / 'MIDA_Head_Phantom',
-                            shape=shape)
-    elif name == 'WirePhantom':
-        phantom = iq_phantoms.WirePhantom(matrix_size=matrix_size)
-    elif name == 'DensitometryPhantom':
-        phantom = iq_phantoms.DensitometryPhantom(matrix_size=matrix_size)
-    elif name == 'LowContrastDetectabilityPhantom':
-        phantom = iq_phantoms.LowContrastDetectabilityPhantom(matrix_size=matrix_size)
-    elif name == 'ACRPhantom':
-        phantom = iq_phantoms.ACRPhantom(matrix_size=matrix_size)
+    if name in available_phantoms:
+        phantom_cls = available_phantoms[name]
+        if name.endswith('Head'):  # add UNC, NIHPD to phantomdir
+            phantom = phantom_cls(shape=shape)
+        else:
+            phantom = phantom_cls(matrix_size=matrix_size)
     elif isinstance(name, str) and Path(name).exists():
         img = sitk.ReadImage(name)
         phantom = Phantom(sitk.GetArrayFromImage(img),
                           spacings=img.GetSpacing()[::-1])
     elif isinstance(name, float | int):
-        name = float(name)
-        if name in [0.0, 1.0, 2.0]:
-            phantom = UNC_Head(phantom_dir / 'UNC_Head_phantom', age=name, shape=shape)
-        else:
-            phantom = NIHPD_Head(phantom_dir / 'NIHPD_Head_Phantom',
-                                 age=name, shape=shape)
+        name = [o for o in available_phantoms.keys() if o.startswith(str(name))][0]
+        phantom_cls = available_phantoms[name]
+        phantom = phantom_cls(shape=shape)
     else:
-        raise ValueError(f'{name} is not in {available_phantoms} nor is it a path')
+        raise ValueError(f'{name} is not in {list(available_phantoms.keys())} nor is it a path')
     return phantom
 
 
@@ -273,7 +225,6 @@ def run_study(output_directory=None, patient_name=None, scanner_model='Scanner_D
     phantom = load_phantom(age)
     if patient_name:
         phantom.patient_name = patient_name
-
     if lesion_type and (volume > 0) and hasattr(phantom, 'insert_lesion'):
         phantom.insert_lesion(lesion_type,
                               volume=volume,

@@ -55,7 +55,7 @@ def ctshow(img, window='soft tissues', fig=None, ax=None):
 # %%
 possible_ages
 # %% lesions
-lesion_types = [None, 'EDH', 'SDH', 'IPH']
+lesion_types = [None, 'epidural', 'subdural', 'round']
 mass_effect = True
 intensities = np.linspace(0, 100)
 seed = None
@@ -66,7 +66,7 @@ rng = np.random.default_rng(seed=seed)
 while len(lesions) < max_lesions:
     lesion = dict()
     lesion_type = rng.choice(lesion_types, size=1)[0]
-    if lesion_type == 'IPH':
+    if lesion_type == 'round':
         lesion['volume'] = rng.choice(np.linspace(0.1, 7.6),
                                       size=1)[0]
     else:
@@ -148,7 +148,7 @@ while not desired_counts_reached:
         # update metadata
         results['uid'].append(uid)
         results['age_yrs'].append(age)
-        if lesion['lesion_type'] == 'IPH':
+        if lesion['lesion_type'] == 'round':
             results['lesion_type'].append('intraparenchymal')
         else:
             results['lesion_type'].append(lesion['lesion_type'])
@@ -164,11 +164,11 @@ while not desired_counts_reached:
         results['seed'].append(scan_seed)
         pd.DataFrame(results).to_csv(outdir.parent / 'metadata.csv',
                                      index=False)
-        if lesion['lesion_type'] == 'IPH':
+        if lesion['lesion_type'] == 'round':
             n_iph += 1
-        elif lesion['lesion_type'] == 'EDH':
+        elif lesion['lesion_type'] == 'epidural':
             n_edh += 1
-        elif lesion['lesion_type'] == 'SDH':
+        elif lesion['lesion_type'] == 'subdural':
             n_sdh += 1
         elif lesion['lesion_type'] is None:
             n_control += 1

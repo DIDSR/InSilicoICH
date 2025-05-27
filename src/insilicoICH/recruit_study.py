@@ -1,4 +1,5 @@
 # %%
+import sys
 from pathlib import Path
 from argparse import ArgumentParser
 
@@ -6,30 +7,40 @@ import tomllib
 import pandas as pd
 import numpy as np
 
-from insilicoICH.ground_truth_definition.phantoms import possible_ages
+from insilicoICH.phantoms.head_phantoms import possible_ages
 
 # Definitions: IPH/intraparenchymal , EDH/epidural, SDH/subdural
 LESION_TYPES = ['IPH', 'EDH', 'SDH'] 
 
 
-def recruit_patients(output_directory, views=[1000], desired_cases=1,
-                     zspan='dynamic', age=[0, 100],
-                     subtypes=[None] + LESION_TYPES,
-                     mass_effect=True,
-                     edema=[0, 15],
-                     volume=dict(zip(LESION_TYPES,
-                                     len(LESION_TYPES)*[[0.1, 60]])),
-                     attenuation=dict(zip(LESION_TYPES,
-                                      len(LESION_TYPES)*[[0, 90]])),
-                     scanner='Scanner_Default',
-                     kVp=[120],
-                     mA=[300],
-                     pitch=[0],
-                     save_name=None,
-                     kernel=['soft'],
-                     slice_thickness=[1],
-                     slice_increment=[1],
-                     keep_raw=False, seed=None):
+def recruit_patients(output_directory, *args, save_name=None, **kwargs):
+    input_df = generate_input_df(*args, **kwargs)
+    save_name = save_name or output_directory / \
+        (output_directory.name + '.csv')
+    save_name.parent.mkdir(exist_ok=True, parents=True)
+    print(save_name)
+    input_df.to_csv(save_name, index=False)
+    return save_name
+
+
+def generate_input_df(output_directory='results', views=[1000], desired_cases=1,
+                      zspan='dynamic', age=[0, 100],
+                      subtypes=[None] + LESION_TYPES,
+                      mass_effect=True,
+                      edema=[0, 15],
+                      volume=dict(zip(LESION_TYPES,
+                                      len(LESION_TYPES)*[[0.1, 60]])),
+                      attenuation=dict(zip(LESION_TYPES,
+                                       len(LESION_TYPES)*[[0, 90]])),
+                      scanner=['Scanner_Default'],
+                      kVp=[120],
+                      mA=[300],
+                      pitch=[0],
+                      save_name=None,
+                      kernel=['soft'],
+                      slice_thickness=[1],
+                      slice_increment=[1],
+                      keep_raw=False, seed=None):
 
     output_directory = Path(output_directory)
     assert (zspan == 'dynamic') or isinstance(zspan, list)
@@ -41,10 +52,9 @@ def recruit_patients(output_directory, views=[1000], desired_cases=1,
         for o in zspan:
             assert isinstance(o, int | float)
     if isinstance(volume, dict):
-        df_volume = pd.DataFrame(volume).rename({'subdural': 'SDH_weight',
-                                                 'epidural': 'EDH_weight',
-                                                 'round': 'IPH_weight'},
-                                                axis='columns')
+        temp_volume = pd.DataFrame({f'{name}_volume': np.linspace(min_max[0], min_max[1]) for name, min_max in volume.items()})
+        temp_weight = pd.DataFrame({f'{name}_weight': len(temp_volume)*[1/len(temp_volume)] for name in volume})
+        df_volume = pd.concat([temp_volume, temp_weight], axis=1)
     elif isinstance(volume, str | Path):
         df_volume = pd.read_csv(volume)
         df_volume['EDH_weight'] /= df_volume['EDH_weight'].sum()
@@ -55,10 +65,9 @@ def recruit_patients(output_directory, views=[1000], desired_cases=1,
 or csv filepath')
 
     if isinstance(attenuation, dict):
-        df_volume = pd.DataFrame(volume).rename({'subdural': 'SDH_weight',
-                                                 'epidural': 'EDH_weight',
-                                                 'round': 'IPH_weight'},
-                                                axis='columns')
+        temp_atten = pd.DataFrame({f'{name}_HU': np.linspace(min_max[0], min_max[1]) for name, min_max in attenuation.items()})
+        temp_weight = pd.DataFrame({f'{name}_weight': len(temp_atten)*[1/len(temp_volume)] for name in attenuation})
+        df_HU = pd.concat([temp_atten, temp_weight], axis=1)
     elif isinstance(attenuation, str | Path):
         df_HU = pd.read_csv(attenuation).rename({'subdural': 'SDH_weight',
                                                  'epidural': 'EDH_weight',
@@ -79,11 +88,11 @@ or csv filepath')
 
     if isinstance(seed, float):
         raise ValueError('seed cannot be float, set to False or integer')
-    elif (not seed) & isinstance(seed, bool):  # check if seed is bool and False
+    elif not seed:  # check if seed is bool and False
         random = np.random.default_rng()
         global_seed = random.integers(0, 1e6)
         random = np.random.default_rng(global_seed)
-    elif seed & isinstance(seed, bool):  # check if seed is bool and True
+    elif seed is True:  # check if seed is bool and True
         raise ValueError('seed cannot be True, set to False or integer')
     elif isinstance(seed, int):  # if not True or False, check if int:
         global_seed = seed
@@ -173,12 +182,7 @@ or csv filepath')
         params['CaseSeed'].append(random.integers(0, 1e6))
         params['OutputDirectory'].append(output_directory)
 
-    df = pd.DataFrame(params)
-    save_name = save_name or output_directory / \
-        (output_directory.name + '.csv')
-    save_name.parent.mkdir(exist_ok=True, parents=True)
-    print(save_name)
-    df.to_csv(save_name, index=False)
+    return pd.DataFrame(params)
 
 
 def flatten_dict(layered_dict):
@@ -187,7 +191,7 @@ def flatten_dict(layered_dict):
     return config
 
 
-def recruitment_cli():
+def recruitment_cli(arg_list: list[str] | None = None):
     parser = ArgumentParser(
         description='''Generates full patient list to conduct study from
           provided distributions.
@@ -222,7 +226,7 @@ def recruitment_cli():
                         storage requirements.
                         ''')
     parser.add_argument('--seed', type=int, help='seed to reproduce a dataset')
-    args = parser.parse_args()
+    args = parser.parse_args(arg_list)
     pkg_dir = Path(__file__).parent
     with open(pkg_dir / 'configs/default.toml', 'rb') as f:
         config = tomllib.load(f)
@@ -244,4 +248,4 @@ def recruitment_cli():
 
 
 if __name__ == '__main__':
-    recruitment_cli()
+    recruitment_cli(sys.argv[1:])
