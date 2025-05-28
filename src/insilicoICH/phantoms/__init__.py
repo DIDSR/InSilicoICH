@@ -1,1 +1,1 @@
-from . import base_phantoms, dicom_to_voxelized_phantom, utils
+from . import base_phantoms, utils

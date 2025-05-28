@@ -14,12 +14,10 @@ dependencies = [
   "scikit-image",
   "scipy",
   "monai==1.3.2",
-  "pandas",
   "SimpleITK",
   "pydicom",
-  "pytest",
   "requests",
-  "gecatsim @ git+https://github.com/xcist/main.git"
+  "VITools @ git+https://github.com/DIDSR/VITools.git"
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -42,5 +40,5 @@ generate = "insilicoICH.pipeline:insilicoich_cli"
 insilicoich = "insilicoICH.pipeline:insilicoich_cli" # keeping for now for backwards compatibility
 recruit = "insilicoICH.recruit_study:recruitment_cli"
 
-[project.entry-points."insilicoich"] # Must match PROJECT_NAME
+[project.entry-points."VITools"] # Must match PROJECT_NAME
 head_phantoms = "insilicoICH.phantoms.head_phantoms"

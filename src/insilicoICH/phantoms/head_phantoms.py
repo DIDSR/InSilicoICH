@@ -24,7 +24,7 @@ from scipy.ndimage import distance_transform_edt
 
 from .base_phantoms import LesionPhantom, resize, get_mean_age, get_transformation_src_dst
 from .utils import download_and_extract_archive
-from ..hooks import hookimpl
+from VITools.hooks import hookimpl
 
 
 load_dotenv()
