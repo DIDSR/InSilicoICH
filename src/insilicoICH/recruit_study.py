@@ -14,6 +14,7 @@ LESION_TYPES = ['IPH', 'EDH', 'SDH']
 
 
 def recruit_patients(output_directory, *args, save_name=None, **kwargs):
+    output_directory = Path(output_directory)
     input_df = generate_input_df(*args, **kwargs)
     save_name = save_name or output_directory / \
         (output_directory.name + '.csv')
