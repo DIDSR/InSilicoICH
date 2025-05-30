@@ -214,7 +214,7 @@ class SkullProcess(Skull):
         )
 
         # Allow some duplicates for better continuity
-        continuity_factor = .8
+        continuity_factor = 0.8
         delta_shift_degree_phi *= continuity_factor
         delta_shift_degree_theta *= continuity_factor
 
@@ -238,13 +238,18 @@ class SkullProcess(Skull):
             list_start.append(self.skull_center)
             list_direction.append(np.multiply(direction, 100))
 
-            if switch_counter % list_reset_counter_wait[list_reset_counter_wait_index] == 0:
-                list_reset_counter_wait_index = random.randint(0, len(list_reset_counter_wait) - 1)
+            if (
+                switch_counter % list_reset_counter_wait[list_reset_counter_wait_index]
+                == 0
+            ):
+                list_reset_counter_wait_index = random.randint(
+                    0, len(list_reset_counter_wait) - 1
+                )
                 switch_counter = 1
                 pointer = list_switch[random.randint(0, len(list_switch) - 1)]
 
             switch_counter += 1
-            
+
             if pointer == 0:
                 phi_degree += delta_shift_degree_phi * random.choice([-1, 1])
             elif pointer == 1:
