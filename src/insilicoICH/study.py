@@ -14,7 +14,7 @@ import pandas as pd
 from scipy.ndimage import center_of_mass
 from monai.transforms import RandAffine
 
-from VITools import Scanner, read_dicom, get_available_phantoms, Phantom
+from VITools import Phantom, Scanner, Study, get_available_phantoms 
 
 
 def load_vol(file_list):
@@ -50,42 +50,124 @@ def load_phantom(name='Densitometry Phantom', shape=None):
         raise ValueError(f'{name} is not in {list(available_phantoms.keys())} nor is it a path')
     return phantom
 
+LESION_TYPES = ['IPH', 'EDH', 'SDH'] 
 
-class Study:
-    def __init__(self, scanner: Scanner, study_name='default'):
-        self.scanner = scanner
-        self.phantom = scanner.phantom
-        self.study_name = study_name
-        self.metadata = None
 
-    def __repr__(self) -> str:
-        repr = f'''
-        study name: {self.study_name}
-        Phantom details:
-        ----------------
-        {self.scanner.phantom.__repr__()}
+class ICHStudy(Study):
 
-        Scanner details:
-        ----------------
-        Scanner: {self.scanner.__repr__()}
+    def generate_from_distributions(*args,
+                                    StudyCount: int = 1,
+                                    Subtype: list[str] = [None] + LESION_TYPES,
+                                    LesionVolume=dict(zip(LESION_TYPES,
+                                      len(LESION_TYPES)*[[0.1, 60]])),
+                                    LesionAttenuation=dict(zip(LESION_TYPES,
+                                       len(LESION_TYPES)*[[0, 90]])),
+                                    Edema=[0, 15],
+                                    MassEffect=True,
+                                    **kwargs):
+        
+        base_df = Study.generate_from_distributions(*args, **kwargs)
+        random = np.random.default_rng(base_df['GlobalSeed'].iloc[0])
 
-        Study details:
-        --------------
-        {self.metadata}
-        '''
-        return repr
+        if isinstance(LesionVolume, dict):
+            temp_volume = pd.DataFrame({f'{name}_volume': np.linspace(min_max[0], min_max[1]) for name, min_max in LesionVolume.items()})
+            temp_weight = pd.DataFrame({f'{name}_weight': len(temp_volume)*[1/len(temp_volume)] for name in LesionVolume})
+            df_volume = pd.concat([temp_volume, temp_weight], axis=1)
+        elif isinstance(LesionVolume, str | Path):
+            df_volume = pd.read_csv(LesionVolume)
+            df_volume['EDH_weight'] /= df_volume['EDH_weight'].sum()
+            df_volume['SDH_weight'] /= df_volume['SDH_weight'].sum()
+            df_volume['IPH_weight'] /= df_volume['IPH_weight'].sum()
+        else:
+            raise ValueError(f'`volume` {type(LesionVolume)} is not a dict\
+    or csv filepath')
 
-    @property
-    def shape(self):
-        return list(self.phantom._phantom.shape)
+        if isinstance(LesionAttenuation, dict):
+            temp_atten = pd.DataFrame({f'{name}_HU': np.linspace(min_max[0], min_max[1]) for name, min_max in LesionAttenuation.items()})
+            temp_weight = pd.DataFrame({f'{name}_weight': len(temp_atten)*[1/len(temp_volume)] for name in LesionAttenuation})
+            df_HU = pd.concat([temp_atten, temp_weight], axis=1)
+        elif isinstance(LesionAttenuation, str | Path):
+            df_HU = pd.read_csv(LesionAttenuation).rename({'subdural': 'SDH_weight',
+                                                    'epidural': 'EDH_weight',
+                                                    'round': 'IPH_weight'},
+                                                    axis='columns')
+            df_HU['EDH_weight'] /= df_HU['EDH_weight'].sum()
+            df_HU['SDH_weight'] /= df_HU['SDH_weight'].sum()
+            df_HU['IPH_weight'] /= df_HU['IPH_weight'].sum()
+        else:
+            raise ValueError(f'`attenuation` {type(LesionAttenuation)} is not a dict\
+            or csv filepath')
 
-    @property
-    def size(self):
-        return np.array(self.phantom.spacings)*self.phantom._phantom.shape
+        edema_list = list(range(*Edema))  # IPH only
 
-    def run_study(self, output_directory=None, kVp=120, mA=200, pitch=0,
-                  views=1000, fov=250, zspan='dynamic', kernel='standard',
-                  slice_thickness=1, slice_increment=None, **kwargs):
+        params = {
+            'Age': [],
+            'LesionAttenuation(HU)': [],
+            'Subtype': [],
+            'LesionVolume(mL)': [],
+            'Edema': [],
+            'MassEffect': [],
+            }
+
+        for i in range(StudyCount):
+            lesion_id = random.choice(Subtype)  # select a random lesion type
+            if lesion_id is None:
+                vol = 0
+                intensity = 0
+                edema = 0
+            elif lesion_id == 'EDH':
+                vol = random.choice(df_volume['EDH_volume'],
+                                    p=df_volume['EDH_weight'])
+                intensity = 0
+                while intensity < 45:
+                    intensity = random.choice(df_HU['EDH_HU'],
+                                            p=df_HU['EDH_weight'])
+                edema = 0
+            elif lesion_id == 'SDH':
+                vol = random.choice(df_volume['SDH_volume'],
+                                    p=df_volume['SDH_weight'])
+                intensity = 0
+                while intensity < 45:
+                    intensity = random.choice(df_HU['SDH_HU'],
+                                            p=df_HU['SDH_weight'])
+                edema = 0
+            elif lesion_id == 'IPH':
+                vol = random.choice(df_volume['IPH_volume'],
+                                    p=df_volume['IPH_weight'])
+                while vol > 50:
+                    vol = random.choice(df_volume['IPH_volume'],
+                                        p=df_volume['IPH_weight'])
+                intensity = 0
+                while intensity < 45:
+                    intensity = random.choice(df_HU['IPH_HU'],
+                                            p=df_HU['IPH_weight'])
+
+                edema = random.choice(edema_list)
+
+            phantom_class = get_available_phantoms()[base_df['Phantom'].iloc[i]]
+            params['Age'].append(phantom_class.keywords['age'])
+            params['LesionAttenuation(HU)'].append(float(intensity))
+            params['Subtype'].append(lesion_id)
+            params['LesionVolume(mL)'].append(vol)
+            params['Edema'].append(edema)
+            params['MassEffect'].append(MassEffect)
+
+        ich_df = pd.DataFrame(params)
+        input_df = base_df.join(ich_df)
+        return input_df
+    
+    def append(self, *args,
+               Subtype: str | None = None,
+               LesionVolume: float=5,
+               LesionAttenuation: float = 80,
+               Edema:int=1,
+               MassEffect=True,
+               **kwargs):
+        super()(*args, **kwargs)
+        ## add here
+
+    def run_study(self, patientid: int = 0):
+        # work on the rest below....
         patient_name = self.phantom.patient_name
         age = self.phantom.age
         lesion_type = self.phantom.lesion_type if hasattr(self.phantom, 'lesion_type') else None
