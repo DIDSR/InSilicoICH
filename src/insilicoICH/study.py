@@ -14,8 +14,9 @@ import pandas as pd
 from scipy.ndimage import center_of_mass
 from monai.transforms import RandAffine
 
-from VITools import Phantom, Scanner, Study, get_available_phantoms 
+from VITools import Phantom, Scanner, Study, get_available_phantoms, read_dicom
 
+from .phantoms.head_phantoms import LesionPhantom
 
 def load_vol(file_list):
     return np.stack(list(map(read_dicom, file_list)))
@@ -50,23 +51,26 @@ def load_phantom(name='Densitometry Phantom', shape=None):
         raise ValueError(f'{name} is not in {list(available_phantoms.keys())} nor is it a path')
     return phantom
 
-LESION_TYPES = ['IPH', 'EDH', 'SDH'] 
+
+LESION_TYPES = ['IPH', 'EDH', 'SDH']
 
 
 class ICHStudy(Study):
 
-    def generate_from_distributions(*args,
+    def generate_from_distributions(Phantoms: list[str],
                                     StudyCount: int = 1,
                                     Subtype: list[str] = [None] + LESION_TYPES,
                                     LesionVolume=dict(zip(LESION_TYPES,
-                                      len(LESION_TYPES)*[[0.1, 60]])),
+                                                      len(LESION_TYPES)*[[0.1, 60]])),
                                     LesionAttenuation=dict(zip(LESION_TYPES,
-                                       len(LESION_TYPES)*[[0, 90]])),
+                                                            len(LESION_TYPES)*[[0, 90]])),
                                     Edema=[0, 15],
                                     MassEffect=True,
                                     **kwargs):
-        
-        base_df = Study.generate_from_distributions(*args, **kwargs)
+
+        base_df = Study.generate_from_distributions(Phantoms,
+                                                    StudyCount,
+                                                    **kwargs)
         random = np.random.default_rng(base_df['GlobalSeed'].iloc[0])
 
         if isinstance(LesionVolume, dict):
@@ -87,7 +91,8 @@ class ICHStudy(Study):
             temp_weight = pd.DataFrame({f'{name}_weight': len(temp_atten)*[1/len(temp_volume)] for name in LesionAttenuation})
             df_HU = pd.concat([temp_atten, temp_weight], axis=1)
         elif isinstance(LesionAttenuation, str | Path):
-            df_HU = pd.read_csv(LesionAttenuation).rename({'subdural': 'SDH_weight',
+            df_HU = pd.read_csv(LesionAttenuation).rename({
+                                                    'subdural': 'SDH_weight',
                                                     'epidural': 'EDH_weight',
                                                     'round': 'IPH_weight'},
                                                     axis='columns')
@@ -110,7 +115,10 @@ class ICHStudy(Study):
             }
 
         for i in range(StudyCount):
-            lesion_id = random.choice(Subtype)  # select a random lesion type
+            phantom_class = get_available_phantoms()[base_df['Phantom'].iloc[i]]
+            lesion_id = None
+            if hasattr(phantom_class, 'func') and issubclass(phantom_class.func, LesionPhantom):
+                lesion_id = random.choice(Subtype)  # select a random lesion type
             if lesion_id is None:
                 vol = 0
                 intensity = 0
@@ -144,8 +152,10 @@ class ICHStudy(Study):
 
                 edema = random.choice(edema_list)
 
-            phantom_class = get_available_phantoms()[base_df['Phantom'].iloc[i]]
-            params['Age'].append(phantom_class.keywords['age'])
+            age = phantom_class.keywords['age'] if\
+                hasattr(phantom_class, 'keywords') and\
+                ('age' in phantom_class.keywords) else 0
+            params['Age'].append(age)
             params['LesionAttenuation(HU)'].append(float(intensity))
             params['Subtype'].append(lesion_id)
             params['LesionVolume(mL)'].append(vol)
@@ -155,7 +165,7 @@ class ICHStudy(Study):
         ich_df = pd.DataFrame(params)
         input_df = base_df.join(ich_df)
         return input_df
-    
+
     def append(self, *args,
                Subtype: str | None = None,
                LesionVolume: float=5,
