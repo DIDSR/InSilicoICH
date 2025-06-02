@@ -123,30 +123,37 @@ class SkullProcess(Skull):
         # Load the mesh
         mesh = self.mesh_skull.extract_geometry()
 
-        # Create a volumetric grid (voxels)
+        # Set your voxel grid resolution
+        spacing = 1.0  # Voxel size
         bounds = mesh.bounds
-        spacing = [1, 1, 1]  # adjust voxel size here
-        dim = np.ceil(
+        dims = np.ceil(
             [
-                (bounds[1] - bounds[0]) / spacing[0],
-                (bounds[3] - bounds[2]) / spacing[1],
-                (bounds[5] - bounds[4]) / spacing[2],
+                (bounds[1] - bounds[0]) / spacing,
+                (bounds[3] - bounds[2]) / spacing,
+                (bounds[5] - bounds[4]) / spacing,
             ]
         ).astype(int)
 
-        # Create the 3D grid
-        grid = pv.ImageData()
-        grid.dimensions = dim
-        grid.origin = [bounds[0], bounds[2], bounds[4]]
-        grid.spacing = spacing
+        # Create a 3D grid of points
+        x = np.linspace(bounds[0], bounds[1], dims[0])
+        y = np.linspace(bounds[2], bounds[3], dims[1])
+        z = np.linspace(bounds[4], bounds[5], dims[2])
+        grid_x, grid_y, grid_z = np.meshgrid(x, y, z, indexing="ij")
 
-        # Compute signed distance
-        signed_dist = grid.compute_implicit_distance(mesh)
+        points = np.column_stack((grid_x.ravel(), grid_y.ravel(), grid_z.ravel()))
 
-        # Threshold to binary voxel grid
-        voxels = (signed_dist["implicit_distance"] < 0).reshape(dim[::-1])
+        # Convert points to PyVista-compatible PolyData
+        point_cloud = pv.PolyData(points)
 
-        nifti_img = nib.Nifti1Image(voxels.astype(np.uint8), np.eye(4))
+        # Compute signed distances from each point to the mesh
+        signed_dist = point_cloud.compute_implicit_distance(mesh)
+        distances = signed_dist["implicit_distance"]
+
+        # Mark voxels close to the surface
+        threshold = spacing * 1
+        surface_voxels = (np.abs(distances) < threshold).reshape(dims)
+
+        nifti_img = nib.Nifti1Image(surface_voxels.astype(np.uint8), np.eye(4))
 
         # Save as numpy voxel grid
         nib.save(
