@@ -10,6 +10,7 @@ import vtk
 from skull import Skull
 from pyransac3d import Sphere
 import random
+import nibabel as nib
 
 main_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), *[".."] * 5))
 sys.path.append(main_directory)
@@ -117,6 +118,45 @@ class SkullProcess(Skull):
         # Remove those cells
         grid.remove_cells(cell_ids_below, inplace=True)
         self.mesh_skull = grid.extract_surface()
+
+    def mesh_to_voxel(self):
+        # Load the mesh
+        mesh = self.mesh_skull.extract_geometry()
+
+        # Create a volumetric grid (voxels)
+        bounds = mesh.bounds
+        spacing = [1, 1, 1]  # adjust voxel size here
+        dim = np.ceil(
+            [
+                (bounds[1] - bounds[0]) / spacing[0],
+                (bounds[3] - bounds[2]) / spacing[1],
+                (bounds[5] - bounds[4]) / spacing[2],
+            ]
+        ).astype(int)
+
+        # Create the 3D grid
+        grid = pv.ImageData()
+        grid.dimensions = dim
+        grid.origin = [bounds[0], bounds[2], bounds[4]]
+        grid.spacing = spacing
+
+        # Compute signed distance
+        signed_dist = grid.compute_implicit_distance(mesh)
+
+        # Threshold to binary voxel grid
+        voxels = (signed_dist["implicit_distance"] < 0).reshape(dim[::-1])
+
+        nifti_img = nib.Nifti1Image(voxels.astype(np.uint8), np.eye(4))
+
+        # Save as numpy voxel grid
+        nib.save(
+            nifti_img,
+            os.path.join(
+                main_directory,
+                "src/pedsilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
+                "mesh_skull_voxel.nii.gz",
+            ),
+        )
 
     def remove_voxel_spherical_coordi(self, list_start=None, list_direction=None):
         """
@@ -320,3 +360,5 @@ if __name__ == "__main__":
             "mesh_skull.vtk",
         ),
     )
+
+    object_skull_process.mesh_to_voxel()
