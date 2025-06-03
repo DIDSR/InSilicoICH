@@ -18,15 +18,19 @@ from .phantoms.head_phantoms import LesionPhantom
 
 
 def load_phantom(name='Densitometry Phantom', shape=None):  # this likely belongs in InSilicoGUI
-    '''
-    Loads appropriate phantom based on age as a keyword
+    """
+    Load a phantom object based on the provided name or file path.
 
-    :param name: phantom name, if a head phanton this is patient age in years,
-                 MIDA currently hard coded at 38 yrs see
-                 `ground_truth_definitions.phantoms.possible_ages` for ages
-    :param shape: shape of that the ground truth phantom will be interpolated
-    :param name: patient name to be saved in DICOM header
-    '''
+    Parameters:
+        name (str|float|int|Path): Name of the phantom, patient age, or file path to a phantom image.
+        shape (tuple or list, optional): Desired shape for the phantom.
+
+    Returns:
+        Phantom: Loaded phantom object.
+
+    Raises:
+        ValueError: If the phantom name or path is not recognized.
+    """
     available_phantoms = get_available_phantoms()
     matrix_size = max(shape) if shape else 400
     if name in available_phantoms:
@@ -54,7 +58,10 @@ LESION_TYPES = list(LesionPhantom.lesion_types)
 
 
 class ICHStudy(Study):
-
+    """
+    Study class for generating and managing in silico ICH (Intracerebral Hemorrhage) datasets.
+    Extends the base Study class with lesion simulation, augmentation, and mask generation.
+    """
     def generate_from_distributions(Phantoms: list[str],
                                     StudyCount: int = 1,
                                     Subtype: list[str] = [None] + LESION_TYPES,
@@ -70,7 +77,23 @@ class ICHStudy(Study):
                                     MassEffect=True,
                                     AddAugmentation=True,
                                     **kwargs):
+        """
+        Generate a DataFrame of study parameters by sampling from specified distributions.
 
+        Parameters:
+            Phantoms (list[str]): List of phantom names to use.
+            StudyCount (int): Number of studies to generate.
+            Subtype (list[str]): List of lesion subtypes to sample.
+            LesionVolume (dict|str|Path): Volume distributions or CSV for each lesion type.
+            LesionAttenuation (dict|str|Path): Attenuation distributions or CSV for each lesion type.
+            Edema (list[int]): Range for edema values (for IPH).
+            MassEffect (bool): Whether to simulate mass effect.
+            AddAugmentation (bool): Whether to apply augmentation transforms.
+            **kwargs: Additional arguments for Study.generate_from_distributions.
+
+        Returns:
+            pd.DataFrame: DataFrame with study parameters for each case.
+        """
         base_df = Study.generate_from_distributions(Phantoms,
                                                     StudyCount,
                                                     **kwargs)
@@ -190,6 +213,22 @@ class ICHStudy(Study):
                MassEffect=True,
                AddAugmentation=True,
                **kwargs):
+        """
+        Append a new study case to the metadata with lesion and augmentation parameters.
+
+        Parameters:
+            *args: Arguments for the base append method.
+            Subtype (str|None): Lesion subtype.
+            LesionVolume (float): Lesion volume in mL.
+            LesionAttenuation (float): Lesion attenuation in HU.
+            Edema (int): Edema value.
+            MassEffect (bool): Whether to simulate mass effect.
+            AddAugmentation (bool): Whether to apply augmentation.
+            **kwargs: Additional arguments for the base append method.
+
+        Returns:
+            ICHStudy: The updated study object.
+        """
         super().append(*args, **kwargs)
         last_idx = len(self) - 1
         self.metadata.at[last_idx, 'Subtype'] = Subtype
@@ -272,5 +311,14 @@ class ICHStudy(Study):
         return results
 
     def get_masks(self, patientid: int = 0):
+        """
+        Retrieve the lesion mask volume(s) for a given patient.
+
+        Parameters:
+            patientid (int): Index of the patient/case.
+
+        Returns:
+            np.ndarray: Loaded mask volume(s).
+        """
         return load_vol(self.results[self.results.CaseID ==
                                      f'case_{patientid:04d}']['MaskFilePath'])
