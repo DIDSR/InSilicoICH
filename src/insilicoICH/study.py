@@ -4,11 +4,14 @@ lesion definitions, augmentations, and CT simulation together into the final
 ct_simulation function.
 '''
 import os
+import sys
+from argparse import ArgumentParser
 from pathlib import Path
 import numpy as np
 import pydicom
 import SimpleITK as sitk
 import pandas as pd
+import tomllib
 from scipy.ndimage import center_of_mass
 from monai.transforms import RandAffine
 
@@ -322,3 +325,129 @@ class ICHStudy(Study):
         """
         return load_vol(self.results[self.results.CaseID ==
                                      f'case_{patientid:04d}']['MaskFilePath'])
+
+
+def insilicoich_cli(arg_list: list[str] | None = None):
+    '''
+    Command-line interface for InSilicoICH simulations.
+
+    Parses command-line arguments to specify an input CSV file for study
+    parameters and an option to run simulations in parallel. If no input CSV
+    is provided via arguments, it attempts to read from stdin.
+
+    The input CSV can define a study to be run. This function initializes a
+    `Study` object with this CSV and then calls its `run_all` method.
+
+    Args:
+        arg_list (list[str] | None, optional):
+            A list of command-line arguments to parse. If None, `sys.argv[1:]`
+            is used.
+            Defaults to None.
+    '''
+    parser = ArgumentParser(
+        description='Runs InSilicoICH simulations',
+        epilog='''
+        arguments can be given as toml config files or command line
+        flags, each overriding defaults
+        ''',
+        fromfile_prefix_chars='@')
+    parser.add_argument('input_csv', nargs='?', type=str,
+                        help='''
+                          input csv to recreate prior dataset,
+                          see `recruit --help` for more details
+                        ''')
+    parser.add_argument('--parallel', '-p', type=bool,
+                        default=False,
+                        help='run simulations in parallel')
+    args = parser.parse_args(arg_list)
+    if args.input_csv:
+        input_csv = args.input_csv
+    elif not sys.stdin.isatty():
+        input_csv = sys.stdin.read().strip()
+    else:
+        parser.print_help()
+
+    ICHStudy(input_csv).run_all(args.parallel)
+
+
+def recruit_patients(OutputDirectory, **config):
+    OutputDirectory = Path(OutputDirectory)
+    age_range = config.pop('Age')
+    phantoms = get_available_phantoms()
+    patients = {k: v for k, v in phantoms.items() if hasattr(v, 'keywords')}
+    patients = {k: v for k, v in patients.items() if 'age' in v.keywords}
+    patients = {k: v for k, v in patients.items() if
+                (v.keywords['age'] > age_range[0]) and
+                (v.keywords['age'] < age_range[1])}
+
+    df = ICHStudy.generate_from_distributions(patients, **config)
+    save_name = OutputDirectory / (OutputDirectory.name + '.csv')
+    save_name.parent.mkdir(exist_ok=True, parents=True)
+    print(save_name)
+    df.to_csv(save_name, index=False)
+
+
+def flatten_dict(layered_dict):
+    config = dict()
+    [config.update(k) for k in layered_dict.values()]
+    return config
+
+
+def recruitment_cli(arg_list: list[str] | None = None):
+    parser = ArgumentParser(
+        description='''Generates full patient list to conduct study from
+          provided distributions.
+
+          Output: a .csv file with scans to perform,
+          the input for the `generate` command
+        ''',
+        epilog='''
+        arguments can be given as toml config files or command line
+        flags, each overriding defaults
+        ''',
+        fromfile_prefix_chars='@')
+    parser.add_argument('config', nargs='?', type=str,
+                        help='''Inclusion criteria config .toml file
+                        specifying ranges of parameters that will be
+                        uniformily randomly sample to generate a recruited
+                        patient list for scanning with `generate`''')
+    parser.add_argument('--OutputDirectory', '-o', type=str,
+                        help='output directory to save simulation results')
+    parser.add_argument('--input_csv', '-i', type=str,
+                        help='input csv to recreate prior dataset')
+    parser.add_argument('--Views', type=int,
+                        help='number of angular CT views per rotation')
+    parser.add_argument('--StudyCount', type=int,
+                        help='number of simulations to run')
+    parser.add_argument('--ScanCoverage', nargs='+',
+                        help='z range of scans [mm], defaults to dynamic')
+    parser.add_argument('--RemoveRawData', type=bool, default=True,
+                        help='''
+                        whether to keep raw projection data and ground
+                        truth phantoms, greatly increases
+                        storage requirements.
+                        ''')
+    parser.add_argument('--Seed', type=int, help='seed to reproduce a dataset')
+    args = parser.parse_args(arg_list)
+    pkg_dir = Path(__file__).parent
+    with open(pkg_dir / 'configs/default.toml', 'rb') as f:
+        config = tomllib.load(f)
+        config = flatten_dict(config)
+        config['LesionVolume'] = pkg_dir / config['LesionVolume']
+        config['LesionAttenuation'] = pkg_dir / config['LesionAttenuation']
+    if args.config:
+        with open(args.config, 'rb') as f:
+            user_config = tomllib.load(f)
+            user_config = flatten_dict(user_config)
+        args.config = None
+        config.update(user_config)
+
+    cli_args = vars(args)
+    cli_args = {k: v for k, v in cli_args.items() if v}
+    config.update(cli_args)
+    config['Subtype'] = list(map(lambda o: o or None, config['Subtype']))
+    recruit_patients(**config)
+
+
+if __name__ == '__main__':
+    insilicoich_cli()
