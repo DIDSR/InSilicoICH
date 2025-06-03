@@ -372,6 +372,7 @@ def insilicoich_cli(arg_list: list[str] | None = None):
 
 def recruit_patients(OutputDirectory, **config):
     OutputDirectory = Path(OutputDirectory)
+    config['OutputDirectory'] = OutputDirectory
     age_range = config.pop('Age')
     phantoms = get_available_phantoms()
     patients = {k: v for k, v in phantoms.items() if hasattr(v, 'keywords')}
@@ -411,7 +412,7 @@ def recruitment_cli(arg_list: list[str] | None = None):
                         specifying ranges of parameters that will be
                         uniformily randomly sample to generate a recruited
                         patient list for scanning with `generate`''')
-    parser.add_argument('--OutputDirectory', '-o', type=str,
+    parser.add_argument('--OutputDirectory', '-o', type=str, default='results',
                         help='output directory to save simulation results')
     parser.add_argument('--input_csv', '-i', type=str,
                         help='input csv to recreate prior dataset')
