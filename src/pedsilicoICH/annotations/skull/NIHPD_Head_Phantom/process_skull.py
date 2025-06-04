@@ -119,12 +119,50 @@ class SkullProcess(Skull):
         grid.remove_cells(cell_ids_below, inplace=True)
         self.mesh_skull = grid.extract_surface()
 
-    def mesh_to_voxel(self):
+    def mesh_to_voxel_center(self):
+        # Load the mesh
+        mesh = self.mesh_skull.extract_geometry()
+
+        # Set voxel size
+        voxel_size = 0.5
+
+        # Get cell centers (triangles/quads/etc.)
+        cell_centers = mesh.cell_centers().points
+
+        # Compute voxel grid bounds
+        min_bounds = cell_centers.min(axis=0)
+        max_bounds = cell_centers.max(axis=0)
+        dims = np.ceil((max_bounds - min_bounds) / voxel_size).astype(int)
+
+        print("dims", dims)
+
+        # Initialize empty voxel grid
+        voxels = np.zeros(dims, dtype=np.uint8)
+
+        # Fill voxel positions using cell centers
+        for pt in cell_centers:
+            idx = ((pt - min_bounds) / voxel_size).astype(int)
+            if np.all(idx >= 0) and np.all(idx < dims):
+                voxels[tuple(idx)] = 1
+
+        nifti_img = nib.Nifti1Image(voxels.astype(np.uint8), np.eye(4))
+
+        # Save as numpy voxel grid
+        nib.save(
+            nifti_img,
+            os.path.join(
+                main_directory,
+                "src/pedsilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
+                "mesh_skull_voxel_2.nii.gz",
+            ),
+        )
+
+    def mesh_to_voxel_distance(self):
         # Load the mesh
         mesh = self.mesh_skull.extract_geometry()
 
         # Set your voxel grid resolution
-        spacing = 1.0  # Voxel size
+        spacing = 0.5  # Voxel size
         bounds = mesh.bounds
         dims = np.ceil(
             [
@@ -133,6 +171,8 @@ class SkullProcess(Skull):
                 (bounds[5] - bounds[4]) / spacing,
             ]
         ).astype(int)
+
+        print("dims", dims)
 
         # Create a 3D grid of points
         x = np.linspace(bounds[0], bounds[1], dims[0])
@@ -150,7 +190,7 @@ class SkullProcess(Skull):
         distances = signed_dist["implicit_distance"]
 
         # Mark voxels close to the surface
-        threshold = spacing * 1
+        threshold = spacing * 0.5
         surface_voxels = (np.abs(distances) < threshold).reshape(dims)
 
         nifti_img = nib.Nifti1Image(surface_voxels.astype(np.uint8), np.eye(4))
@@ -368,4 +408,4 @@ if __name__ == "__main__":
         ),
     )
 
-    object_skull_process.mesh_to_voxel()
+    object_skull_process.mesh_to_voxel_center()
