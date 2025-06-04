@@ -153,54 +153,6 @@ class SkullProcess(Skull):
             os.path.join(
                 main_directory,
                 "src/pedsilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
-                "mesh_skull_voxel_2.nii.gz",
-            ),
-        )
-
-    def mesh_to_voxel_distance(self):
-        # Load the mesh
-        mesh = self.mesh_skull.extract_geometry()
-
-        # Set your voxel grid resolution
-        spacing = 0.5  # Voxel size
-        bounds = mesh.bounds
-        dims = np.ceil(
-            [
-                (bounds[1] - bounds[0]) / spacing,
-                (bounds[3] - bounds[2]) / spacing,
-                (bounds[5] - bounds[4]) / spacing,
-            ]
-        ).astype(int)
-
-        print("dims", dims)
-
-        # Create a 3D grid of points
-        x = np.linspace(bounds[0], bounds[1], dims[0])
-        y = np.linspace(bounds[2], bounds[3], dims[1])
-        z = np.linspace(bounds[4], bounds[5], dims[2])
-        grid_x, grid_y, grid_z = np.meshgrid(x, y, z, indexing="ij")
-
-        points = np.column_stack((grid_x.ravel(), grid_y.ravel(), grid_z.ravel()))
-
-        # Convert points to PyVista-compatible PolyData
-        point_cloud = pv.PolyData(points)
-
-        # Compute signed distances from each point to the mesh
-        signed_dist = point_cloud.compute_implicit_distance(mesh)
-        distances = signed_dist["implicit_distance"]
-
-        # Mark voxels close to the surface
-        threshold = spacing * 0.5
-        surface_voxels = (np.abs(distances) < threshold).reshape(dims)
-
-        nifti_img = nib.Nifti1Image(surface_voxels.astype(np.uint8), np.eye(4))
-
-        # Save as numpy voxel grid
-        nib.save(
-            nifti_img,
-            os.path.join(
-                main_directory,
-                "src/pedsilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
                 "mesh_skull_voxel.nii.gz",
             ),
         )
