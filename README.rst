@@ -3,6 +3,10 @@ InSilicoICH: Synthetic Intracranial Hemorrhage Modeling Tools
 
 |tests|
 
+.. image:: assets/InSilicoICH.png
+        :width: 400
+        :align: center
+
 .. image:: assets/pipeline.png
         :width: 800
         :align: center

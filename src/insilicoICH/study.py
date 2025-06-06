@@ -20,43 +20,6 @@ from VITools import Phantom, Study, get_available_phantoms, load_vol
 from .phantoms.head_phantoms import LesionPhantom
 
 
-def load_phantom(name='Densitometry Phantom', shape=None):  # this likely belongs in InSilicoGUI
-    """
-    Load a phantom object based on the provided name or file path.
-
-    Parameters:
-        name (str|float|int|Path): Name of the phantom, patient age, or file path to a phantom image.
-        shape (tuple or list, optional): Desired shape for the phantom.
-
-    Returns:
-        Phantom: Loaded phantom object.
-
-    Raises:
-        ValueError: If the phantom name or path is not recognized.
-    """
-    available_phantoms = get_available_phantoms()
-    matrix_size = max(shape) if shape else 400
-    if name in available_phantoms:
-        phantom_cls = available_phantoms[name]
-        if name.endswith('Head'):
-            phantom = phantom_cls(shape=shape)
-        else:
-            phantom = phantom_cls(matrix_size=matrix_size)
-    elif isinstance(name, str) and Path(name).exists():
-        img = sitk.ReadImage(name)
-        phantom = Phantom(sitk.GetArrayFromImage(img),
-                          spacings=img.GetSpacing()[::-1])
-    elif isinstance(name, float | int):
-        name = [o for o in available_phantoms.keys() if
-                o.startswith(str(name))][0]
-        phantom_cls = available_phantoms[name]
-        phantom = phantom_cls(shape=shape)
-    else:
-        raise ValueError(f'{name} is not in {list(available_phantoms.keys())}\
-                         nor is it a path')
-    return phantom
-
-
 LESION_TYPES = list(LesionPhantom.lesion_types)
 
 
@@ -273,7 +236,7 @@ class ICHStudy(Study):
         mask_files = None
         lesion_coords = None
         vol_by_slice_mL = 0
-        if series.Subtype:
+        if not pd.isna(series.Subtype):
             lesion_only = self.scanner
             startZ, endZ = self.scanner.ScanCoverage
             mask = self.scanner.get_lesion_mask(
