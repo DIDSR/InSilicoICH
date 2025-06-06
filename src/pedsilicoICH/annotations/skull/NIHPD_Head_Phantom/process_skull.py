@@ -184,6 +184,9 @@ class SkullProcess(Skull):
         return shape, origin, spacing, affine, array
 
     def mesh_to_voxel_center(self):
+        mesh_sphere, center, radius = self._get_bounding_sphere_mesh(self.mesh_brain)
+        print('center', center)
+
         # Load the mesh
         mesh = self.mesh_skull.extract_geometry()
 
@@ -196,7 +199,8 @@ class SkullProcess(Skull):
         # Compute voxel grid bounds
         min_bounds = cell_centers.min(axis=0)
         max_bounds = cell_centers.max(axis=0)
-        dims = np.ceil((max_bounds - min_bounds) / voxel_size).astype(int)
+        # dims = np.ceil((max_bounds - min_bounds) / voxel_size).astype(int)
+        dims = [197, 233, 189]
 
         print("dims", dims)
 
@@ -207,7 +211,9 @@ class SkullProcess(Skull):
         for pt in cell_centers:
             idx = ((pt - min_bounds) / voxel_size).astype(int)
             if np.all(idx >= 0) and np.all(idx < dims):
-                voxels[tuple(idx)] = 1
+                voxels[tuple(np.add(idx, [24, 24, 0]))] = 1
+        
+        voxels = np.flip(voxels, axis=1)
 
         path_mask_brain = os.path.join(
             main_directory, "src/NIHPD_Head_Phantom", "nihpd_asym_04.5-08.5_mask.nii"
@@ -417,18 +423,18 @@ if __name__ == "__main__":
     )
 
     object_skull_process = SkullProcess(path_mesh_brainmask=path_mesh_brainmask)
-    object_skull_process._check()
-    # object_skull_process.extract_skull()
-    # object_skull_process.extract_primary_skull_mesh()
-    # object_skull_process.add_fracture()
+    # object_skull_process._check()
+    object_skull_process.extract_skull()
+    object_skull_process.extract_primary_skull_mesh()
+    object_skull_process.add_fracture()
 
-    # object_skull_process.save_mesh(
-    #     mesh=object_skull_process.mesh_skull,
-    #     filepath=os.path.join(
-    #         main_directory,
-    #         "src/pedsilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
-    #         "mesh_skull.vtk",
-    #     ),
-    # )
+    object_skull_process.save_mesh(
+        mesh=object_skull_process.mesh_skull,
+        filepath=os.path.join(
+            main_directory,
+            "src/pedsilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
+            "mesh_skull.vtk",
+        ),
+    )
 
-    # object_skull_process.mesh_to_voxel_center()
+    object_skull_process.mesh_to_voxel_center()
