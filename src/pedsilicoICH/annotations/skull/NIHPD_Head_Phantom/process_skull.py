@@ -184,9 +184,35 @@ class SkullProcess(Skull):
 
         return shape, origin, spacing, affine, array
 
+    def get_center_voxel_space(self):
+        """
+        While extracting the skull, center of the mesh is lost. This method provides the skull center relative to voxel space (from mesh space), to be used later while converting to voxels.
+        """
+        shape, origin, spacing, affine, array  = self.get_nifti_info(self.path_mask_brain)
+
+        # Load the mesh
+        mesh = self.mesh_brain.extract_geometry()
+
+        # Set voxel size
+        voxel_size = 1
+
+        # Get cell centers (triangles/quads/etc.)
+        cell_centers = mesh.cell_centers().points
+
+        # Compute voxel grid bounds
+        min_bounds = cell_centers.min(axis=0)
+
+        idx = ((self.skull_center - min_bounds) / voxel_size).astype(int)
+
+        return idx
+
     def mesh_to_voxel_center(self):
-        mesh_sphere, center, radius = self._get_bounding_sphere_mesh(self.mesh_brain)
-        print('center', center)
+        shape, origin, spacing, affine, array  = self.get_nifti_info(self.path_mask_brain)
+        indices = np.argwhere(array.astype(int) == 1)
+        offset = [np.min(indices[:, 0]), np.min(indices[:, 1]), np.min(indices[:, 2])]
+        offset[2] = self.get_center_voxel_space()[2]
+        print('offset', offset)
+        print('affine', affine)
 
         # Load the mesh
         mesh = self.mesh_skull.extract_geometry()
@@ -199,25 +225,14 @@ class SkullProcess(Skull):
 
         # Compute voxel grid bounds
         min_bounds = cell_centers.min(axis=0)
-        max_bounds = cell_centers.max(axis=0)
-        # dims = np.ceil((max_bounds - min_bounds) / voxel_size).astype(int)
-        dims = [197, 233, 189]
-
-        print("dims", dims)
 
         # Initialize empty voxel grid
-        voxels = np.zeros(dims, dtype=np.uint8)
-
-        shape, origin, spacing, affine, array  = self.get_nifti_info(self.path_mask_brain)
-
-        indices = np.argwhere(array.astype(int) == 1)
-        offset = [np.min(indices[:, 0]), np.min(indices[:, 1]), np.min(indices[:, 2])]
-        print('offset', offset)
+        voxels = np.zeros(shape, dtype=np.uint8)
 
         # Fill voxel positions using cell centers
         for pt in cell_centers:
             idx = ((pt - min_bounds) / voxel_size).astype(int)
-            if np.all(idx >= 0) and np.all(idx < dims):
+            if np.all(idx >= 0) and np.all(idx < shape):
                 voxels[tuple(np.add(idx, offset))] = 1
         
         voxels = np.flip(voxels, axis=1)
@@ -428,7 +443,6 @@ if __name__ == "__main__":
         )
 
     object_skull_process = SkullProcess(path_mesh_brainmask=path_mesh_brainmask, path_mask_brain=path_mask_brain)
-    # object_skull_process._check()
     object_skull_process.extract_skull()
     object_skull_process.extract_primary_skull_mesh()
     object_skull_process.add_fracture()
