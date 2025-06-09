@@ -9,13 +9,12 @@ from argparse import ArgumentParser
 from pathlib import Path
 import numpy as np
 import pydicom
-import SimpleITK as sitk
 import pandas as pd
 import tomllib
 from scipy.ndimage import center_of_mass
 from monai.transforms import RandAffine
 
-from VITools import Phantom, Study, get_available_phantoms, load_vol
+from VITools import Study, get_available_phantoms, load_vol
 
 from .phantoms.head_phantoms import LesionPhantom
 

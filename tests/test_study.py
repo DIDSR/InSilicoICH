@@ -1,4 +1,3 @@
-# %%
 '''
 tests high level Study functionality
 '''
