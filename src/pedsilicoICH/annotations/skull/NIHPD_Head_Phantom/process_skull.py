@@ -17,10 +17,11 @@ sys.path.append(main_directory)
 
 
 class SkullProcess(Skull):
-    def __init__(self, path_mesh_brainmask: str):
+    def __init__(self, path_mesh_brainmask: str, path_mask_brain: str):
         super().__init__()
         self.mesh_brain = self.load_mesh(path_mesh_brainmask)
         self.skull_center = None
+        self.path_mask_brain = path_mask_brain
 
     def load_mesh(self, path_mesh_brainmask: str):
         return pv.read(path_mesh_brainmask)
@@ -112,7 +113,7 @@ class SkullProcess(Skull):
         for pt in cell_centers:
             idx = ((pt - min_bounds) / voxel_size).astype(int)
             if np.all(idx >= 0) and np.all(idx < dims):
-                voxels[tuple(np.add(idx, [24, 24, 0]))] = 1
+                voxels[tuple(np.add(idx, [24, 25, 0]))] = 1
         
         voxels = np.flip(voxels, axis=1)
         
@@ -120,13 +121,13 @@ class SkullProcess(Skull):
             main_directory, "src/NIHPD_Head_Phantom", "nihpd_asym_04.5-08.5_mask.nii"
         )
 
-        shape, origin, spacing, affine, array  = self.get_nifti_info(path_mask_brain)
+        # shape, origin, spacing, affine, array  = self.get_nifti_info(path_mask_brain)
         # print('shape', shape)
         # print('unique', np.unique(array))
 
         # indices = np.argwhere(array.astype(int) == 1)
-        # offset = [np.min(indices[:, 0]), np.min(indices[:, 0]), np.min(indices[:, 0])]
-        # centroid = [np.mean(indices[:, 0]), np.mean(indices[:, 0]), np.mean(indices[:, 0])]
+        # offset = [np.min(indices[:, 0]), np.min(indices[:, 1]), np.min(indices[:, 2])]
+        # centroid = [np.mean(indices[:, 0]), np.mean(indices[:, 1]), np.mean(indices[:, 2])]
         # print(offset)
 
         nifti_img = nib.Nifti1Image(voxels.astype(np.uint8), affine)
@@ -207,19 +208,19 @@ class SkullProcess(Skull):
         # Initialize empty voxel grid
         voxels = np.zeros(dims, dtype=np.uint8)
 
+        shape, origin, spacing, affine, array  = self.get_nifti_info(self.path_mask_brain)
+
+        indices = np.argwhere(array.astype(int) == 1)
+        offset = [np.min(indices[:, 0]), np.min(indices[:, 1]), np.min(indices[:, 2])]
+        print('offset', offset)
+
         # Fill voxel positions using cell centers
         for pt in cell_centers:
             idx = ((pt - min_bounds) / voxel_size).astype(int)
             if np.all(idx >= 0) and np.all(idx < dims):
-                voxels[tuple(np.add(idx, [24, 24, 0]))] = 1
+                voxels[tuple(np.add(idx, offset))] = 1
         
         voxels = np.flip(voxels, axis=1)
-
-        path_mask_brain = os.path.join(
-            main_directory, "src/NIHPD_Head_Phantom", "nihpd_asym_04.5-08.5_mask.nii"
-        )
-
-        shape, origin, spacing, affine, array  = self.get_nifti_info(path_mask_brain)
 
         nifti_img = nib.Nifti1Image(voxels.astype(np.uint8), affine)
 
@@ -422,7 +423,11 @@ if __name__ == "__main__":
         "mesh_brain.vtk",
     )
 
-    object_skull_process = SkullProcess(path_mesh_brainmask=path_mesh_brainmask)
+    path_mask_brain = os.path.join(
+            main_directory, "src/NIHPD_Head_Phantom", "nihpd_asym_04.5-08.5_mask.nii"
+        )
+
+    object_skull_process = SkullProcess(path_mesh_brainmask=path_mesh_brainmask, path_mask_brain=path_mask_brain)
     # object_skull_process._check()
     object_skull_process.extract_skull()
     object_skull_process.extract_primary_skull_mesh()
