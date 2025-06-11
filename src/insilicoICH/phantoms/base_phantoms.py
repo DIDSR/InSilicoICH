@@ -15,11 +15,7 @@ from scipy.ndimage import (center_of_mass,
 from VITools import Phantom
 
 from ..artifact_generation import transform_image_label_pair
-
-from ..lesion_definition import (elliptical_lesion,
-                                 insert_dural,
-                                 warp_slice,
-                                 get_perimeter)
+from .. import lesion_definition as ld
 
 
 def sphere_radius_from_volume(volume):
@@ -89,8 +85,8 @@ def get_transformation_src_dst(lesion: np.ndarray[bool],
     if (strength < 0) or (strength > 1):
         raise ValueError(f'strength {strength} is not in allowed range [0, 1]')
     footprint = int(strength*np.ceil(distance_transform_edt(lesion).max()))
-    dst = get_perimeter(lesion)
-    src = get_perimeter(ski.morphology.binary_erosion(lesion,
+    dst = ld.get_perimeter(lesion)
+    src = ld.get_perimeter(ski.morphology.binary_erosion(lesion,
                                                       np.ones(2*[footprint])))
     return src, dst
 
@@ -197,19 +193,79 @@ class LesionPhantom(Phantom):
         '''
         return self.dz, self.dx, self.dy
 
-    def insert_lesion(self, lesion_type, volume=5, intensity=50,
-                      mass_effect=False, seed=None, **kwargs):
+    def get_noise_texture(self, noise_type='perlin', contrast=80,
+                          contrast_std=1, scale=15, seed=None, **kwargs):
         '''
-        Inserts a lesion of a specified type into the phantom array.
+        Generates a noise texture for the phantom.
+        :param noise_type: str, type of noise to generate. Options include 'perlin', 'simplex', 'fbm', and 'filtered_noise'.
+        :param contrast: float, contrast level of the noise texture. Default is 80.
+        :param contrast_std: float, standard deviation of the contrast. Default is 1.
+        :param scale: float, The 'zoom' level of the noise. Larger values result in lower frequency. Default is 15.
+        :param kwargs: additional keyword arguments to pass to the noise generation function.
+        :return: numpy.ndarray, noise texture of the phantom.
+        :raises ValueError: if an unknown noise type is provided or if contrast_std is negative.
+        '''
+        if noise_type not in ['perlin', 'simplex', 'fbm', 'filtered_noise']:
+            raise ValueError(f'Unknown noise type: {noise_type}. '
+                             'Options are: perlin, simplex, fbm, filtered_noise.')
+        if contrast_std < 0:
+            raise ValueError(f'contrast_std {contrast_std} must be >= 0')
 
-        :param lesion_type: str, type of the lesion. Options include 'IPH' (intraparenchymal), 'EDH' (epidural), and 'SDH' (subdural).
-        :param volume: float, volume of the lesion in mL. Default is 5.
-        :param intensity: int, CT number of the lesion in HU. Default is 50.
-        :param mass_effect: bool, whether to apply mass effect processing to displace brain tissue following lesion insertion. Default is False.
-        :param seed: int, optional seed for reproducible lesion insertion. Default is None.
-        :param kwargs: additional keyword arguments to pass to the lesion insertion function.
-        :return: self, the updated LesionPhantom object.
-        '''
+        if seed is None:
+            seed = np.random.randint(0, 1e6)
+
+        if contrast_std == 0:
+            noise_type = 'constant'
+            noise_texture = np.full(self.shape, contrast, dtype=np.float32)
+        if noise_type == 'perlin':
+            noise_texture = ld.generate_3d_perlin_texture(*self.shape,
+                                                          scale=scale,
+                                                          seed=seed,
+                                                          **kwargs)
+        elif noise_type == 'simplex':
+            noise_texture = ld.generate_3d_simplex_texture(*self.shape,
+                                                           scale=scale,
+                                                           **kwargs)
+        elif noise_type == 'fbm':
+            noise_texture = ld.generate_3d_fbm_texture(*self.shape,
+                                                       seed=seed,
+                                                       scale=scale, **kwargs)
+        elif noise_type == 'filtered_noise':
+            noise_texture = ld.generate_3d_filtered_noise_texture(*self.shape,
+                                                                  **kwargs)
+        return noise_texture*contrast_std*contrast + contrast
+
+    def insert_lesion(self, lesion_type, volume=5, intensity=50,
+                      mass_effect=False, seed=None,
+                      texture_args: dict | None = None, **iph_kwargs):
+        """Inserts a lesion of a specified type into the phantom array.
+
+        Args:
+            lesion_type (str): Type of the lesion. Options include 'IPH'
+                (intraparenchymal), 'EDH' (epidural), and 'SDH' (subdural).
+            volume (float, optional): Volume of the lesion in mL. Defaults to 5.
+            intensity (int, optional): CT number of the lesion in HU.
+                Defaults to 50.
+            mass_effect (bool, optional): Whether to apply mass effect processing
+                to displace brain tissue following lesion insertion.
+                Defaults to False.
+            seed (int, optional): Seed for reproducible lesion insertion.
+                Defaults to None.
+            iph_kwargs: Additional keyword arguments for the IPH lesion
+                insertion function.
+            texture_args (dict, optional): Arguments for the noise texture
+                generation. If None, default parameters are used.
+
+        Returns:
+            LesionPhantom: The updated LesionPhantom object.
+
+        Raises:
+            ValueError: If an unknown lesion type is provided, if the volume
+            TypeError   is not a positive integer, or if the intensity is not a
+                valid CT number.
+            RuntimeError: If the requested volume is too large for the phantom.
+            : If the lesion_type is not a string.
+        """
         if volume <= 0:
             return self
         self.lesion_type.append(lesion_type)
@@ -217,14 +273,18 @@ class LesionPhantom(Phantom):
         if lesion_type == 'IPH':
             img_w_lesion, lesion_image, lesion_coords = \
                 self.add_round_lesion(volume=volume, intensity=intensity,
-                                      mass_effect=mass_effect, seed=seed, **kwargs)
+                                      mass_effect=mass_effect, seed=seed,
+                                      texture_args=texture_args, **iph_kwargs)
         elif lesion_type in ['EDH', 'SDH']:
             img_w_lesion, lesion_image, lesion_coords = \
                 self._add_dural_lesion(volume, lesion_type, intensity,
-                                       mass_effect=mass_effect, seed=seed)
+                                       mass_effect=mass_effect, seed=seed,
+                                       texture_args=texture_args)
         else:
             raise ValueError(f'unknown lesion type passed: {lesion_type}. '
                              'Currently accepts IPH (intraparenchymal), EDH (epidural), or SDH (subdural).')
+
+            img_w_lesion[lesion_image] = lesion_texture[lesion_image]
         self._phantom = img_w_lesion
         self._lesion.append(lesion_image)
         self._lesion_coords.append(lesion_coords)
@@ -253,39 +313,50 @@ class LesionPhantom(Phantom):
                          complexity: int = 3,
                          overlap: float = 0.4,
                          seed: int | None = None,
+                         texture_args: dict | None = None,
                          **kwargs) -> tuple:
-        '''
-        adds round lesion to img in random location within mask of size radius
-        and intensity level intensity
+        """Adds a round lesion to an image in a random location.
 
-        See parameter descriptions below for further modifications that can
-        be added:
+        This function inserts a lesion, potentially with complex characteristics,
+        into a specified material region of an image. It allows for detailed
+        customization of the lesion's shape, intensity, and secondary effects
+        like edema or mass effect.
 
-        :param volume: int or list of ints, volume of the sphere lesion in mL,
-            if provided a list it will make concentric lesions
-        :param intensity: int or list of ints, intensity of the sphere lesion
-            in HU, if provided a list it will make concentric lesions of
-            intensities
-        :param material: which material region to insert lesion into,
-            self.materials for options
-        :param eccentricity: between 0, 1 defines how elongated the lesions
-            are, with 0 being spherical, 1 being very oblong
-        :param mass_effect: bool or float between [0, 1], if 0 or False no
-            mass effect is applied, a mass effect > 0 but < 1 controls mass
-            effect strength where 1 is a large degree of mass effect warping
-            and 0.2 is a smaller amount of warping, see
-            `insert_with_mass_effect` for more details
-        :param edema: bool or int, referring to the number of pixels thick of
-            an edema layer to add around the lesion
-        :param complexity: int, number of ellipses to aid with
-            random jiggle, 1 gives a single ellipsoid, increasing to 2 or 3
-            yields overlapping ellipsoids with a more complex shape.
-        :param overlap: float, allowed overlap with the white matter mask
-        :param seed: optional, defaults to None, set seed for reproducible
-            lesion insertion
+        Args:
+            volume (int | list[int]): The volume of the sphere lesion in mL. If a
+                list is provided, it will create concentric lesions.
+            intensity (int | list[int]): The intensity of the sphere lesion in
+                Hounsfield Units (HU). If a list is provided, it will create
+                concentric lesions with the corresponding intensities.
+            material (str): The material region to insert the lesion into. See
+                the `self.materials` attribute for available options.
+            eccentricity (float): A value between 0.0 and 1.0 that defines how
+                elongated the lesion is. A value of 0 is spherical, while 1.0 is
+                very oblong.
+            mass_effect (bool | float): If False or 0.0, no mass effect is applied.
+                A float between 0.0 and 1.0 controls the strength of the effect,
+                where 1.0 causes a large degree of warping. See the
+                `insert_with_mass_effect` method for more details.
+            edema (bool | int): Specifies an edema layer to add around the lesion.
+                If an integer is provided, it defines the thickness of the layer
+                in pixels.
+            complexity (int): The number of ellipses used to generate the lesion
+                shape. A value of 1 creates a single ellipsoid, while higher
+                values result in more complex, overlapping shapes.
+            overlap (float): The allowed fractional overlap with the white matter
+                mask.
+            seed (int, optional): A seed for the random number generator to ensure
+                reproducible lesion insertion. Defaults to None.
+            texture_args (dict, optional): A dictionary of arguments for the noise
+                texture generation. If None, default parameters are used.
 
-        :return: img_w_lesion, lesion_vol, (z, x, y)
-        '''
+        Returns:
+            tuple: A tuple containing the following three elements:
+                - np.ndarray: The image array with the lesion inserted.
+                - np.ndarray: A mask of the generated lesion volume.
+                - tuple[int, int, int]: The (z, x, y) coordinates of the
+                lesion's center.
+        """
         rng = np.random.default_rng(seed)
 
         voxel_size = np.power(self.dx*self.dy*self.dz, 1/3)
@@ -320,13 +391,17 @@ large, try smaller volume')
             else:
                 correction = 1
             foci = foci*correction
-            sphere = elliptical_lesion(img.shape, center=(z, x, y),
-                                       radius=foci,
-                                       random_rotate=seed)
+            sphere = ld.elliptical_lesion(img.shape, center=(z, x, y),
+                                          radius=foci,
+                                          random_rotate=seed)
             sphere = transform(sphere).astype(bool)
             lesion_vol[sphere] = intensity
         lesion_mask = lesion_vol > -1000
-
+        if texture_args:
+            lesion_texture = self.get_noise_texture(contrast=intensity,
+                                                    seed=seed,
+                                                    **texture_args)
+            lesion_vol[lesion_mask] = lesion_texture[lesion_mask]
         if edema:
             edema_pixels = 5
             edema_HU = 10
@@ -357,31 +432,20 @@ large, try smaller volume')
         assert img.ndim == 3
 
         warped = np.zeros_like(img)
-        exclusion_mask = self.get_warp_exclusion_mask()
         inclusion_mask = self.get_warp_inclusion_mask()
         for idx in range(lesion.shape[0]):
             if not lesion[idx].any():
                 continue
-            src_coords, dst_coords = self.get_warp_coordinates(lesion, idx)
-            warped[idx] = warp_slice(axial_slice=img[idx],
-                                     exclusion_mask=exclusion_mask[idx],
-                                     inclusion_mask=inclusion_mask[idx],
-                                     src=src_coords, dst=dst_coords,
-                                     hematoma_type='IPH')
+            warped[idx] = ld.warp_slice(axial_slice=img[idx],
+                                        object_mask=lesion[idx],
+                                        inclusion_mask=inclusion_mask[idx])
         return warped
 
-    def get_warp_coordinates(self, lesion, idx):
-        # get lesion coordinates
-        src, dst = get_transformation_src_dst(lesion[idx])
-        warp_dst = np.argwhere(dst)
-        warp_src = np.argwhere(src)
-        return warp_src, warp_dst
-
     def _add_dural_lesion(self, volume, lesion_type, intensity,
-                          seed=None, mass_effect=True):
-
+                          seed=None, mass_effect=True, texture_args: dict | None = None):
+        original = self.get_CT_number_phantom()
         HU_volume = self.get_CT_number_phantom()
-        lesion_vol, HU_volume = insert_dural(
+        lesion_vol, HU_volume = ld.insert_dural(
             phantom=self,
             desired_volume=volume,
             hematoma_type=lesion_type,
@@ -392,5 +456,12 @@ large, try smaller volume')
 
         img_w_lesion = HU_volume.copy()
         img_w_lesion[lesion_vol] = intensity
+        diff_img = abs(img_w_lesion - original)
+        img_w_lesion[diff_img > intensity] = original[self.get_warp_inclusion_mask()].mean()
+        if texture_args:
+            lesion_texture = self.get_noise_texture(contrast=intensity,
+                                                    seed=seed,
+                                                    **texture_args)
+            lesion_vol[lesion_vol] = lesion_texture[lesion_vol]
         z, x, y = center_of_mass(lesion_vol)
         return img_w_lesion, lesion_vol, (int(z), int(x), int(y))

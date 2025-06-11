@@ -2,12 +2,18 @@
 Module responsible for lesion definition
 """
 import math
-
+from scipy.interpolate import interp1d
 import numpy as np
 import skimage as ski
-import scipy
-import sys
+from scipy.ndimage import map_coordinates, distance_transform_edt
+from typing import Tuple, Union
+import noise
+from scipy.ndimage import gaussian_filter
 from monai.transforms import RandAffine
+
+from skimage.graph import route_through_array
+from skimage.draw import bezier_curve
+import sys
 
 
 def get_perimeter(lesion):
@@ -60,17 +66,7 @@ def elliptical_lesion(shape: tuple | list,
 
 def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None):
 
-    if phantom.__class__.__name__ == 'MIDA_Head':
-        phantom_name = phantom.__class__.__name__
-        skull_map = phantom.get_skull_map()
-        mask = skull_map
-    elif phantom.__class__.__name__ == 'NIHPD_Head' or 'UNC_Head':
-        phantom_name = phantom.__class__.__name__
-        skull_map = ski.morphology.binary_dilation(phantom.get_skull_map(), np.ones(3*[5]))
-        mask = phantom.mask
-    else:
-        skull_map = phantom.get_skull_map()
-
+    mask = phantom.get_warp_inclusion_mask()
     random = np.random.default_rng(seed)
 
     num_slices = coverage_from_volume(volume=desired_volume,
@@ -85,7 +81,7 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
     HU_array = phantom.get_CT_number_phantom()
 
     # TODO: better logic for hemorrhage starting slice (especially UNC)
-    if phantom_name == 'UNC_Head':
+    if phantom.__class__.__name__ == 'UNC_Head':
         init_slice = 90
     else:
         init_slice = int(random.choice(np.linspace(0, int(HU_array.shape[0]/2), int(HU_array.shape[0]/2) + 1)))
@@ -146,28 +142,23 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
                 raise RuntimeError(f'lesion insertion failed with requested volume: {desired_volume} mL, try a smaller volume')
 
             # connect the start and end points of the hemorrhage 
-            filled_array, boundary_coords, connect_coords =\
+            filled_array, boundary_coords, _ =\
                 connect_points(start=orig_start,
                                end=orig_end,
                                boundary=temp_boundary,
-                               hematoma_type=hematoma_type,
-                               initial_slice=True)
+                               hematoma_type=hematoma_type)
 
             if mass_effect:
-                try:
-                    warped_slice = warp_slice(HU_array[init_slice],
-                                              skull_map[init_slice],
-                                              mask[init_slice],
-                                              boundary_coords,
-                                              connect_coords,
-                                              hematoma_type)
-                    new_volume[init_slice, :, :] = warped_slice
-                except ValueError:
-                    Warning(f'Failed to perform mass effect insertion for\
-                          volume: {desired_volume}, now inserting with mass\
-                          effect to 0')
-                    new_volume[init_slice] = HU_array[init_slice]
-                    phantom.mass_effect = 0
+                inclusion_mask = ski.morphology.binary_erosion(
+                    mask[init_slice], np.ones((5, 5)))
+                exclusion_mask = phantom.get_warp_exclusion_mask()[init_slice]
+                object_mask = filled_array & inclusion_mask & ~ exclusion_mask
+                object_mask = filled_array & inclusion_mask
+                warped_slice = warp_slice(axial_slice=HU_array[init_slice],
+                                          object_mask=object_mask,
+                                          inclusion_mask=inclusion_mask)
+                warped_slice[phantom.get_warp_exclusion_mask()[init_slice]] =\
+                    HU_array[init_slice][phantom.get_warp_exclusion_mask()[init_slice]]          
 
             hemorrhage_mask[init_slice, :, :] = filled_array
 
@@ -184,7 +175,7 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
         dura_idx = np.argwhere(temp_boundary == 1.0)
 
         if len(dura_idx) != 0:  # check that top or bottom of brain wasn't reached
-            
+
             # find closest boundary point to previous start
             distance_idx = np.zeros((len(dura_idx), 2))
 
@@ -203,12 +194,11 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
             new_start = dura_idx[np.argmin(distance_from_start)]
             new_end = dura_idx[np.argmin(distance_from_end)]
 
-            filled_array, boundary_coords, connect_coords =\
+            filled_array, boundary_coords, _ =\
                 connect_points(start=new_start,
                                end=new_end,
                                boundary=temp_boundary,
-                               hematoma_type=hematoma_type,
-                               initial_slice=False)
+                               hematoma_type=hematoma_type)
             try:
                 new_start = boundary_coords[1:-1][0]
                 new_end = boundary_coords[1:-1][-1]
@@ -217,21 +207,17 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
                 new_end = dura_idx[np.argmin(distance_from_end)]
 
             if mass_effect:
-                try:
-                    warped_slice = warp_slice(HU_array[init_slice-slice_idx],
-                                              skull_map[init_slice-slice_idx],
-                                              mask[init_slice-slice_idx],
-                                              boundary_coords,
-                                              connect_coords,
-                                              hematoma_type)
-                    new_volume[init_slice-slice_idx] = warped_slice
-                except ValueError:
-                    Warning(f'Failed to perform mass effect insertion for\
-                          volume: {desired_volume}, now inserting with mass\
-                          effect to 0')
-                    new_volume[init_slice-slice_idx] =\
-                        HU_array[init_slice-slice_idx]
-                    phantom.mass_effect = 0
+                inclusion_mask = ski.morphology.binary_erosion(
+                    mask[init_slice-slice_idx], np.ones((5, 5)))
+                axial_slice = HU_array[init_slice-slice_idx]
+                exclusion_mask = phantom.get_warp_exclusion_mask()[init_slice-slice_idx]
+                object_mask = filled_array & inclusion_mask & ~ exclusion_mask
+                warped_slice = warp_slice(axial_slice=axial_slice,
+                                          object_mask=object_mask,
+                                          inclusion_mask=inclusion_mask)
+                warped_slice[phantom.get_warp_exclusion_mask()[init_slice-slice_idx]] =\
+                    HU_array[init_slice-slice_idx][phantom.get_warp_exclusion_mask()[init_slice-slice_idx]]
+                new_volume[init_slice-slice_idx] = warped_slice
 
             hemorrhage_mask[init_slice-slice_idx] = filled_array
 
@@ -244,108 +230,230 @@ def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None)
             slice_counter += 1
             if slice_counter == num_slices:
                 iter_flag = False
-    
+
     return hemorrhage_mask.astype(bool), new_volume
 
 
-def connect_points(start, end, boundary, hematoma_type, initial_slice=False):
-    '''
-    Creates two lines connecting start and end points:
-    1. Line following existing dura (borders skull)
-    2. Bezier curve `inside` brain
-    '''
+def connect_points(
+    start: Union[Tuple[int, int], np.ndarray],
+    end: Union[Tuple[int, int], np.ndarray],
+    boundary: np.ndarray,
+    hematoma_type: str
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Creates two aligned coordinate paths connecting start and end points.
 
-    # Define first line (following dura)
+    One path follows a high-cost boundary in an image, and the second is a
+    Bézier curve running between the points. Both output paths are resampled
+    to have the same number of points and are de-duplicated. The paths form
+    a closed loop suitable for filling.
+
+    Args:
+        start: A tuple or NumPy array (row, col) for the starting coordinate.
+        end: A tuple or NumPy array (row, col) for the ending coordinate.
+        boundary: A 2D NumPy array where the desired path has a low cost
+                  (e.g., 1s on a background of 0s).
+        hematoma_type: A string ('EDH', 'SDH', or other) that determines the
+                       shape of the Bézier curve.
+
+    Returns:
+        A tuple containing:
+        - filled_array: A 2D NumPy array with the area between the two
+                        paths filled in.
+        - boundary_coords: An (N, 2) array of unique coordinates for the path
+                           along the boundary.
+        - connect_coords: An (N, 2) array of unique coordinates for the Bézier
+                          curve, with length N matching boundary_coords.
+    """
+    # --- 1. Find the path along the boundary (more efficiently) ---
+    costs = np.where(boundary == 1, 0, 10000)
+    path, _ = route_through_array(costs, start=tuple(start), end=tuple(end), fully_connected=False)
+
+    boundary_coords = np.array(path)
+    if len(boundary_coords) == 0:
+        raise ValueError("Could not find a path between start and end points on the boundary.")
+
+    # --- 2. Define Bézier Curve Parameters in a structured way ---
     rows, cols = boundary.shape
-    costs = np.where(boundary, 0, 10000)
-    path, _ = ski.graph.route_through_array(costs, start=(start[0], start[1]), end=(end[0], end[1]), fully_connected=False)
+    bezier_params = {
+        'EDH': {'weight': 0.14, 'middle': (rows / 2, cols / 2)},
+        'SDH': {'weight': 2.0, 'middle': boundary_coords[len(boundary_coords) // 2]},
+    }
+    params = bezier_params.get(hematoma_type, {'weight': 0.0, 'middle': (rows / 2, cols / 2)})
+    bezier_weight = params['weight']
+    bezier_middle = params['middle']
 
-    indices = np.stack(path, axis=-1)
-    boundary_route = np.zeros_like(boundary)
-    boundary_route[indices[0], indices[1]] = 1.0
+    # --- 3. Generate the Bézier Curve with a more robust retry mechanism ---
+    for i, weight in enumerate([bezier_weight, 0.0]):
+        rr, cc = bezier_curve(
+            r0=start[0], c0=start[1],
+            r1=int(bezier_middle[0]), c1=int(bezier_middle[1]),
+            r2=end[0], c2=end[1],
+            weight=weight
+        )
 
-    boundary_coords = np.zeros((len(path), 2))
-    for idx, coord in enumerate(path):
-        boundary_coords[idx, :] = np.array(coord)
+        generated_points = set(zip(rr, cc))
+        if tuple(start) in generated_points and tuple(end) in generated_points:
+            connect_coords_raw = np.stack((rr, cc), axis=-1)
+            break
 
-    # Define second line (Bezier curve)
-    successful_bezier = False
-    if hematoma_type == 'EDH':
-        bezier_weight = 0.14  # weight should probably be below 0.2 to avoid ballooning too much, but will break if 0.04....
-        bezier_middle = (int(rows/2), int(cols/2))  # defined as center of the image (roughly center of brain)
-    elif hematoma_type == 'SDH':
-        bezier_weight = 2
-        bezier_middle = boundary_coords[round(len(boundary_coords)/2)]  # use the middle point of the dura line
+        if i == 0 and bezier_weight == 0.0:
+            break
     else:
-        bezier_weight = 0.0
-        bezier_middle = (int(rows/2), int(cols/2))
+        sys.exit(f"Unable to create a valid Bézier curve between {start} and {end}.")
 
-    while successful_bezier == False:
-        rr, cc = ski.draw.bezier_curve(r0=start[0], c0=start[1],
-                                    r1=int(bezier_middle[0]),
-                                    c1=int(bezier_middle[1]),
-                                    r2=end[0], c2=end[1],
-                                    weight=bezier_weight)
+    # --- 4. Reorder and Resample the Bézier Curve (Vectorized) ---
+    distances = np.linalg.norm(connect_coords_raw - np.array(start), axis=1)
+    ordered_connect_coords = connect_coords_raw[np.argsort(distances)]
 
-        connecting_route = np.zeros_like(boundary)
-        connecting_route[rr, cc] = 1.0
-        connect_coords = np.stack((rr, cc), axis=-1)
+    num_points_boundary = len(boundary_coords)
+    if len(ordered_connect_coords) > 1:
+        t_original = np.linspace(0, 1, len(ordered_connect_coords))
 
-        # check if connecting route includes start and end:
-        if (connecting_route[start[0], start[1]] == 1) & (connecting_route[end[0], end[1]] == 1):
-            successful_bezier = True
-        else:
-            if bezier_weight != 0: # if bezier curve was unsuccessful with a nonzero weight, try with 0:
-                bezier_weight = 0
-            else:
-                sys.exit('Unable to create bezier curve with weight=0')
+        f_row = interp1d(t_original, ordered_connect_coords[:, 0], kind='linear')
+        f_col = interp1d(t_original, ordered_connect_coords[:, 1], kind='linear')
 
-    # re-order coordinates by distance from start point
-    connect_coords = connect_coords.tolist()
-    connect_coords.sort(key=lambda p: math.dist(p, [start[0], start[1]]))
-    connect_coords = np.array(connect_coords)
+        t_new = np.linspace(0, 1, num_points_boundary)
 
-    filled_array = scipy.ndimage.binary_fill_holes(np.where(np.add(connecting_route, boundary_route) > 0, 1.0, 0)).astype(int)
+        row_new = f_row(t_new)
+        col_new = f_col(t_new)
+
+        connect_coords = np.vstack((row_new, col_new)).T
+        connect_coords[0] = start
+        connect_coords[-1] = end
+        connect_coords = connect_coords.astype(int)
+    else:
+        connect_coords = np.repeat(ordered_connect_coords, num_points_boundary, axis=0)
+
+    # --- 5. Remove duplicate coordinates from both paths to ensure uniqueness ---
+    # A coordinate is a duplicate if it's identical to a preceding coordinate.
+    # We find duplicates in each path and remove the corresponding indices from 
+    # both paths to maintain alignment for transformations like ThinPlateSpline.
+
+    def get_duplicate_mask(arr):
+        # Using a structured array to treat rows as single entities for finding uniqueness
+        # This is more robust and often faster than lexsort for this purpose.
+        _, unique_indices = np.unique(arr, axis=0, return_index=True)
+        duplicate_mask = np.ones(len(arr), dtype=bool)
+        duplicate_mask[np.sort(unique_indices)] = False
+        return duplicate_mask
+
+    duplicate_mask_b = get_duplicate_mask(boundary_coords)
+    duplicate_mask_c = get_duplicate_mask(connect_coords)
+
+    # Combine the masks: an index is removed if it's a duplicate in *either* path
+    combined_duplicate_mask = duplicate_mask_b | duplicate_mask_c
+
+    # Keep only the non-duplicate indices by inverting the mask
+    boundary_coords = boundary_coords[~combined_duplicate_mask]
+    connect_coords = connect_coords[~combined_duplicate_mask]
+    connect_coords[0] = boundary_coords[0]  # Ensure the first point matches the boundary start
+    connect_coords[-1] = boundary_coords[-1]  # Ensure the last point matches the boundary end
+    # --- 6. Create Final Filled Array from a Guaranteed Closed Loop ---
+    # This step is performed *after* de-duplication to ensure the final paths are used.
+    # To ensure a perfectly closed loop for filling, we combine the two paths.
+    # We take the boundary path, and append the connecting path in reverse order
+    # (so it goes from 'end' back to 'start'), removing the shared endpoints
+    # from the reversed path to avoid overlap.
+    if len(boundary_coords) > 0 and len(connect_coords) > 0:
+        closed_loop_coords = np.concatenate(
+            (boundary_coords, connect_coords[::-1][1:-1])
+        )
+
+        # Create the perimeter on an empty array
+        perimeter_array = np.zeros_like(boundary, dtype=float)
+        rows, cols = closed_loop_coords[:, 0], closed_loop_coords[:, 1]
+        perimeter_array[rows, cols] = 1.0
+        # perimeter_array = ski.morphology.closing(perimeter_array, np.ones((3, 3)))
+        # Fill the area enclosed by the perimeter
+        filled_array = ski.morphology.convex_hull_image(perimeter_array)
+    else:
+        # If de-duplication resulted in an empty path, return an empty filled_array
+        filled_array = np.zeros_like(boundary, dtype=int)
 
     return filled_array, boundary_coords, connect_coords
 
 
-def warp_slice(axial_slice, exclusion_mask, inclusion_mask, src, dst, hematoma_type):
-    '''
-    performs warp of 2D slice according to hematoma boundary coordinates
-    while maintaining a rigid skull
+def warp_slice(
+    axial_slice: np.ndarray,
+    object_mask: np.ndarray,
+    inclusion_mask: np.ndarray,
+    max_displacement: float = 15.0,
+    decay_factor: float = 40.0
+) -> np.ndarray:
+    """
+    Performs a localized warp on a 2D slice based on a displacement field.
 
-    exclusion_mask: pixels which will no move
-    inclusion_mask: pixels allowed to move
-    src: coordinates of source point
-    dst: coordinates of destination point
-    '''
+    Pixels inside the `inclusion_mask` are "pushed" away from the `object_mask`.
+    Pixels outside the `inclusion_mask` remain stationary.
 
-    # find transform and execute warp
-    tps = ski.transform.ThinPlateSplineTransform()
-    tps.estimate(np.flip(dst), np.flip(src))
-    warped_slice = ski.transform.warp(axial_slice, tps, preserve_range=True, order=0)
+    Args:
+        axial_slice: The 2D image data to be warped.
+        object_mask: A boolean mask defining the object causing displacement.
+        inclusion_mask: A boolean mask defining the region of pixels to be warped.
+        max_displacement: The maximum distance in pixels a point can be displaced.
+        decay_factor: Controls how quickly the displacement effect falls off
+                      with distance from the object_mask. Larger values mean
+                      the effect extends further.
 
-    # trying to warp around small subdural hematomas on superior brain slices may result
-    # in a warp artifact where the image just becomes all (or mostly). if this happens, skip
-    # mass effect and just use original brain slice
-    # TODO: find more elegant methods for fixing warping artifacts 
-    if (np.mean(warped_slice) > -10) & (np.mean(warped_slice) < 10):
-        warped_slice = axial_slice
-    else: # if warp was successful, check for spurious hyperdense voxels from warp and replace 
-        masked_axial = axial_slice*inclusion_mask
-        # new code to try to "fix" skull warping into brain
-        problem_voxels = np.argwhere((exclusion_mask != 1) & (warped_slice > 50))
-        for index in problem_voxels:
-            if hematoma_type == 'EDH' or 'SDH':
-                warped_slice[index[0], index[1]] = 40 # HU value of dura mater
-            elif hematoma_type == 'IPH':
-                warped_slice[index[0], index[1]] = masked_axial[masked_axial!=0].mean()
+    Returns:
+        The warped 2D image as a NumPy array.
+    """
+    rows, cols = axial_slice.shape
 
-        # finally, replace all voxels outside brain with original voxels
-        warped_slice = np.where(inclusion_mask==1, warped_slice, axial_slice)
+    # --- 1. Calculate the displacement field based on the object_mask ---
+    # We calculate the distance from each pixel to the nearest "True" pixel in object_mask.
+    # `indices` will have shape (2, H, W) and will contain the (row, col)
+    # of the nearest object pixel for each point in the grid.
+    _, indices = distance_transform_edt(~object_mask, return_indices=True)
 
-    return warped_slice
+    # --- 2. Create coordinate grids ---
+    # `output_coords` has shape (H, W, 2) and holds the (row, col) for each pixel.
+    output_coords = np.indices((rows, cols), dtype=float).transpose(1, 2, 0)
+    # `indices` needs to be in the same (H, W, 2) format.
+    nearest_object_coords = indices.transpose(1, 2, 0)
+
+    # --- 3. Calculate and scale displacement vectors ---
+    # Vector from the nearest object point TO each grid point. This points "away".
+    displacement_vectors = output_coords - nearest_object_coords
+
+    # Calculate the distance (magnitude of the displacement vectors).
+    # Add a small epsilon to avoid division by zero later.
+    distances = np.linalg.norm(displacement_vectors, axis=-1) + 1e-6
+
+    # Create a scaling factor that decays with distance via an exponential function.
+    # The displacement is strongest near the object and fades out.
+    scale_factors = max_displacement * np.exp(-distances / decay_factor)
+
+    # To apply the scaled magnitude, normalize the original vectors and multiply.
+    scaled_displacement = displacement_vectors / distances[..., np.newaxis] * scale_factors[..., np.newaxis]
+
+    # The final "pull" location for a pixel is its original position minus the displacement.
+    src_coords = output_coords - scaled_displacement
+
+    # --- 4. Create a final, blended "flow field" ---
+    # This logic is preserved: we only apply the warp inside the inclusion_mask.
+    # Outside the mask, the mapping is an "identity" transform (r,c -> r,c).
+    final_src_coords = np.where(
+        inclusion_mask[..., np.newaxis],  # Broadcast inclusion_mask to match shape
+        src_coords,
+        output_coords  # The identity mapping
+    )
+
+    # --- 5. Apply the transformation using the flow field ---
+    # Reshape the flow field back to the (2, H, W) shape required by map_coordinates.
+    final_src_coords_reshaped = final_src_coords.transpose(2, 0, 1)
+
+    # `map_coordinates` efficiently pulls pixels from the `axial_slice`.
+    warped_slice = map_coordinates(
+        axial_slice,
+        final_src_coords_reshaped,
+        order=1,
+        prefilter=True,  # Recommended for interpolation order > 0
+        cval=np.min(axial_slice)  # Fill pixels mapped from outside with the image minimum
+    )
+
+    return warped_slice.astype(axial_slice.dtype)
 
 
 def coverage_from_volume(volume, hematoma_type, slice_thickness):
@@ -373,3 +481,118 @@ def coverage_from_volume(volume, hematoma_type, slice_thickness):
         slice_coverage = slice_coverage - 1
 
     return slice_coverage
+
+
+# --- Method 1: 3D Perlin Noise ---
+def generate_3d_perlin_texture(depth=32, height=128, width=128, scale=50.0,
+                               octaves=4, persistence=0.5, lacunarity=2.0,
+                               seed=None) -> np.ndarray:
+    """
+    Generates a 3D texture using Perlin noise.
+
+    Args:
+        depth (int): The depth of the texture.
+        height (int): The height of the texture.
+        width (int): The width of the texture.
+        scale (float): The 'zoom' level of the noise. Larger values result in lower frequency.
+        octaves (int): The number of noise layers to combine.
+        persistence (float): The amplitude multiplier for each subsequent octave.
+        lacunarity (float): The frequency multiplier for each subsequent octave.
+        seed (int, optional): Seed for reproducibility. If None, a random seed is used.
+    Returns:
+        np.ndarray: A 3D numpy array containing the generated texture.
+    If `seed` is provided, it will be used to ensure reproducibility.
+    If `seed` is None, a random seed will be used.
+    """
+    texture_array = np.zeros((depth, height, width))
+    for z in range(depth):
+        for y in range(height):
+            for x in range(width):
+                texture_array[z][y][x] = noise.pnoise3(x / scale,
+                                                       y / scale,
+                                                       z / scale,
+                                                       octaves=octaves,
+                                                       persistence=persistence,
+                                                       lacunarity=lacunarity,
+                                                       repeatx=width,
+                                                       repeaty=height,
+                                                       repeatz=depth,
+                                                       base=seed)
+    return texture_array
+
+
+# --- Method 2: 3D Simplex Noise ---
+def generate_3d_simplex_texture(depth=32, height=128, width=128, scale=50.0,
+                                octaves=4, persistence=0.5,
+                                lacunarity=2.0) -> np.ndarray:
+    """
+    Generates a texture using a single layer of Simplex noise.
+
+    Args:
+        depth (int): The depth of the texture.
+        height (int): The height of the texture.
+        width (int): The width of the texture.
+        scale (float): The 'zoom' level of the noise.
+        octaves (int): The number of noise layers to combine.
+        persistence (float): The amplitude multiplier for each subsequent octave.
+        lacunarity (float): The frequency multiplier for each subsequent octave.
+    Returns:
+        np.ndarray: A 3D numpy array containing the generated texture.
+    """
+    texture_array = np.zeros((depth, height, width))
+    for z in range(depth):
+        for y in range(height):
+            for x in range(width):
+                texture_array[z][y][x] = noise.snoise3(x / scale, 
+                                                       y / scale,
+                                                       z / scale,
+                                                       octaves=octaves,
+                                                       persistence=persistence,
+                                                       lacunarity=lacunarity)
+    return texture_array
+
+
+# --- Method 3: 3D Fractional Brownian Motion (fBm) / Turbulence ---
+def generate_3d_fbm_texture(depth=32, height=128, width=128, scale=75.0,
+                            octaves=6, persistence=0.5, lacunarity=2.0,
+                            seed=None) -> np.ndarray:
+    """
+    Generates a more complex, mottled texture using Fractional Brownian Motion (fBm).
+    This is essentially layering multiple octaves of noise.
+
+    Args:
+        depth (int): The depth of the texture.
+        height (int): The height of the texture.
+        width (int): The width of the texture.
+        scale (float): The base 'zoom' level of the noise.
+        octaves (int): The number of noise layers.
+        persistence (float): How much each octave contributes to the overall shape.
+        lacunarity (float): How much detail is added with each octave.
+        seed (int, optional): Seed for reproducibility. If None, a random seed is used.
+    Returns:
+        np.ndarray: A 3D numpy array containing the generated texture.
+    If `seed` is provided, it will be used to ensure reproducibility.
+    If `seed` is None, a random seed will be used.
+    """
+    # This is identical in implementation to the multi-octave Perlin noise function,
+    # as pnoise2 with octaves > 1 is an implementation of fBm.
+    # We use different parameters here to highlight its use for mottled textures.
+    return generate_3d_perlin_texture( depth, height, width, scale, octaves, persistence, lacunarity, seed=seed)
+
+
+# --- Method 4: 3D Filtered Random Noise ---
+def generate_3d_filtered_noise_texture(depth=32, height=128, width=128, sigma=10.0):
+    """
+    Generates a texture by applying a Gaussian low-pass filter to random noise.
+
+    Args:
+        width (int): The width of the texture.
+        height (int): The height of the texture.
+        sigma (float): The standard deviation for the Gaussian kernel. 
+                       Larger values create smoother, lower-frequency textures.
+    """
+    # Create a 3D array of random values
+    random_noise = np.random.rand(depth, height, width)
+    # Apply the 3D Gaussian filter
+    filtered_noise = gaussian_filter(random_noise, sigma=sigma)
+    return filtered_noise

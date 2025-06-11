@@ -1,10 +1,24 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from VITools import read_dicom
+from VITools import read_dicom, get_available_phantoms
 from insilicoICH.phantoms.base_phantoms import get_transformation_src_dst
 from insilicoICH.lesion_definition import warp_slice
 
 from ipywidgets import interact, IntSlider
+
+available_phantoms = get_available_phantoms()
+
+
+def load_phantom(age, shape=None):
+    '''
+    load a phantom for testing
+    '''
+    if age < 6.5:
+        return available_phantoms[f'{age} yr UNC Head'](shape=shape)
+    if age < 19.0:
+        return available_phantoms[f'{age} yr NIHPD Head'](shape=shape)
+    if age == 38.0:
+        return available_phantoms[f'{age} yr MIDA Head'](shape=shape)
 
 
 def make_and_display_lesion(phantom, lesion_type='round', volume=2,

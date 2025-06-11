@@ -5,6 +5,7 @@ module for working with phantoms
 from pathlib import Path
 import os
 from functools import partial
+from warnings import warn
 
 import numpy as np
 import nibabel as nib
@@ -12,19 +13,17 @@ import SimpleITK as sitk
 import pandas as pd
 import skimage as ski
 from dotenv import load_dotenv
-from warnings import warn
-
 from skimage.morphology import (binary_closing,
                                 remove_small_holes,
                                 binary_dilation,
                                 binary_erosion)
 from monai.transforms import ResizeWithPadOrCrop
-
 from scipy.ndimage import distance_transform_edt
-
-from .base_phantoms import LesionPhantom, resize, get_mean_age, get_transformation_src_dst
-from .utils import download_and_extract_archive
 from VITools.hooks import hookimpl
+
+from .base_phantoms import (LesionPhantom, resize,
+                            get_mean_age, get_transformation_src_dst)
+from .utils import download_and_extract_archive
 
 
 load_dotenv()
