@@ -3,8 +3,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from insilicoICH.recruit_study import recruitment_cli
-from insilicoICH.pipeline import insilicoich_cli
+from insilicoICH.study import insilicoich_cli, recruitment_cli
 
 test_dir = Path(__file__).parent.absolute()
 
@@ -14,7 +13,7 @@ def test_cli():
 
     inclusion_criteria = test_dir / 'test_inclusion_criteria.toml'
 
-    recruitment_cli([str(inclusion_criteria), "--output_directory", str(output_dir)])
+    recruitment_cli([str(inclusion_criteria), "--OutputDirectory", str(output_dir)])
 
     input_csv = output_dir / (output_dir.name + '.csv')
 
