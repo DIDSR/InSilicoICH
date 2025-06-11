@@ -87,7 +87,7 @@ class SkullProcess(Skull):
 
         # Convert back to PolyData if needed
         return grid.extract_surface()
-    
+
     def _check(self):
         # Load the mesh
         mesh = self.mesh_brain.extract_geometry()
@@ -114,9 +114,9 @@ class SkullProcess(Skull):
             idx = ((pt - min_bounds) / voxel_size).astype(int)
             if np.all(idx >= 0) and np.all(idx < dims):
                 voxels[tuple(np.add(idx, [24, 25, 0]))] = 1
-        
+
         voxels = np.flip(voxels, axis=1)
-        
+
         path_mask_brain = os.path.join(
             main_directory, "src/NIHPD_Head_Phantom", "nihpd_asym_04.5-08.5_mask.nii"
         )
@@ -177,10 +177,10 @@ class SkullProcess(Skull):
     def get_nifti_info(self, nifti_path):
         img = nib.load(nifti_path)
         array = img.get_fdata()
-        shape = img.shape                      # (z, y, x) or (x, y, z), depending on orientation
-        affine = img.affine                    # 4x4 affine transformation matrix
+        shape = img.shape  # (z, y, x) or (x, y, z), depending on orientation
+        affine = img.affine  # 4x4 affine transformation matrix
         spacing = np.sqrt((affine[:3, :3] ** 2).sum(axis=0))  # voxel spacing
-        origin = affine[:3, 3]                 # origin (translation component)
+        origin = affine[:3, 3]  # origin (translation component)
 
         return shape, origin, spacing, affine, array
 
@@ -188,7 +188,9 @@ class SkullProcess(Skull):
         """
         While extracting the skull, center of the mesh is lost. This method provides the skull center relative to voxel space (from mesh space), to be used later while converting to voxels.
         """
-        shape, origin, spacing, affine, array  = self.get_nifti_info(self.path_mask_brain)
+        shape, origin, spacing, affine, array = self.get_nifti_info(
+            self.path_mask_brain
+        )
 
         # Load the mesh
         mesh = self.mesh_brain.extract_geometry()
@@ -207,12 +209,14 @@ class SkullProcess(Skull):
         return idx
 
     def mesh_to_voxel_center(self):
-        shape, origin, spacing, affine, array  = self.get_nifti_info(self.path_mask_brain)
+        shape, origin, spacing, affine, array = self.get_nifti_info(
+            self.path_mask_brain
+        )
         indices = np.argwhere(array.astype(int) == 1)
         offset = [np.min(indices[:, 0]), np.min(indices[:, 1]), np.min(indices[:, 2])]
         offset[2] = self.get_center_voxel_space()[2]
-        print('offset', offset)
-        print('affine', affine)
+        print("offset", offset)
+        print("affine", affine)
 
         # Load the mesh
         mesh = self.mesh_skull.extract_geometry()
@@ -234,7 +238,7 @@ class SkullProcess(Skull):
             idx = ((pt - min_bounds) / voxel_size).astype(int)
             if np.all(idx >= 0) and np.all(idx < shape):
                 voxels[tuple(np.add(idx, offset))] = 1
-        
+
         voxels = np.flip(voxels, axis=1)
 
         nifti_img = nib.Nifti1Image(voxels.astype(np.uint8), affine)
@@ -248,6 +252,14 @@ class SkullProcess(Skull):
                 "mesh_skull_voxel.nii.gz",
             ),
         )
+
+    def get_neighbour_cells_info(self, mesh, ind_maincell):
+        """
+        Get the list of indices of the neighbor cells.
+        """
+        neighbors = mesh.cell_neighbors(ind_maincell)
+
+        return neighbors
 
     def remove_voxel_spherical_coordi(self, list_start=None, list_direction=None):
         """
@@ -265,6 +277,11 @@ class SkullProcess(Skull):
         for start, stop in zip(list_start, list_stop):
             points, inds = self.mesh_skull.ray_trace(start, stop)
             list_indice_intersect.extend(inds)
+
+            for ind in inds:
+                list_indice_intersect.extend(
+                    self.get_neighbour_cells_info(self.mesh_skull, ind)
+                )
 
         self.mesh_skull = self.mesh_skull.extract_surface()
 
@@ -439,10 +456,12 @@ if __name__ == "__main__":
     )
 
     path_mask_brain = os.path.join(
-            main_directory, "src/NIHPD_Head_Phantom", "nihpd_asym_04.5-08.5_mask.nii"
-        )
+        main_directory, "src/NIHPD_Head_Phantom", "nihpd_asym_04.5-08.5_mask.nii"
+    )
 
-    object_skull_process = SkullProcess(path_mesh_brainmask=path_mesh_brainmask, path_mask_brain=path_mask_brain)
+    object_skull_process = SkullProcess(
+        path_mesh_brainmask=path_mesh_brainmask, path_mask_brain=path_mask_brain
+    )
     object_skull_process.extract_skull()
     object_skull_process.extract_primary_skull_mesh()
     object_skull_process.add_fracture()
