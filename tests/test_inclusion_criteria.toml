@@ -3,30 +3,30 @@
 #
 # uncommented parameters here will override defaults
 [general]
-output_directory="default_study"
-zspan=[0, 10]  # scan range in mm, min max, comment out to scan whole range
-desired_cases=2  # desired dataset size
-keep_raw=false  # keep projection data
-seed=88  # seed to reproduce dataset, set to false or integer
+OutputDirectory="default_study"
+ScanCoverage=[0, 10]  # scan range in mm, min max, comment out to scan whole range
+StudyCount=2  # desired dataset size
+RemoveRawData=false  # keep projection data
+Seed=88  # seed to reproduce dataset, set to false or integer
 
 [patient]
-age=[0, 18]  # range in yrs [min, max]
+Age=[0, 18]  # range in yrs [min, max]
 
 [lesion]
-subtypes=['IPH', 'SDH', 'EDH'] # add [false] for hemorrhage-absent cases
-mass_effect=true  # whether lesions displace brain tissue
-edema=[0, 15]  # edema width range [min, max] in pixels
-volume='src/insilicoICH/distributions/BHSD_volume_distributions.csv'  # str or list
-attenuation='src/insilicoICH/distributions/BHSD_HU_distributions.csv'  # str or list
+Subtype=['IPH', 'SDH', 'EDH'] # add [false] for hemorrhage-absent cases
+MassEffect=true  # whether lesions displace brain tissue
+Edema=[0, 15]  # edema width range [min, max] in pixels
+LesionVolume='src/insilicoICH/distributions/BHSD_volume_distributions.csv'  # str or list
+LesionAttenuation='src/insilicoICH/distributions/BHSD_HU_distributions.csv'  # str or list
 
 [acquisition]
-scanner=['GE_Lightspeed16','Scanner_Default']
-views=[20]
+ScannerModel=['GE_Lightspeed16','Scanner_Default']
+Views=[20]
 kVp=[120]  # Tube potential: The electric potential applied across an x-ray tube to accelerate electrons towards a target material, expressed in units of kilovolts (kV) 
 mA=[200]  # Tube current: Number of electrons accelerated across an x-ray tube per unit time, expressed in units of milliampere (mA)
-pitch=[0.5]  # pitch = 0 for axial model, pitch > 0 for helical, recommend pitch < 0.6 for head
+Pitch=[0.5]  # pitch = 0 for axial model, pitch > 0 for helical, recommend pitch < 0.6 for head
 #  Unitless parameter used to describe the table travel during helical CT; equal to table travel (mm) per gantry rotation ÷ total nominal beam width (mm) 
 [recon]
-kernel=['standard']  # Reconstruction property that determines sharpness or smoothness of image in the axial plane 
-slice_thickness=[1]  # Nominal width of reconstructed image along the z axis 
-slice_increment=[1]  # Distance between two consecutive reconstructed images
+ReconKernel=['standard']  # Reconstruction property that determines sharpness or smoothness of image in the axial plane 
+SliceThickness=[1]  # Nominal width of reconstructed image along the z axis 
+SliceIncrement=[1]  # Distance between two consecutive reconstructed images

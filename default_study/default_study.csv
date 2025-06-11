@@ -1,4 +1,4 @@
-CaseID,Age,Scanner,kVp,mA,Pitch,Views,ScanCoverage,ReconKernel,SliceThickness(mm),SliceIncrement(mm),LesionAttenuation(HU),Subtype,LesionVolume(mL),Edema,MassEffect,GlobalSeed,CaseSeed,OutputDirectory
-case_000,10.5,Scanner_Default,120.0,200.0,0.5,100.0,"[0, 10]",standard,2,1,47.56226441847765,SDH,5.354621313833025,0,True,596184,869449,default_study
-case_001,0.0,Scanner_Default,120.0,200.0,0.5,100.0,"[0, 10]",standard,2,1,60.21824115903722,EDH,4.159623610243102,0,True,596184,588332,default_study
-case_002,6.5,GE_Lightspeed16,120.0,200.0,0.5,100.0,"[0, 10]",standard,1,1,58.083197453024354,EDH,12.56792441346169,0,True,596184,105914,default_study
+CaseID,Phantom,ScannerModel,kVp,mA,Pitch,Views,ScanCoverage,ReconKernel,SliceThickness,SliceIncrement,FOV,GlobalSeed,CaseSeed,OutputDirectory,RemoveRawData,Age,LesionAttenuation,Subtype,LesionVolume,Edema,MassEffect,AddAugmentation
+case_0000,9.0 yr NIHPD Head,Scanner_Default,120.0,200.0,0.5,100.0,"[0, 10]",standard,1,1,250,562727,416037,/home/brandon.nelson/Dev/PedSilicoICH/results/case_0000,True,9.0,52.15430017330228,SDH,18.66797169192197,0,True,True
+case_0001,15.75 yr NIHPD Head,GE_Lightspeed16,120.0,200.0,0.5,100.0,"[0, 10]",standard,1,1,250,562727,528082,/home/brandon.nelson/Dev/PedSilicoICH/results/case_0001,True,15.75,52.389747570323365,EDH,15.721037214668655,0,True,True
+case_0002,38.0 yr MIDA Head,Scanner_Default,120.0,200.0,0.5,100.0,"[0, 10]",standard,1,1,250,562727,413318,/home/brandon.nelson/Dev/PedSilicoICH/results/case_0002,True,38.0,57.727356835355536,EDH,17.823112415473304,0,True,True

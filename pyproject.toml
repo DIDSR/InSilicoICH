@@ -17,7 +17,7 @@ dependencies = [
   "SimpleITK",
   "pydicom",
   "requests",
-  "VITools @ git+https://github.com/DIDSR/VITools.git"
+  # "VITools @ git+https://github.com/DIDSR/VITools.git"
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -36,9 +36,8 @@ Homepage = "https://github.com/DIDSR/InSilicoICH"
 Issues = "https://github.com/DIDSR/InSilicoICH/issues"
 
 [project.scripts]
-generate = "insilicoICH.pipeline:insilicoich_cli"
-insilicoich = "insilicoICH.pipeline:insilicoich_cli" # keeping for now for backwards compatibility
-recruit = "insilicoICH.recruit_study:recruitment_cli"
+generate = "insilicoICH.study:insilicoich_cli"
+recruit = "insilicoICH.study:recruitment_cli"
 
 [project.entry-points."VITools"] # Must match PROJECT_NAME
 head_phantoms = "insilicoICH.phantoms.head_phantoms"
