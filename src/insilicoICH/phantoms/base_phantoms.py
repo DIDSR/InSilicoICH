@@ -5,7 +5,6 @@ module for working with phantoms
 import os
 
 import numpy as np
-import skimage as ski
 from skimage.morphology import binary_erosion
 from monai.transforms import Resize, RandAffine, Affine
 
@@ -68,29 +67,6 @@ def get_semi_major_axes(eccentricity, seed=None):
     return np.array(foci)
 
 
-def get_transformation_src_dst(lesion: np.ndarray[bool],
-                               strength: int = 0):
-    '''
-    returns `src` and `dst` arrays to insert `lesion` into an img of the same
-    shape. e.g. of the head and applies a mass effect warping of the local
-    tissues.
-
-    This function takes a solid lesion and extracts the perimeter as the input
-     `dst` to `warp_slice` and applies the perimeter `strength` to determine
-    how many erosions make up the `src` input to `warp` slice, where higher
-    strength yields a greater degree of warping by creating a greater distance
-    between `src` and `dst`. See `warp_slice` for more details.
-    :param lesion: a 2D binary image of the lesion, must be same shape as img
-    '''
-    if (strength < 0) or (strength > 1):
-        raise ValueError(f'strength {strength} is not in allowed range [0, 1]')
-    footprint = int(strength*np.ceil(distance_transform_edt(lesion).max()))
-    dst = ld.get_perimeter(lesion)
-    src = ld.get_perimeter(ski.morphology.binary_erosion(lesion,
-                                                      np.ones(2*[footprint])))
-    return src, dst
-
-
 def get_mean_age(age_range: str):
     return (float(age_range.split('-')[1])+float(age_range.split('-')[0]))/2
 
@@ -102,8 +78,8 @@ def resize(phantom, shape, **kwargs):
 
 
 class LesionPhantom(Phantom):
-    '''
-    A Phantom object with methods for inserting lesions.
+    '''A Phantom object with methods for inserting lesions.
+
     '''
     lesion_types = {'IPH': {
         'volume': [0, 100],
@@ -126,13 +102,15 @@ class LesionPhantom(Phantom):
                     }
 
     def __init__(self, img: np.ndarray, spacings: tuple = (1, 1, 1), **kwargs):
-        '''
-        Initializes a LesionPhantom object.
+        """Initializes a LesionPhantom object.
 
-        Parameters:
-        - img: numpy.ndarray, image data of the phantom.
-        :param spacings: tuple, voxel spacings (dz, dx, dy). Default is (1, 1, 1).
-        '''
+        Args:
+            img (np.ndarray): The image data of the phantom.
+            spacings (tuple, optional): The voxel spacings in (dz, dx, dy)
+                format. Defaults to (1, 1, 1).
+            **kwargs: Additional keyword arguments passed to the parent class's
+                initializer.
+        """
         super().__init__(img, spacings, **kwargs)
         self._lesion = []
         self._lesion_coords = []
@@ -149,22 +127,37 @@ class LesionPhantom(Phantom):
         return np.ones(self.shape, dtype=bool)
 
     def resize(self, shape: tuple, **kwargs) -> None:
-        '''
-        Resizes the phantom array to the given shape and adjusts the spacings accordingly.
+        """Resizes the phantom array and adjusts spacings.
 
-        :param shape: tuple, new shape for the phantom array
-        '''
+        This method resizes the phantom array, warp exclusion mask, and warp
+        inclusion mask to the specified shape, adjusting spacings accordingly.
+
+        Args:
+            shape (tuple): The new shape for the phantom array.
+            **kwargs: Additional keyword arguments passed to the resize
+                function.
+
+        Returns:
+            None: The method modifies the array and masks in place.
+        """
         super().resize(shape, **kwargs)
-        self.warp_exclusion_mask = resize(self.warp_exclusion_mask, shape, **kwargs).astype(bool)
-        self.warp_inclusion_mask = resize(self.warp_inclusion_mask, shape, **kwargs).astype(bool)
+        self.warp_exclusion_mask = resize(
+            self.warp_exclusion_mask, shape, **kwargs).astype(bool)
+        self.warp_inclusion_mask = resize(
+            self.warp_inclusion_mask, shape, **kwargs).astype(bool)
 
     def get_lesion_volume(self, unit='mL'):
-        '''
-        Calculates the volume of the lesion in either milliliters (mL) or cubic millimeters (mm3).
+        """Calculates the volume of the lesion.
 
-        :param unit: str, unit of the lesion volume. Default is 'mL'.
-        :return: float, volume of the lesion.
-        '''
+        The volume can be determined in either milliliters (mL) or cubic 
+        millimeters (mm3).
+
+        Args:
+            unit (str): The unit of the lesion volume. Defaults to 'mL'.
+
+        Returns:
+            float: The volume of the lesion.
+        """
         vol_mm3 = self.dx * self.dy * self.dz * self.get_lesion_mask().sum()
         if unit == 'mm3':
             return vol_mm3
@@ -172,11 +165,14 @@ class LesionPhantom(Phantom):
             return vol_mm3 / 1000
 
     def __repr__(self) -> str:
-        '''
-        Returns a string representation of the LesionPhantom object.
+        """Returns the string representation of the LesionPhantom object.
 
-        :return: str, string representation of the LesionPhantom object.
-        '''
+        This representation includes details from the parent class, along with
+        the number of lesions, their coordinates, and the mass effect status.
+
+        Returns:
+            str: The string representation of the object.
+        """
         repr = super().__repr__() + f'''
         Number of lesions: {len(self._lesion_coords)}
         Lesion locations [voxel index (z, x, y)]: {self._lesion_coords}
@@ -186,28 +182,41 @@ class LesionPhantom(Phantom):
 
     @property
     def spacings(self):
-        '''
-        Returns the voxel spacings of the phantom.
+        """The voxel spacings of the phantom.
 
-        :return: tuple, voxel spacings (dz, dx, dy).
-        '''
+        Returns:
+            tuple: Voxel spacings in (dz, dx, dy) format.
+        """
         return self.dz, self.dx, self.dy
 
     def get_noise_texture(self, noise_type='perlin', contrast=80,
                           contrast_std=1, scale=15, seed=None, **kwargs):
-        '''
-        Generates a noise texture for the phantom.
-        :param noise_type: str, type of noise to generate. Options include 'perlin', 'simplex', 'fbm', and 'filtered_noise'.
-        :param contrast: float, contrast level of the noise texture. Default is 80.
-        :param contrast_std: float, standard deviation of the contrast. Default is 1.
-        :param scale: float, The 'zoom' level of the noise. Larger values result in lower frequency. Default is 15.
-        :param kwargs: additional keyword arguments to pass to the noise generation function.
-        :return: numpy.ndarray, noise texture of the phantom.
-        :raises ValueError: if an unknown noise type is provided or if contrast_std is negative.
-        '''
+        """Generates a noise texture for the phantom.
+
+        Args:
+            noise_type (str): Type of noise to generate. Options include
+                'perlin', 'simplex', 'fbm', and 'filtered_noise'.
+            contrast (float, optional): Contrast level of the noise texture.
+                Defaults to 80.
+            contrast_std (float, optional): Standard deviation of the contrast.
+                Defaults to 1.
+            scale (float, optional): The 'zoom' level of the noise. Larger
+                values result in lower frequency. Defaults to 15.
+            **kwargs: Additional keyword arguments to pass to the noise
+                generation function.
+
+        Returns:
+            numpy.ndarray: The generated noise texture for the phantom.
+
+        Raises:
+            ValueError: If an unknown noise type is provided or if
+                contrast_std is negative.
+
+        """
         if noise_type not in ['perlin', 'simplex', 'fbm', 'filtered_noise']:
-            raise ValueError(f'Unknown noise type: {noise_type}. '
-                             'Options are: perlin, simplex, fbm, filtered_noise.')
+            raise ValueError(
+                f'Unknown noise type: {noise_type}. '
+                  'Options are: perlin, simplex, fbm, filtered_noise.')
         if contrast_std < 0:
             raise ValueError(f'contrast_std {contrast_std} must be >= 0')
 
@@ -236,24 +245,28 @@ class LesionPhantom(Phantom):
         return noise_texture*contrast_std*contrast + contrast
 
     def insert_lesion(self, lesion_type, volume=5, intensity=50,
-                      mass_effect=False, seed=None,
-                      texture_args: dict | None = None, **iph_kwargs):
+                      mass_effect: float = 0.5, seed=None,
+                      texture_kwargs: dict = {},
+                      iph_kwargs: dict = {}):
         """Inserts a lesion of a specified type into the phantom array.
 
         Args:
             lesion_type (str): Type of the lesion. Options include 'IPH'
                 (intraparenchymal), 'EDH' (epidural), and 'SDH' (subdural).
-            volume (float, optional): Volume of the lesion in mL. Defaults to 5.
+            volume (float, optional): Volume of the lesion in mL.
+                Defaults to 5.
             intensity (int, optional): CT number of the lesion in HU.
                 Defaults to 50.
-            mass_effect (bool, optional): Whether to apply mass effect processing
-                to displace brain tissue following lesion insertion.
-                Defaults to False.
+            mass_effect (bool | float, optional): Whether to apply mass effect
+                processing to displace brain tissue following lesion insertion.
+                Defaults to False. If True, a default strength of 0.5 is used.
+                If a float is provided, it controls the strength of the effect,
+                where 1.0 causes a large degree of warping.
             seed (int, optional): Seed for reproducible lesion insertion.
                 Defaults to None.
             iph_kwargs: Additional keyword arguments for the IPH lesion
                 insertion function.
-            texture_args (dict, optional): Arguments for the noise texture
+            texture_kwargs (dict, optional): Arguments for the noise texture
                 generation. If None, default parameters are used.
 
         Returns:
@@ -261,30 +274,35 @@ class LesionPhantom(Phantom):
 
         Raises:
             ValueError: If an unknown lesion type is provided, if the volume
-            TypeError   is not a positive integer, or if the intensity is not a
+            TypeError:  is not a positive integer, or if the intensity is not a
                 valid CT number.
             RuntimeError: If the requested volume is too large for the phantom.
-            : If the lesion_type is not a string.
         """
         if volume <= 0:
             return self
         self.lesion_type.append(lesion_type)
+        if mass_effect is True:
+            mass_effect = 1.0
         self.mass_effect = mass_effect
         if lesion_type == 'IPH':
             img_w_lesion, lesion_image, lesion_coords = \
                 self.add_round_lesion(volume=volume, intensity=intensity,
                                       mass_effect=mass_effect, seed=seed,
-                                      texture_args=texture_args, **iph_kwargs)
+                                      texture_kwargs=texture_kwargs,
+                                      **iph_kwargs)
         elif lesion_type in ['EDH', 'SDH']:
             img_w_lesion, lesion_image, lesion_coords = \
-                self._add_dural_lesion(volume, lesion_type, intensity,
-                                       mass_effect=mass_effect, seed=seed,
-                                       texture_args=texture_args)
+                self.add_dural_lesion(volume, lesion_type, intensity,
+                                      mass_effect=mass_effect, seed=seed,
+                                      texture_kwargs=texture_kwargs)
         else:
-            raise ValueError(f'unknown lesion type passed: {lesion_type}. '
-                             'Currently accepts IPH (intraparenchymal), EDH (epidural), or SDH (subdural).')
-
-            img_w_lesion[lesion_image] = lesion_texture[lesion_image]
+            raise ValueError(f'''unknown lesion type passed: {lesion_type}.
+                             Currently accepts IPH (intraparenchymal),
+                             EDH (epidural), or SDH (subdural).''')
+        original = self.get_CT_number_phantom()
+        diff_img = abs(img_w_lesion - original)
+        img_w_lesion[diff_img > intensity] =\
+            original[self.get_warp_inclusion_mask()].mean()
         self._phantom = img_w_lesion
         self._lesion.append(lesion_image)
         self._lesion_coords.append(lesion_coords)
@@ -308,47 +326,46 @@ class LesionPhantom(Phantom):
                          intensity: int = 50,
                          material: str = 'white matter',
                          eccentricity: float = 0.5,
-                         mass_effect: bool | float = 0.5,
+                         mass_effect: float | bool = 0.5,
                          edema: bool | int = False,
                          complexity: int = 3,
                          overlap: float = 0.4,
                          seed: int | None = None,
-                         texture_args: dict | None = None,
-                         **kwargs) -> tuple:
+                         texture_kwargs: dict | None = None) -> tuple:
         """Adds a round lesion to an image in a random location.
 
-        This function inserts a lesion, potentially with complex characteristics,
-        into a specified material region of an image. It allows for detailed
-        customization of the lesion's shape, intensity, and secondary effects
-        like edema or mass effect.
+        This function inserts a lesion, potentially with complex
+        characteristics, into a specified material region of an image.
+        It allows for detailed customization of the lesion's shape, intensity,
+        and secondary effects like edema or mass effect.
 
         Args:
-            volume (int | list[int]): The volume of the sphere lesion in mL. If a
-                list is provided, it will create concentric lesions.
+            volume (int | list[int]): The volume of the sphere lesion in mL.
+                If a list is provided, it will create concentric lesions.
             intensity (int | list[int]): The intensity of the sphere lesion in
                 Hounsfield Units (HU). If a list is provided, it will create
                 concentric lesions with the corresponding intensities.
             material (str): The material region to insert the lesion into. See
                 the `self.materials` attribute for available options.
             eccentricity (float): A value between 0.0 and 1.0 that defines how
-                elongated the lesion is. A value of 0 is spherical, while 1.0 is
-                very oblong.
-            mass_effect (bool | float): If False or 0.0, no mass effect is applied.
-                A float between 0.0 and 1.0 controls the strength of the effect,
-                where 1.0 causes a large degree of warping. See the
-                `insert_with_mass_effect` method for more details.
-            edema (bool | int): Specifies an edema layer to add around the lesion.
-                If an integer is provided, it defines the thickness of the layer
-                in pixels.
-            complexity (int): The number of ellipses used to generate the lesion
-                shape. A value of 1 creates a single ellipsoid, while higher
-                values result in more complex, overlapping shapes.
-            overlap (float): The allowed fractional overlap with the white matter
-                mask.
-            seed (int, optional): A seed for the random number generator to ensure
-                reproducible lesion insertion. Defaults to None.
-            texture_args (dict, optional): A dictionary of arguments for the noise
-                texture generation. If None, default parameters are used.
+                elongated the lesion is. A value of 0 is spherical, while 1.0
+                is very oblong.
+            mass_effect (bool): If False or 0.0, no mass effect is
+                applied. A float between 0.0 and 1.0 controls the strength of
+                the effect,  where 1.0 causes a large degree of warping. See
+                the `insert_with_mass_effect` method for more details.
+            edema (bool | int): Specifies an edema layer to add around the
+                lesion. If an integer is provided, it defines the thickness of
+                the layer in pixels.
+            complexity (int): The number of ellipses used to generate the
+                lesion shape. A value of 1 creates a single ellipsoid, while
+                higher values result in more complex, overlapping shapes.
+            overlap (float): The allowed fractional overlap with the white
+                matter mask.
+            seed (int, optional): A seed for the random number generator to
+                ensure reproducible lesion insertion. Defaults to None.
+            texture_kwargs (dict, optional): A dictionary of arguments for the
+                noise texture generation. If None, default parameters are used.
 
         Returns:
             tuple: A tuple containing the following three elements:
@@ -380,7 +397,8 @@ large, try smaller volume')
         transform = RandAffine(prob=1, translate_range=[r, r])
         transform.set_random_state(seed)
         if os.name == 'nt':
-            seed = False  # windows compatibility, monai transform crashes windows kernel
+            seed = False
+            # windows compatibility, monai transform crashes windows kernel
             transform = lambda o: o  # return self
 
         for _ in range(complexity):
@@ -397,10 +415,10 @@ large, try smaller volume')
             sphere = transform(sphere).astype(bool)
             lesion_vol[sphere] = intensity
         lesion_mask = lesion_vol > -1000
-        if texture_args:
+        if texture_kwargs:
             lesion_texture = self.get_noise_texture(contrast=intensity,
                                                     seed=seed,
-                                                    **texture_args)
+                                                    **texture_kwargs)
             lesion_vol[lesion_mask] = lesion_texture[lesion_mask]
         if edema:
             edema_pixels = 5
@@ -415,8 +433,6 @@ large, try smaller volume')
         img_w_lesion[lesion_mask] = lesion_vol[lesion_mask]
 
         if mass_effect:
-            if mass_effect is True:
-                mass_effect = 0.5
             warped = self.insert_with_mass_effect(img,
                                                   lesion_mask,
                                                   strength=mass_effect)
@@ -426,7 +442,7 @@ large, try smaller volume')
 
         return img_w_lesion, lesion_mask, (z, x, y)
 
-    def insert_with_mass_effect(self, img, lesion, strength=1):
+    def insert_with_mass_effect(self, img, lesion, strength=0.2):
         if img.ndim == 2:
             img = img[None]
         assert img.ndim == 3
@@ -438,15 +454,16 @@ large, try smaller volume')
                 continue
             warped[idx] = ld.warp_slice(axial_slice=img[idx],
                                         object_mask=lesion[idx],
-                                        inclusion_mask=inclusion_mask[idx])
+                                        inclusion_mask=inclusion_mask[idx],
+                                        strength=strength)
+        warped = warped.astype(img.dtype)
         return warped
 
-    def _add_dural_lesion(self, volume, lesion_type, intensity,
-                          seed=None, mass_effect=True, texture_args: dict | None = None):
-        original = self.get_CT_number_phantom()
+    def add_dural_lesion(self, volume, lesion_type, intensity,
+                         seed=None, mass_effect: float = 0.2,
+                         texture_kwargs: dict = {}):
         HU_volume = self.get_CT_number_phantom()
-        lesion_vol, HU_volume = ld.insert_dural(
-            phantom=self,
+        lesion_vol, HU_volume = self.dural_lesion(
             desired_volume=volume,
             hematoma_type=lesion_type,
             mass_effect=mass_effect,
@@ -456,12 +473,189 @@ large, try smaller volume')
 
         img_w_lesion = HU_volume.copy()
         img_w_lesion[lesion_vol] = intensity
-        diff_img = abs(img_w_lesion - original)
-        img_w_lesion[diff_img > intensity] = original[self.get_warp_inclusion_mask()].mean()
-        if texture_args:
+        if texture_kwargs:
             lesion_texture = self.get_noise_texture(contrast=intensity,
                                                     seed=seed,
-                                                    **texture_args)
-            lesion_vol[lesion_vol] = lesion_texture[lesion_vol]
+                                                    **texture_kwargs)
+            img_w_lesion[lesion_vol] = lesion_texture[lesion_vol]
         z, x, y = center_of_mass(lesion_vol)
         return img_w_lesion, lesion_vol, (int(z), int(x), int(y))
+
+    def dural_lesion(self, desired_volume, hematoma_type, mass_effect=0.2,
+                     seed: int | None = None):
+
+        mask = self.get_warp_inclusion_mask()
+        random = np.random.default_rng(seed)
+
+        num_slices = ld.coverage_from_volume(volume=desired_volume,
+                                             hematoma_type=hematoma_type,
+                                             slice_thickness=self.dz)
+        ab = (desired_volume*2000)/(num_slices * self.dz)  # using ABC/2
+        # formula (although /2000 for mL and mm)
+        if hematoma_type == 'EDH':
+            desired_distance = np.sqrt(4*ab)  # assume that length of epidural
+            #  hemorrhage is about 4 times the width
+        elif hematoma_type == 'SDH':
+            desired_distance = np.sqrt(11*ab)  # assume that length of subdural
+            #  hemorrhage is about 11 times the width
+
+        HU_array = self.get_CT_number_phantom()
+
+        possible_init_slices = np.argwhere(
+            self.get_warp_inclusion_mask().sum(axis=(1, 2)) > 0
+                ).ravel()[num_slices//2:-num_slices//2]
+
+        init_slice = int(random.choice(possible_init_slices))
+
+        # initialize arrays, maps, and masks
+        new_volume = np.copy(HU_array)
+        boundary = self.get_dura_map()
+        hemorrhage_mask = np.zeros_like(boundary)
+
+        distances = [(desired_distance-5)/self.spacings[2], (desired_distance+5)/self.spacings[2]]
+
+        hemisphere = random.choice(['left', 'right'])  # can either be random or pre-defined
+        if hemisphere == 'left':
+            boundary[:, :, (int(HU_array.shape[2]/2) - 10):None] = 0.0
+        elif hemisphere == 'right':
+            boundary[:, :, :(int(HU_array.shape[2]/2) + 10)] = 0.0
+
+        # begin iteration
+        iter_flag = True
+        slice_counter = slice_idx = 0
+        while iter_flag:
+
+            current_vol = ((self.dx * self.dy * self.dz) *
+                           hemorrhage_mask.sum())/1000
+            if current_vol > desired_volume:
+                iter_flag = False
+
+            if slice_counter == 0:  # need to do the slice in the middle of the hemorrhage, same as before
+
+                tol = 2000
+                count = 0
+                failure_occured = False
+                while count < tol:
+                    temp_boundary = boundary[init_slice]
+                    dura_idx = np.argwhere(temp_boundary == 1.0)
+
+                    try:
+                        # choose a random start point, and calculate distance from all available boundary voxels to start point
+                        start_point = dura_idx[random.choice(range(len(dura_idx)))]
+
+                        distance_idx = np.zeros(len(dura_idx))
+                        for i in range(len(dura_idx)):
+                            distance_idx[i] = np.sqrt((start_point[0] - dura_idx[i][0])**2 + (start_point[1] - dura_idx[i][1])**2)
+
+                        # create list of possible end points and choose one at random
+                        close_voxel_list = np.where(np.logical_and(distance_idx > distances[0], distance_idx < distances[1]))
+                        end_point = dura_idx[random.choice(close_voxel_list[0])]
+
+                        orig_start = new_start = start_point
+                        orig_end = new_end = end_point
+                    except:
+                        count += 1
+                        init_slice = int(random.choice(np.linspace(0, int(HU_array.shape[0]/2), int(HU_array.shape[0]/2) + 1)))
+                        if count == tol:
+                            failure_occured = True
+                    else:
+                        count = tol
+                if failure_occured:
+                    raise RuntimeError(f'lesion insertion failed with requested volume: {desired_volume} mL, try a smaller volume')
+
+                # connect the start and end points of the hemorrhage 
+                filled_array, boundary_coords, _ =\
+                    ld.connect_points(start=orig_start,
+                                      end=orig_end,
+                                      boundary=temp_boundary,
+                                      hematoma_type=hematoma_type)
+
+                if mass_effect:
+                    inclusion_mask = binary_erosion(mask[init_slice],
+                                                    np.ones((5, 5)))
+                    exclusion_mask = self.get_warp_exclusion_mask()[init_slice]
+                    object_mask = filled_array & inclusion_mask &\
+                        ~exclusion_mask
+                    object_mask = filled_array & inclusion_mask
+                    warped_slice = ld.warp_slice(axial_slice=HU_array[init_slice],
+                                                 object_mask=object_mask,
+                                                 inclusion_mask=inclusion_mask,
+                                                 strength=mass_effect)
+                    warped_slice[self.get_warp_exclusion_mask()[init_slice]] =\
+                        HU_array[init_slice][self.get_warp_exclusion_mask()[init_slice]]
+
+                hemorrhage_mask[init_slice, :, :] = filled_array
+
+                slice_counter += 1
+
+            # starting from init_slice, first move down slices 
+            # then, move up from init_slice while doing the same
+            if slice_counter <= (num_slices-1)/2:  # move down from init_slice
+                slice_idx = slice_counter
+            elif slice_counter > (num_slices-1)/2:  # start moving up from init_slice
+                slice_idx = -1*(slice_counter - int((num_slices-1)/2))
+
+            temp_boundary = boundary[init_slice-slice_idx]
+            dura_idx = np.argwhere(temp_boundary == 1.0)
+
+            if len(dura_idx) != 0:  # check that top or bottom of brain wasn't reached
+
+                # find closest boundary point to previous start
+                distance_idx = np.zeros((len(dura_idx), 2))
+
+                distance_from_start = np.zeros(len(dura_idx))
+                distance_from_end = np.zeros(len(dura_idx))
+
+                if abs(slice_idx) == 1:
+                    for i in range(len(dura_idx)):
+                        distance_from_start[i] = np.sqrt((orig_start[0] - dura_idx[i][0])**2 + (orig_start[1] - dura_idx[i][1])**2)
+                        distance_from_end[i] = np.sqrt((orig_end[0] - dura_idx[i][0])**2 + (orig_end[1] - dura_idx[i][1])**2)
+                else:
+                    for i in range(len(dura_idx)):
+                        distance_from_start[i] = np.sqrt((new_start[0] - dura_idx[i][0])**2 + (new_start[1] - dura_idx[i][1])**2)
+                        distance_from_end[i] = np.sqrt((new_end[0] - dura_idx[i][0])**2 + (new_end[1] - dura_idx[i][1])**2)
+
+                new_start = dura_idx[np.argmin(distance_from_start)]
+                new_end = dura_idx[np.argmin(distance_from_end)]
+
+                filled_array, boundary_coords, _ =\
+                    ld.connect_points(start=new_start,
+                                      end=new_end,
+                                      boundary=temp_boundary,
+                                      hematoma_type=hematoma_type)
+                try:
+                    new_start = boundary_coords[1:-1][0]
+                    new_end = boundary_coords[1:-1][-1]
+                except:
+                    new_start = dura_idx[np.argmin(distance_from_start)]
+                    new_end = dura_idx[np.argmin(distance_from_end)]
+
+                if mass_effect:
+                    inclusion_mask = binary_erosion(mask[init_slice-slice_idx],
+                                                    np.ones((5, 5)))
+                    axial_slice = HU_array[init_slice-slice_idx]
+                    exclusion_mask = self.get_warp_exclusion_mask()[init_slice-slice_idx]
+                    object_mask = filled_array & inclusion_mask & ~ exclusion_mask
+                    warped_slice = ld.warp_slice(axial_slice=axial_slice,
+                                                 object_mask=object_mask,
+                                                 inclusion_mask=inclusion_mask,
+                                                 strength=mass_effect)
+                    warped_slice[self.get_warp_exclusion_mask()[init_slice-slice_idx]] =\
+                        HU_array[init_slice-slice_idx][
+                            self.get_warp_exclusion_mask()[init_slice-slice_idx]
+                            ]
+                    new_volume[init_slice-slice_idx] = warped_slice
+
+                hemorrhage_mask[init_slice-slice_idx] = filled_array
+
+                slice_counter += 1
+
+                if slice_counter == num_slices:
+                    iter_flag = False
+
+            else:
+                slice_counter += 1
+                if slice_counter == num_slices:
+                    iter_flag = False
+
+        return hemorrhage_mask.astype(bool), new_volume

@@ -214,7 +214,7 @@ class ICHStudy(Study):
                                   intensity=series.LesionAttenuation,
                                   mass_effect=series.MassEffect,
                                   seed=series.CaseSeed,
-                                  edema=int(series.Edema))
+                                  iph_kwargs=dict(edema=int(series.Edema)))
         if os.name == 'nt':
             series.AddAugmentation = False
             # windows compatibility, monai transform crashes windows kernel

@@ -106,8 +106,10 @@ def test_IPH_volume_accuracy():
     inputs = np.linspace(1, 70, 3)
     for overlap in [0.2, 0.4]:
         for complexity in range(1, 4):
-            corrected = check_volumes(inputs=inputs, complexity=complexity,
-                                      overlap=overlap, seed=seed)
+            corrected = check_volumes(inputs=inputs,
+                                      iph_kwargs=dict(complexity=complexity,
+                                                      overlap=overlap),
+                                      seed=seed)
             assert rmse(inputs, corrected) < 20
 
 
@@ -121,3 +123,35 @@ def test_load_phantoms():
             continue
         phantom = phantom_class()
         print(f'{name} {phantom}')
+
+
+def test_mass_effect():
+    '''
+    tests that mass effect is applied correctly
+    '''
+    age = 6.5
+    vol = 20
+    seed = 42
+    phantom = load_phantom(age)
+    phantom.insert_lesion('EDH', volume=vol, mass_effect=False, seed=seed)
+    phantom_no_me_image = phantom.get_CT_number_phantom()[
+        phantom._lesion_coords[0][0]]
+
+    phantom_me = load_phantom(age)
+    phantom_me.insert_lesion('EDH', volume=vol, mass_effect=0.5, seed=seed)
+    phantom_me_image = phantom_me.get_CT_number_phantom()[
+        phantom_me._lesion_coords[0][0]
+        ]
+
+    me_05 = phantom_me_image - phantom_no_me_image
+    assert (np.linalg.norm(me_05) > 300) & (np.linalg.norm(me_05) < 1000)
+
+    phantom_me = load_phantom(age)
+    phantom_me.insert_lesion('EDH', volume=vol, mass_effect=1.0, seed=seed)
+    phantom_me_image = phantom_me.get_CT_number_phantom()[
+        phantom_me._lesion_coords[0][0]
+        ]
+
+    me_10 = phantom_me_image - phantom_no_me_image
+
+    assert np.linalg.norm(me_10) > np.linalg.norm(me_05)

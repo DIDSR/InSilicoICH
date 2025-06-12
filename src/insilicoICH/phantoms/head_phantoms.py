@@ -22,7 +22,7 @@ from scipy.ndimage import distance_transform_edt
 from VITools.hooks import hookimpl
 
 from .base_phantoms import (LesionPhantom, resize,
-                            get_mean_age, get_transformation_src_dst)
+                            get_mean_age)
 from .utils import download_and_extract_archive
 
 
@@ -140,37 +140,6 @@ and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
 
     def get_warp_inclusion_mask(self):
         return np.where(self.warp_exclusion_mask, False, True)
-
-    def get_warp_coordinates(self, lesion, idx, strength=1):
-        # get lesion coordinates
-        src, dst = get_transformation_src_dst(lesion[idx], strength=strength)
-        src = np.argwhere(src)
-        dst = np.argwhere(dst)
-        skull_slice = self.warp_exclusion_mask[idx]
-        # using the entire inner boundary of the skull mask seems to work great as anchor points
-        skull_boundary = ski.segmentation.find_boundaries(skull_slice, mode='inner', background=0)
-        skull_sample = np.argwhere(skull_boundary)
-
-        warp_src = warp_dst = skull_sample  # initialize warp_src and warp_dst with the skull boundary voxels
-
-        src_subset = src[np.round(np.linspace(0, len(src)-1, 5)).astype(int)] # subsample points from the src points
-        dst_subset = dst[np.round(np.linspace(0, len(dst)-1, 5)).astype(int)] # subsample points from the dst points
-
-        warp_src = np.insert(warp_src, 0, src_subset, axis=0) # insert src subset into main warp list
-        warp_dst = np.insert(warp_dst, 0, dst_subset, axis=0) # insert dst subset into main warp list
-
-        # insert the four corner coordinates for added warp stability
-        warp_src = np.insert(warp_src, 0, [[0, 0],
-                                           [0, lesion.shape[1]],
-                                           [lesion.shape[0], 0],
-                                           [lesion.shape[0], lesion.shape[1]]
-                                           ], axis=0)
-        warp_dst = np.insert(warp_dst, 0, [[0, 0],
-                                           [0, lesion.shape[1]],
-                                           [lesion.shape[0], 0],
-                                           [lesion.shape[0], lesion.shape[1]]
-                                           ], axis=0)
-        return warp_src, warp_dst
 
     def _load_material_LUT(self):
         return pd.read_csv(os.path.join(Path(__file__).parent.resolve(),
@@ -327,42 +296,16 @@ from {phantom_dir}')
         spacings = self.dz, self.dx, self.dy
         return self._phantom, spacings
 
-    def get_warp_coordinates(self, lesion, idx, strength=1):
-        # get lesion coordinates
-        src, dst = get_transformation_src_dst(lesion[idx], strength=strength)
-        src = np.argwhere(src)
-        dst = np.argwhere(dst)
-        # use brain mask to define anchor points
-        skull_boundary = self.warp_exclusion_mask[idx]
-        skull_sample = np.argwhere(skull_boundary)
-
-        warp_src = warp_dst = skull_sample  # initialize warp_src and warp_dst with the skull boundary voxels
-
-        src_subset = src[np.round(np.linspace(0, len(src)-1, 5)).astype(int)] # subsample points from the src points
-        dst_subset = dst[np.round(np.linspace(0, len(dst)-1, 5)).astype(int)] # subsample points from the dst points
-
-        warp_src = np.insert(warp_src, 0, src_subset, axis=0) # insert src subset into main warp list
-        warp_dst = np.insert(warp_dst, 0, dst_subset, axis=0) # insert dst subset into main warp list
-
-        # insert the four corner coordinates for added warp stability
-        warp_src = np.insert(warp_src, 0, [[0, 0],
-                                           [0, lesion.shape[1]],
-                                           [lesion.shape[0], 0],
-                                           [lesion.shape[0], lesion.shape[1]]
-                                           ], axis=0)
-        warp_dst = np.insert(warp_dst, 0, [[0, 0],
-                                           [0, lesion.shape[1]],
-                                           [lesion.shape[0], 0],
-                                           [lesion.shape[0], lesion.shape[1]]
-                                           ], axis=0)
-        return warp_src, warp_dst
-
     def get_warp_exclusion_mask(self):
         '''
         approximates the skull as the outer boundary of the brain mask
         '''
-        return ski.segmentation.find_boundaries(self.mask.astype(bool),
-                                                mode='outer', background=0)
+        return self.get_skull_map() |\
+            ski.segmentation.find_boundaries(self.mask.astype(bool),
+                                             mode='outer', background=0)
+
+    def get_warp_inclusion_mask(self):
+        return self.mask.astype(bool)
 
     def resize(self, shape=None):
         original_shape = self.csf.shape

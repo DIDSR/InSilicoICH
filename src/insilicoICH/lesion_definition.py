@@ -13,7 +13,6 @@ from monai.transforms import RandAffine
 
 from skimage.graph import route_through_array
 from skimage.draw import bezier_curve
-import sys
 
 
 def get_perimeter(lesion):
@@ -25,18 +24,25 @@ def elliptical_lesion(shape: tuple | list,
                       center: tuple | None = None,
                       radius: tuple | None = None,
                       random_rotate: bool | int = True):
-    '''
-    Returns binary elliptical mask based on input matrix shape and
-    center coordinates and radii parameters
+    """Generates a binary elliptical mask.
 
-    sphere defined as r^2 = z^2 + x^2 + y^2
+    This function creates a binary elliptical mask based on the specified shape,
+    center, and radii. The sphere is defined by the equation:
+    $r^2 = z^2 + x^2 + y^2$.
 
-    :param shape: sequence of ints, shape of the new array
-    :param center: sequence of ints, coord
-    :param radius: sequence of 3 ints specifying the 3 semimajor axes
-    :param random_rotate: bool or int, if an integer is given, sets random
-        seed of transform for repeatability.
-    '''
+    Args:
+        shape (Sequence[int]): The shape of the output array.
+        center (Sequence[int]): The coordinates of the center of the ellipse.
+        radius (Sequence[int]): A sequence of 3 integers specifying the three
+            semi-major axes.
+        random_rotate (Union[bool, int]): If True, applies a random rotation.
+            If an integer, it is used as the random seed for the transform
+            to ensure repeatability.
+
+    Returns:
+        np.ndarray: A binary array representing the elliptical mask.
+
+    """
     if isinstance(radius, np.ndarray):
         radius = list(radius)
     center = center or [dim//2 for dim in shape]
@@ -62,176 +68,6 @@ def elliptical_lesion(shape: tuple | list,
                 starts[1]:ends[1],
                 starts[2]:ends[2]] = ell
     return np.where(lesion_only > 0, True, False)
-
-
-def insert_dural(phantom, desired_volume, hematoma_type, mass_effect, seed=None):
-
-    mask = phantom.get_warp_inclusion_mask()
-    random = np.random.default_rng(seed)
-
-    num_slices = coverage_from_volume(volume=desired_volume,
-                                      hematoma_type=hematoma_type,
-                                      slice_thickness=phantom.dz)
-    ab = (desired_volume*2000)/(num_slices * phantom.dz)  # using ABC/2 formula (although /2000 for mL and mm)
-    if hematoma_type == 'EDH':
-        desired_distance = math.sqrt(4*ab) # assume that length of epidural hemorrhage is about 4 times the width
-    elif hematoma_type == 'SDH':
-        desired_distance = math.sqrt(11*ab) # assume that length of subdural hemorrhage is about 11 times the width
-
-    HU_array = phantom.get_CT_number_phantom()
-
-    # TODO: better logic for hemorrhage starting slice (especially UNC)
-    if phantom.__class__.__name__ == 'UNC_Head':
-        init_slice = 90
-    else:
-        init_slice = int(random.choice(np.linspace(0, int(HU_array.shape[0]/2), int(HU_array.shape[0]/2) + 1)))
-
-    # initialize arrays, maps, and masks
-    new_volume = np.copy(HU_array)
-    boundary = phantom.get_dura_map()
-    hemorrhage_mask = np.zeros_like(boundary)
-
-    distances = [(desired_distance-5)/phantom.spacings[2], (desired_distance+5)/phantom.spacings[2]]
-
-    hemisphere = random.choice(['left', 'right'])  # can either be random or pre-defined
-    if hemisphere == 'left':
-        boundary[:, :, (int(HU_array.shape[2]/2) - 10):None] = 0.0
-    elif hemisphere == 'right':
-        boundary[:, :, :(int(HU_array.shape[2]/2) + 10)] = 0.0
-
-    # begin iteration
-    iter_flag = True
-    slice_counter = slice_idx = 0
-    while iter_flag:
-
-        current_vol = ((phantom.dx * phantom.dy * phantom.dz) * hemorrhage_mask.sum())/1000
-        if current_vol > desired_volume:
-            iter_flag = False
-
-        if slice_counter == 0:  # need to do the slice in the middle of the hemorrhage, same as before
-
-            tol = 2000
-            count = 0
-            failure_occured = False
-            while count < tol:
-                temp_boundary = boundary[init_slice]
-                dura_idx = np.argwhere(temp_boundary == 1.0)
-
-                try:
-                    # choose a random start point, and calculate distance from all available boundary voxels to start point
-                    start_point = dura_idx[random.choice(range(len(dura_idx)))]
-
-                    distance_idx = np.zeros(len(dura_idx))
-                    for i in range(len(dura_idx)):
-                        distance_idx[i] = math.sqrt((start_point[0] - dura_idx[i][0])**2 + (start_point[1] - dura_idx[i][1])**2)
-
-                    # create list of possible end points and choose one at random
-                    close_voxel_list = np.where(np.logical_and(distance_idx > distances[0], distance_idx < distances[1]))
-                    end_point = dura_idx[random.choice(close_voxel_list[0])]
-
-                    orig_start = new_start = start_point
-                    orig_end = new_end = end_point
-                except:
-                    count += 1
-                    init_slice = int(random.choice(np.linspace(0, int(HU_array.shape[0]/2), int(HU_array.shape[0]/2) + 1)))
-                    if count == tol:
-                        failure_occured = True
-                else:
-                    count = tol
-            if failure_occured:
-                raise RuntimeError(f'lesion insertion failed with requested volume: {desired_volume} mL, try a smaller volume')
-
-            # connect the start and end points of the hemorrhage 
-            filled_array, boundary_coords, _ =\
-                connect_points(start=orig_start,
-                               end=orig_end,
-                               boundary=temp_boundary,
-                               hematoma_type=hematoma_type)
-
-            if mass_effect:
-                inclusion_mask = ski.morphology.binary_erosion(
-                    mask[init_slice], np.ones((5, 5)))
-                exclusion_mask = phantom.get_warp_exclusion_mask()[init_slice]
-                object_mask = filled_array & inclusion_mask & ~ exclusion_mask
-                object_mask = filled_array & inclusion_mask
-                warped_slice = warp_slice(axial_slice=HU_array[init_slice],
-                                          object_mask=object_mask,
-                                          inclusion_mask=inclusion_mask)
-                warped_slice[phantom.get_warp_exclusion_mask()[init_slice]] =\
-                    HU_array[init_slice][phantom.get_warp_exclusion_mask()[init_slice]]          
-
-            hemorrhage_mask[init_slice, :, :] = filled_array
-
-            slice_counter += 1
-
-        # starting from init_slice, first move down slices 
-        # then, move up from init_slice while doing the same
-        if slice_counter <= (num_slices-1)/2:  # move down from init_slice
-            slice_idx = slice_counter
-        elif slice_counter > (num_slices-1)/2:  # start moving up from init_slice
-            slice_idx = -1*(slice_counter - int((num_slices-1)/2))
-
-        temp_boundary = boundary[init_slice-slice_idx]
-        dura_idx = np.argwhere(temp_boundary == 1.0)
-
-        if len(dura_idx) != 0:  # check that top or bottom of brain wasn't reached
-
-            # find closest boundary point to previous start
-            distance_idx = np.zeros((len(dura_idx), 2))
-
-            distance_from_start = np.zeros(len(dura_idx))
-            distance_from_end = np.zeros(len(dura_idx))
-
-            if abs(slice_idx) == 1:
-                for i in range(len(dura_idx)):
-                    distance_from_start[i] = math.sqrt((orig_start[0] - dura_idx[i][0])**2 + (orig_start[1] - dura_idx[i][1])**2)
-                    distance_from_end[i] = math.sqrt((orig_end[0] - dura_idx[i][0])**2 + (orig_end[1] - dura_idx[i][1])**2)
-            else:
-                for i in range(len(dura_idx)):
-                    distance_from_start[i] = math.sqrt((new_start[0] - dura_idx[i][0])**2 + (new_start[1] - dura_idx[i][1])**2)
-                    distance_from_end[i] = math.sqrt((new_end[0] - dura_idx[i][0])**2 + (new_end[1] - dura_idx[i][1])**2)
-
-            new_start = dura_idx[np.argmin(distance_from_start)]
-            new_end = dura_idx[np.argmin(distance_from_end)]
-
-            filled_array, boundary_coords, _ =\
-                connect_points(start=new_start,
-                               end=new_end,
-                               boundary=temp_boundary,
-                               hematoma_type=hematoma_type)
-            try:
-                new_start = boundary_coords[1:-1][0]
-                new_end = boundary_coords[1:-1][-1]
-            except:
-                new_start = dura_idx[np.argmin(distance_from_start)]
-                new_end = dura_idx[np.argmin(distance_from_end)]
-
-            if mass_effect:
-                inclusion_mask = ski.morphology.binary_erosion(
-                    mask[init_slice-slice_idx], np.ones((5, 5)))
-                axial_slice = HU_array[init_slice-slice_idx]
-                exclusion_mask = phantom.get_warp_exclusion_mask()[init_slice-slice_idx]
-                object_mask = filled_array & inclusion_mask & ~ exclusion_mask
-                warped_slice = warp_slice(axial_slice=axial_slice,
-                                          object_mask=object_mask,
-                                          inclusion_mask=inclusion_mask)
-                warped_slice[phantom.get_warp_exclusion_mask()[init_slice-slice_idx]] =\
-                    HU_array[init_slice-slice_idx][phantom.get_warp_exclusion_mask()[init_slice-slice_idx]]
-                new_volume[init_slice-slice_idx] = warped_slice
-
-            hemorrhage_mask[init_slice-slice_idx] = filled_array
-
-            slice_counter += 1
-
-            if slice_counter == num_slices:
-                iter_flag = False
-
-        else:
-            slice_counter += 1
-            if slice_counter == num_slices:
-                iter_flag = False
-
-    return hemorrhage_mask.astype(bool), new_volume
 
 
 def connect_points(
@@ -300,7 +136,9 @@ def connect_points(
         if i == 0 and bezier_weight == 0.0:
             break
     else:
-        sys.exit(f"Unable to create a valid Bézier curve between {start} and {end}.")
+        raise RuntimeError(
+            f"Unable to create a valid Bézier curve between {start} and {end}."
+            )
 
     # --- 4. Reorder and Resample the Bézier Curve (Vectorized) ---
     distances = np.linalg.norm(connect_coords_raw - np.array(start), axis=1)
@@ -378,8 +216,7 @@ def warp_slice(
     axial_slice: np.ndarray,
     object_mask: np.ndarray,
     inclusion_mask: np.ndarray,
-    max_displacement: float = 15.0,
-    decay_factor: float = 40.0
+    strength: float = 1.0
 ) -> np.ndarray:
     """
     Performs a localized warp on a 2D slice based on a displacement field.
@@ -391,57 +228,79 @@ def warp_slice(
         axial_slice: The 2D image data to be warped.
         object_mask: A boolean mask defining the object causing displacement.
         inclusion_mask: A boolean mask defining the region of pixels to be warped.
-        max_displacement: The maximum distance in pixels a point can be displaced.
-        decay_factor: Controls how quickly the displacement effect falls off
-                      with distance from the object_mask. Larger values mean
-                      the effect extends further.
+        strength: Controls the area of effect for the displacement. Higher
+                  values result in a warp that extends further from the object.
+                  A value of 1.0 is a baseline.
 
     Returns:
         The warped 2D image as a NumPy array.
     """
     rows, cols = axial_slice.shape
 
-    # --- 1. Calculate the displacement field based on the object_mask ---
-    # We calculate the distance from each pixel to the nearest "True" pixel in object_mask.
+    # --- 1. Calculate warp parameters from inputs ---
+    # Max displacement is estimated from the size of the area to be moved.
+    num_object_pixels = np.sum(object_mask)
+    if num_object_pixels > 0:
+        # Approximate the width of the object area as a square root.
+        max_displacement = np.sqrt(num_object_pixels)
+    else:
+        # If nothing is to be moved, displacement is zero.
+        max_displacement = 0.0
+
+    # The decay factor, which controls area of effect, is scaled by strength.
+    # A base value of 40.0 provides a reasonable default falloff.
+    decay_factor = 40.0 * strength
+
+    # --- 2. Calculate the displacement field based on the object_mask ---
+    # We calculate the distance from each pixel to the nearest "True" pixel
+    # in object_mask.
     # `indices` will have shape (2, H, W) and will contain the (row, col)
     # of the nearest object pixel for each point in the grid.
     _, indices = distance_transform_edt(~object_mask, return_indices=True)
 
-    # --- 2. Create coordinate grids ---
-    # `output_coords` has shape (H, W, 2) and holds the (row, col) for each pixel.
+    # --- 3. Create coordinate grids ---
+    # `output_coords` has shape (H, W, 2) and holds the (row, col)
+    #  for each pixel.
     output_coords = np.indices((rows, cols), dtype=float).transpose(1, 2, 0)
     # `indices` needs to be in the same (H, W, 2) format.
     nearest_object_coords = indices.transpose(1, 2, 0)
 
-    # --- 3. Calculate and scale displacement vectors ---
-    # Vector from the nearest object point TO each grid point. This points "away".
+    # --- 4. Calculate and scale displacement vectors ---
+    # Vector from the nearest object point TO each grid point.
+    # This points "away".
     displacement_vectors = output_coords - nearest_object_coords
 
     # Calculate the distance (magnitude of the displacement vectors).
     # Add a small epsilon to avoid division by zero later.
     distances = np.linalg.norm(displacement_vectors, axis=-1) + 1e-6
 
-    # Create a scaling factor that decays with distance via an exponential function.
+    # Create a scaling factor that decays with distance via an
+    # exponential function.
     # The displacement is strongest near the object and fades out.
     scale_factors = max_displacement * np.exp(-distances / decay_factor)
 
-    # To apply the scaled magnitude, normalize the original vectors and multiply.
-    scaled_displacement = displacement_vectors / distances[..., np.newaxis] * scale_factors[..., np.newaxis]
+    # To apply the scaled magnitude, normalize the original vectors and
+    # multiply.
+    scaled_displacement = displacement_vectors / distances[..., np.newaxis] *\
+        scale_factors[..., np.newaxis]
 
-    # The final "pull" location for a pixel is its original position minus the displacement.
+    # The final "pull" location for a pixel is its original position
+    # minus the displacement.
     src_coords = output_coords - scaled_displacement
 
-    # --- 4. Create a final, blended "flow field" ---
-    # This logic is preserved: we only apply the warp inside the inclusion_mask.
+    # --- 5. Create a final, blended "flow field" ---
+    # This logic is preserved: we only apply the warp inside the
+    # inclusion_mask.
     # Outside the mask, the mapping is an "identity" transform (r,c -> r,c).
     final_src_coords = np.where(
-        inclusion_mask[..., np.newaxis],  # Broadcast inclusion_mask to match shape
+        inclusion_mask[..., np.newaxis],  # Broadcast inclusion_mask to match
         src_coords,
         output_coords  # The identity mapping
     )
 
-    # --- 5. Apply the transformation using the flow field ---
-    # Reshape the flow field back to the (2, H, W) shape required by map_coordinates.
+    # --- 6. Apply the transformation using the flow field ---
+    # Reshape the flow field back to the (2, H, W) shape required by
+    # map_coordinates.
     final_src_coords_reshaped = final_src_coords.transpose(2, 0, 1)
 
     # `map_coordinates` efficiently pulls pixels from the `axial_slice`.
@@ -450,7 +309,7 @@ def warp_slice(
         final_src_coords_reshaped,
         order=1,
         prefilter=True,  # Recommended for interpolation order > 0
-        cval=np.min(axial_slice)  # Fill pixels mapped from outside with the image minimum
+        cval=np.min(axial_slice)  # Fill pixels mapped from outside with min
     )
 
     return warped_slice.astype(axial_slice.dtype)
@@ -577,7 +436,7 @@ def generate_3d_fbm_texture(depth=32, height=128, width=128, scale=75.0,
     # This is identical in implementation to the multi-octave Perlin noise function,
     # as pnoise2 with octaves > 1 is an implementation of fBm.
     # We use different parameters here to highlight its use for mottled textures.
-    return generate_3d_perlin_texture( depth, height, width, scale, octaves, persistence, lacunarity, seed=seed)
+    return generate_3d_perlin_texture(depth, height, width, scale, octaves, persistence, lacunarity, seed=seed)
 
 
 # --- Method 4: 3D Filtered Random Noise ---
