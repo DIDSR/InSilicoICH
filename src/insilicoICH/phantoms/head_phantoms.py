@@ -6,6 +6,7 @@ from pathlib import Path
 import os
 from functools import partial
 from warnings import warn
+from typing import List
 
 import numpy as np
 import nibabel as nib
@@ -23,6 +24,7 @@ from VITools.hooks import hookimpl
 
 from .base_phantoms import (LesionPhantom, resize,
                             get_mean_age)
+from ..lesion_definition import Lesion
 from .utils import download_and_extract_archive
 
 
@@ -64,11 +66,7 @@ class HeadPhantom(LesionPhantom):
             'skull': 900
             }
         self.patientid = 0
-        self._lesion = []
-        self._lesion_coords = []
-        self.lesion_type = []
-        self.lesion_intensity = []  # HU
-        self.mass_effect = False
+        self.lesions: List[Lesion] = []
         phantom, spacings = self.load_phantom(Path(phantom_dir))
         super().__init__(phantom, spacings, **kwargs)
         if shape:
@@ -92,10 +90,12 @@ class HeadPhantom(LesionPhantom):
     def get_lesion_mask(self):
         return self._lesion[0]
 
-    def get_warp_exclusion_mask(self):
+    @property
+    def warp_exclusion_mask(self):
         return self.get_skull_map().astype(bool)
 
-    def get_warp_inclusion_mask(self):
+    @property
+    def warp_inclusion_mask(self):
         return self.get_CT_number_phantom() > -900
 
 
@@ -128,7 +128,8 @@ and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
         spacings = dz, dx, dy
         return phantom, spacings
 
-    def get_warp_exclusion_mask(self):
+    @property
+    def warp_exclusion_mask(self):
         skull = self.get_skull_map()
         mask = np.zeros_like(skull, dtype=bool)
         for idx in range(self.shape[0]):
@@ -138,7 +139,8 @@ and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
             mask[idx] = skull_slice
         return mask
 
-    def get_warp_inclusion_mask(self):
+    @property
+    def warp_inclusion_mask(self):
         return np.where(self.warp_exclusion_mask, False, True)
 
     def _load_material_LUT(self):
@@ -146,7 +148,7 @@ and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
                                         'MIDA_v1.csv'))
 
     def get_CT_number_phantom(self):
-        if len(self._lesion_coords) > 0:
+        if len(self.lesions) > 0:
             return self._phantom
         phantom = self._phantom
         material_lut = self.material_lut
@@ -215,19 +217,19 @@ class NIHPD_Head(HeadPhantom):
                  skull_seg_method='otsu', add_sutures=True):
         phantom_dir = Path(phantom_dir)
         self.age = age
-        self.patient_name = f'{age} yr {NIHPD_Head.name}'
+        self.patient_name = f'{age} yr {self.name}'
         self.symmetric = symmetric
         self.skull_seg_method = skull_seg_method
         self.add_sutures = add_sutures
         if not phantom_dir.exists():
             print(f'''
 `PHANTOM_DIRECTORY` {phantom_dir} not found, now downloading NIHPD phantoms
-from {NIHPD_Head.url}
+from {self.url}
 
 If you have already downloaded NIHPD and MIDA head phantoms, please see
 `load_phantom` for details on how to add their locations.
 ''')
-            download_and_extract_archive(NIHPD_Head.url, phantom_dir)
+            download_and_extract_archive(self.url, phantom_dir)
         super().__init__(phantom_dir, shape, age=age, patient_name=self.patient_name)
 
     def load_phantom(self, phantom_dir):
@@ -296,16 +298,20 @@ from {phantom_dir}')
         spacings = self.dz, self.dx, self.dy
         return self._phantom, spacings
 
-    def get_warp_exclusion_mask(self):
+    @property
+    def warp_exclusion_mask(self):
         '''
         approximates the skull as the outer boundary of the brain mask
         '''
-        return self.get_skull_map() |\
+        mask = self.get_skull_map() |\
             ski.segmentation.find_boundaries(self.mask.astype(bool),
                                              mode='outer', background=0)
+        mask = ski.morphology.binary_dilation(mask, np.ones(3*[3]))
+        return mask
 
-    def get_warp_inclusion_mask(self):
-        return self.mask.astype(bool)
+    @property
+    def warp_inclusion_mask(self):
+        return self.mask.astype(bool) & ~self.warp_exclusion_mask
 
     def resize(self, shape=None):
         original_shape = self.csf.shape
@@ -326,7 +332,8 @@ from {phantom_dir}')
         new_spacings = np.array(original_shape) / np.array(new_shape) *\
             [self.dz, self.dx, self.dy]
         self.dz, self.dx, self.dy = new_spacings
-        self.nz, self.nx, self.ny = shape
+        self.nz, self.nx, self.ny = new_shape
+        return self
 
     def get_sutures(self, thickness=2, thresh=30):
         """
@@ -388,10 +395,9 @@ from {phantom_dir}')
         return phantom
 
     def get_CT_number_phantom(self):
-        if len(self._lesion_coords) > 0:
+        if len(self.lesions) > 0:
             return self._phantom
         phantom = self.assign_HUs()
-
         return phantom
 
     def get_material_mask(self, material):
@@ -459,22 +465,8 @@ class UNC_Head(NIHPD_Head):
     name = 'UNC Head'
     url = 'https://www.nitrc.org/frs/download.php/14897/UNCInfant012Atlases-2022-10-21.zip'
 
-    def __init__(self, phantom_dir, age: float, symmetric=False, shape=None,
-                 skull_seg_method='otsu'):
-        phantom_dir = Path(phantom_dir)
-        self.age = age
-        self.skull_seg_method = skull_seg_method
-        if not phantom_dir.exists():
-            print(f'''
-`PHANTOM_DIRECTORY` {phantom_dir} not found, now downloading UNC phantoms
-from {UNC_Head.url}
-
-If you have already downloaded NIHPD and MIDA head phantoms, please see
-`load_phantom` for details on how to add their locations.
-''')
-            download_and_extract_archive(UNC_Head.url, phantom_dir, remove_finished=True)
-        super().__init__(phantom_dir, shape=shape, age=age)
-        self.patient_name = f'{age} yr {UNC_Head.name}'
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         # define material HU; 0-2 yr old based on cases in
         # https://physionet.org/content/ct-ich/1.3.1/ and 
@@ -598,19 +590,13 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
         phantom[sinous] = self.materials['CSF']  # approximates blood
         if self.skull_seg_method == 'pseudoct':
             phantom[self.skull] = self.pseudoct[self.skull]
+        if self.add_sutures:
+            sutures = self.get_sutures()
+            phantom[sutures] = 0  # assume water HU
         phantom[phantom < 0] = self.materials['air']
 
         # # TODO: dura map currently overlaps with new skull methods, need fix
         # phantom[self.get_dura_map()] = 50  # HU same as MIDA
-        return phantom
-
-    def get_CT_number_phantom(self, add_sutures=False):
-        if len(self._lesion_coords) > 0:
-            return self._phantom
-        phantom = self.assign_HUs()
-        if add_sutures:
-            sutures = self.get_sutures()
-            phantom[sutures] = 0  # assume water HU
         return phantom
 
     def get_head_mask(self):

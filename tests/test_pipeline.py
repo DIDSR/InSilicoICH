@@ -109,12 +109,13 @@ def test_lesion_characteristics(age=15.75, views=100,
             phantom.patient_name = lesion_type
             phantom.insert_lesion(lesion_type=lesion_type, volume=volume,
                                   intensity=intensity,
-                                  mass_effect=mass_effect, seed=336)
+                                  mass_effect=mass_effect, seed=42)
             params.append((lesion_type, intensity, volume))
             phantoms.append(phantom.get_CT_number_phantom()[
-                phantom._lesion_coords[0][0]])
+                phantom.lesions[0].coords_voxel[0]
+                ])
             lesion_level_mm = (phantom.get_CT_number_phantom().shape[0]/2 -
-                               phantom._lesion_coords[0][0])*phantom.dz
+                               phantom.lesions[0].coords_voxel[0])*phantom.dz
             center = lesion_level_mm
             width = 7
 

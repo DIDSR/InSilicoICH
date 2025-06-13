@@ -24,11 +24,12 @@ def show_lesions(phantom, display='brain'):
     f, axs = plt.subplots(2, n_lesions, dpi=150, tight_layout=True)
     if n_lesions < 2:
         axs = axs[:, None]
-    for idx, (lesion, coords) in enumerate(zip(phantom._lesion, phantom._lesion_coords)):
-        ctshow(phantom.get_CT_number_phantom()[coords[0]], display, ax=axs[0, idx], fig=f)
-        axs[0, idx].set_title(f'slice {coords[0]}')
-        ctshow(phantom.get_CT_number_phantom()[coords[0]], display, ax=axs[1, idx], fig=f)
-        axs[1, idx].imshow(lesion[coords[0]], cmap='Reds', alpha=0.3)
+    for idx, lesion in enumerate(phantom.lesions):
+        z = lesion.coords_voxel[0]
+        ctshow(phantom.get_CT_number_phantom()[z], display, ax=axs[0, idx], fig=f)
+        axs[0, idx].set_title(f'slice {z}')
+        ctshow(phantom.get_CT_number_phantom()[z], display, ax=axs[1, idx], fig=f)
+        axs[1, idx].imshow(lesion[z], cmap='Reds', alpha=0.3)
         axs[1, idx].set_title(f'{phantom.lesion_type[idx]}')
 
 

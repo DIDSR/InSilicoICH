@@ -2,17 +2,74 @@
 Module responsible for lesion definition
 """
 import math
+from dataclasses import dataclass
+from typing import Tuple, Union, Dict, Any
+
 from scipy.interpolate import interp1d
 import numpy as np
 import skimage as ski
-from scipy.ndimage import map_coordinates, distance_transform_edt
-from typing import Tuple, Union
-import noise
 from scipy.ndimage import gaussian_filter
 from monai.transforms import RandAffine
+import noise
 
-from skimage.graph import route_through_array
-from skimage.draw import bezier_curve
+# --- Type Aliases for Clarity ---
+Shape3D = Tuple[int, int, int]
+Point3D = Tuple[int, int, int]
+
+
+@dataclass
+class Lesion:
+    """A data class to hold all information about a single lesion."""
+    lesion_type: str
+    mask: np.ndarray
+    coords_voxel: Point3D
+    intensity_hu: float
+    volume_ml: float
+    mass_effect: float
+    seed: int
+
+
+def sphere_radius_from_volume(volume_ml: float) -> float:
+    """Converts volume in milliliters (mL) to a sphere's radius in millimeters (mm)."""
+    # 1 mL = 1000 mm^3. Volume of sphere V = 4/3 * pi * r^3
+    return np.cbrt(0.75 * volume_ml * 1000 / np.pi)
+
+
+def calculate_eccentricity(a: float, b: float) -> float:
+    """Calculates the eccentricity of an ellipse with semi-axes a and b."""
+    # Ensure a is the major axis for the formula.
+    major, minor = (a, b) if a > b else (b, a)
+    if major == 0:
+        return 0.0
+    return np.sqrt(1 - (minor**2 / major**2))
+
+
+def get_closest_key(target_key: float, dictionary: Dict[float, Any]) -> float:
+    """Finds the key in a dictionary closest to the target key."""
+    if not dictionary:
+        raise ValueError("Cannot find closest key in an empty dictionary.")
+    return min(dictionary.keys(), key=lambda k: abs(k - target_key))
+
+
+def get_semi_major_axes_ratios(eccentricity: float, seed: int = None) -> np.ndarray:
+    """
+    Generates three semi-major axis ratios for an ellipsoid with a target mean eccentricity.
+
+    Note: This is a simplified approach. A more robust method would involve
+    optimization to find axes that precisely match the target eccentricity.
+    """
+    # Pre-calculated lookup table for common eccentricities.
+    # Maps mean eccentricity to a plausible set of axis ratios [a, b, c].
+    eccentricity_map = {
+        0.2: [1.0, 1.0, 0.9], 0.4: [1.0, 0.9, 0.8], 0.6: [1.0, 0.8, 0.6],
+        0.8: [1.0, 0.7, 0.4], 0.9: [1.0, 0.6, 0.2], 1.0: [1.0, 0.5, 0.1]
+    }
+    closest_eccentricity = get_closest_key(eccentricity, eccentricity_map)
+    ratios = eccentricity_map[closest_eccentricity]
+
+    rng = np.random.default_rng(seed)
+    rng.shuffle(ratios)
+    return np.array(ratios)
 
 
 def get_perimeter(lesion):
@@ -103,11 +160,14 @@ def connect_points(
     """
     # --- 1. Find the path along the boundary (more efficiently) ---
     costs = np.where(boundary == 1, 0, 10000)
-    path, _ = route_through_array(costs, start=tuple(start), end=tuple(end), fully_connected=False)
+    path, _ = ski.graph.route_through_array(costs, start=tuple(start),
+                                            end=tuple(end),
+                                            fully_connected=False)
 
     boundary_coords = np.array(path)
     if len(boundary_coords) == 0:
-        raise ValueError("Could not find a path between start and end points on the boundary.")
+        raise ValueError(
+            "Could not find a path between start and end points on boundary.")
 
     # --- 2. Define Bézier Curve Parameters in a structured way ---
     rows, cols = boundary.shape
@@ -121,7 +181,7 @@ def connect_points(
 
     # --- 3. Generate the Bézier Curve with a more robust retry mechanism ---
     for i, weight in enumerate([bezier_weight, 0.0]):
-        rr, cc = bezier_curve(
+        rr, cc = ski.draw.bezier_curve(
             r0=start[0], c0=start[1],
             r1=int(bezier_middle[0]), c1=int(bezier_middle[1]),
             r2=end[0], c2=end[1],
@@ -210,109 +270,6 @@ def connect_points(
         filled_array = np.zeros_like(boundary, dtype=int)
 
     return filled_array, boundary_coords, connect_coords
-
-
-def warp_slice(
-    axial_slice: np.ndarray,
-    object_mask: np.ndarray,
-    inclusion_mask: np.ndarray,
-    strength: float = 1.0
-) -> np.ndarray:
-    """
-    Performs a localized warp on a 2D slice based on a displacement field.
-
-    Pixels inside the `inclusion_mask` are "pushed" away from the `object_mask`.
-    Pixels outside the `inclusion_mask` remain stationary.
-
-    Args:
-        axial_slice: The 2D image data to be warped.
-        object_mask: A boolean mask defining the object causing displacement.
-        inclusion_mask: A boolean mask defining the region of pixels to be warped.
-        strength: Controls the area of effect for the displacement. Higher
-                  values result in a warp that extends further from the object.
-                  A value of 1.0 is a baseline.
-
-    Returns:
-        The warped 2D image as a NumPy array.
-    """
-    rows, cols = axial_slice.shape
-
-    # --- 1. Calculate warp parameters from inputs ---
-    # Max displacement is estimated from the size of the area to be moved.
-    num_object_pixels = np.sum(object_mask)
-    if num_object_pixels > 0:
-        # Approximate the width of the object area as a square root.
-        max_displacement = np.sqrt(num_object_pixels)
-    else:
-        # If nothing is to be moved, displacement is zero.
-        max_displacement = 0.0
-
-    # The decay factor, which controls area of effect, is scaled by strength.
-    # A base value of 40.0 provides a reasonable default falloff.
-    decay_factor = 40.0 * strength
-
-    # --- 2. Calculate the displacement field based on the object_mask ---
-    # We calculate the distance from each pixel to the nearest "True" pixel
-    # in object_mask.
-    # `indices` will have shape (2, H, W) and will contain the (row, col)
-    # of the nearest object pixel for each point in the grid.
-    _, indices = distance_transform_edt(~object_mask, return_indices=True)
-
-    # --- 3. Create coordinate grids ---
-    # `output_coords` has shape (H, W, 2) and holds the (row, col)
-    #  for each pixel.
-    output_coords = np.indices((rows, cols), dtype=float).transpose(1, 2, 0)
-    # `indices` needs to be in the same (H, W, 2) format.
-    nearest_object_coords = indices.transpose(1, 2, 0)
-
-    # --- 4. Calculate and scale displacement vectors ---
-    # Vector from the nearest object point TO each grid point.
-    # This points "away".
-    displacement_vectors = output_coords - nearest_object_coords
-
-    # Calculate the distance (magnitude of the displacement vectors).
-    # Add a small epsilon to avoid division by zero later.
-    distances = np.linalg.norm(displacement_vectors, axis=-1) + 1e-6
-
-    # Create a scaling factor that decays with distance via an
-    # exponential function.
-    # The displacement is strongest near the object and fades out.
-    scale_factors = max_displacement * np.exp(-distances / decay_factor)
-
-    # To apply the scaled magnitude, normalize the original vectors and
-    # multiply.
-    scaled_displacement = displacement_vectors / distances[..., np.newaxis] *\
-        scale_factors[..., np.newaxis]
-
-    # The final "pull" location for a pixel is its original position
-    # minus the displacement.
-    src_coords = output_coords - scaled_displacement
-
-    # --- 5. Create a final, blended "flow field" ---
-    # This logic is preserved: we only apply the warp inside the
-    # inclusion_mask.
-    # Outside the mask, the mapping is an "identity" transform (r,c -> r,c).
-    final_src_coords = np.where(
-        inclusion_mask[..., np.newaxis],  # Broadcast inclusion_mask to match
-        src_coords,
-        output_coords  # The identity mapping
-    )
-
-    # --- 6. Apply the transformation using the flow field ---
-    # Reshape the flow field back to the (2, H, W) shape required by
-    # map_coordinates.
-    final_src_coords_reshaped = final_src_coords.transpose(2, 0, 1)
-
-    # `map_coordinates` efficiently pulls pixels from the `axial_slice`.
-    warped_slice = map_coordinates(
-        axial_slice,
-        final_src_coords_reshaped,
-        order=1,
-        prefilter=True,  # Recommended for interpolation order > 0
-        cval=np.min(axial_slice)  # Fill pixels mapped from outside with min
-    )
-
-    return warped_slice.astype(axial_slice.dtype)
 
 
 def coverage_from_volume(volume, hematoma_type, slice_thickness):
