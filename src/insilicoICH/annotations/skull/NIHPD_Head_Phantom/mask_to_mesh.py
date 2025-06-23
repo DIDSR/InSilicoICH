@@ -8,8 +8,8 @@ import slicer
 
 main_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), *[".."] * 5))
 
-if not os.path.exists(os.path.join(main_directory, "src/pedsilicoICH/annotations/skull/NIHPD_Head_Phantom/assets")):
-    os.makedirs(os.path.join(main_directory, "src/pedsilicoICH/annotations/skull/NIHPD_Head_Phantom/assets"))
+if not os.path.exists(os.path.join(main_directory, "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets")):
+    os.makedirs(os.path.join(main_directory, "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets"))
 
 # Path to brain mask (NIfTI)
 path_mask_brain = os.path.join(
@@ -21,7 +21,7 @@ path_mask_brain = os.path.join(
 # Path to save brain mesh (VTK)
 path_vtk_brain = os.path.join(
         main_directory,
-        "src/pedsilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
+        "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
         "mesh_brain.vtk",
     )
 

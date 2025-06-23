@@ -390,7 +390,7 @@ class SkullProcess(Skull):
 if __name__ == "__main__":
     path_mesh_brainmask = os.path.join(
         main_directory,
-        "src/pedsilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
+        "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
         "mesh_brain.vtk",
     )
 
@@ -409,7 +409,7 @@ if __name__ == "__main__":
         mesh=object_skull_process.mesh_skull,
         filepath=os.path.join(
             main_directory,
-            "src/pedsilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
+            "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
             "mesh_skull.vtk",
         ),
     )
@@ -417,7 +417,7 @@ if __name__ == "__main__":
     object_skull_process.mesh_to_voxel_center(
         path_nifti_save=os.path.join(
             main_directory,
-            "src/pedsilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
+            "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
             "skull_fracture_seg.nii.gz",
         )
     )
