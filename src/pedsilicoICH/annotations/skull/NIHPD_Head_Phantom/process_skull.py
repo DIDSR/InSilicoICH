@@ -88,60 +88,6 @@ class SkullProcess(Skull):
         # Convert back to PolyData if needed
         return grid.extract_surface()
 
-    def _check(self):
-        # Load the mesh
-        mesh = self.mesh_brain.extract_geometry()
-
-        # Set voxel size
-        voxel_size = 1
-
-        # Get cell centers (triangles/quads/etc.)
-        cell_centers = mesh.cell_centers().points
-
-        # Compute voxel grid bounds
-        min_bounds = cell_centers.min(axis=0)
-        max_bounds = cell_centers.max(axis=0)
-        # dims = np.ceil((max_bounds - min_bounds) / voxel_size).astype(int)
-        dims = [197, 233, 189]
-
-        print("dims", dims)
-
-        # Initialize empty voxel grid
-        voxels = np.zeros(dims, dtype=np.uint8)
-
-        # Fill voxel positions using cell centers
-        for pt in cell_centers:
-            idx = ((pt - min_bounds) / voxel_size).astype(int)
-            if np.all(idx >= 0) and np.all(idx < dims):
-                voxels[tuple(np.add(idx, [24, 25, 0]))] = 1
-
-        voxels = np.flip(voxels, axis=1)
-
-        path_mask_brain = os.path.join(
-            main_directory, "src/NIHPD_Head_Phantom", "nihpd_asym_04.5-08.5_mask.nii"
-        )
-
-        # shape, origin, spacing, affine, array  = self.get_nifti_info(path_mask_brain)
-        # print('shape', shape)
-        # print('unique', np.unique(array))
-
-        # indices = np.argwhere(array.astype(int) == 1)
-        # offset = [np.min(indices[:, 0]), np.min(indices[:, 1]), np.min(indices[:, 2])]
-        # centroid = [np.mean(indices[:, 0]), np.mean(indices[:, 1]), np.mean(indices[:, 2])]
-        # print(offset)
-
-        nifti_img = nib.Nifti1Image(voxels.astype(np.uint8), affine)
-
-        # Save as numpy voxel grid
-        nib.save(
-            nifti_img,
-            os.path.join(
-                main_directory,
-                "src/pedsilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
-                "mesh_brain_voxel.nii.gz",
-            ),
-        )
-
     def extract_primary_skull_mesh(self, maxIteration=1000):
         """
         Removes the skull mesh from the lower hemisphere. (not in use. function needs to be updated)
@@ -208,7 +154,7 @@ class SkullProcess(Skull):
 
         return idx
 
-    def mesh_to_voxel_center(self):
+    def mesh_to_voxel_center(self, path_nifti_save):
         shape, origin, spacing, affine, array = self.get_nifti_info(
             self.path_mask_brain
         )
@@ -244,14 +190,7 @@ class SkullProcess(Skull):
         nifti_img = nib.Nifti1Image(voxels.astype(np.uint8), affine)
 
         # Save as numpy voxel grid
-        nib.save(
-            nifti_img,
-            os.path.join(
-                main_directory,
-                "src/pedsilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
-                "mesh_skull_voxel.nii.gz",
-            ),
-        )
+        nib.save(nifti_img, path_nifti_save)
 
     def get_neighbour_cells_info(self, mesh, ind_maincell):
         """
@@ -475,4 +414,10 @@ if __name__ == "__main__":
         ),
     )
 
-    object_skull_process.mesh_to_voxel_center()
+    object_skull_process.mesh_to_voxel_center(
+        path_nifti_save=os.path.join(
+            main_directory,
+            "src/pedsilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
+            "skull_fracture_seg.nii.gz",
+        )
+    )
