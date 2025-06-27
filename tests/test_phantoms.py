@@ -1,42 +1,32 @@
 '''
 test low level insilicoich phantom generation functionality
 '''
-from pathlib import Path
-import os
-from dotenv import load_dotenv
+from functools import partial
+
 from monai.transforms import RandAffine
 import numpy as np
+from VITools import get_available_phantoms
 
-from insilicoICH.ground_truth_definition.utils import download_and_extract_archive
-from insilicoICH import load_phantom
+from insilicoICH.phantoms.head_phantoms import MIDA_Head
 
-unc_ages = [0, 1.0, 2.0]
-nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
 
-load_dotenv()
-if 'PHANTOM_DIRECTORY' in os.environ:
-    phantom_dir = Path(os.environ['PHANTOM_DIRECTORY'])
-else:
-    print('''
-Please `export PHANTOM_DIRECTORY=/path/to/phantoms` or add your `.env`
-file with PHANTOM_DIRECTORY=/path/to/phantoms
-''')
-    phantom_dir = Path(__file__).parent.absolute()
+available_phantoms = get_available_phantoms()
 
-unc_dir = phantom_dir / 'UNC_Head_Phantom'
-nihpd_dir = phantom_dir / 'NIHPD_Head_Phantom'
-mida_dir = phantom_dir / 'MIDA_Head_Phantom'
-
-if not unc_dir.exists():
-    url = 'https://www.nitrc.org/frs/download.php/14897/UNCInfant012Atlases-2022-10-21.zip'
-    download_and_extract_archive(url, unc_dir)
-
-if not nihpd_dir.exists():
-    url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
-    download_and_extract_archive(url, nihpd_dir)
 
 shape = 3*[128]
 seed = 41
+
+
+def load_phantom(age, shape=None):
+    '''
+    load a phantom for testing
+    '''
+    if age < 6.5:
+        return available_phantoms[f'{age} yr UNC Head'](shape=shape)
+    if age < 19.0:
+        return available_phantoms[f'{age} yr NIHPD Head'](shape=shape)
+    if age == 38.0:
+        return available_phantoms[f'{age} yr MIDA Head'](shape=shape)
 
 
 def rmse(x, y): return np.sqrt(np.mean((x-y)**2))
@@ -44,7 +34,7 @@ def rmse(x, y): return np.sqrt(np.mean((x-y)**2))
 
 def test_big_epidural_lesion():
     intensity = 100
-    age = 9
+    age = 9.0
     mass_effect = True
     desired_volume = 60
     phantom = load_phantom(age, shape=shape)
@@ -58,11 +48,25 @@ def test_big_epidural_lesion():
 
 def test_big_subdural_lesion():
     intensity = 100
-    age = 9
+    age = 9.0
     desired_volume = 60
     mass_effect = True
     phantom = load_phantom(age, shape=shape)
     phantom.insert_lesion('SDH', volume=desired_volume,
+                          intensity=intensity,
+                          mass_effect=mass_effect,
+                          seed=seed)
+    measured_volume = phantom.get_lesion_volume()
+    assert rmse(desired_volume, measured_volume) < 56
+
+
+def test_big_intraparenchymal_lesion():
+    intensity = 100
+    age = 9.0
+    desired_volume = 60
+    mass_effect = True
+    phantom = load_phantom(age, shape=shape)
+    phantom.insert_lesion('IPH', volume=desired_volume,
                           intensity=intensity,
                           mass_effect=mass_effect,
                           seed=seed)
@@ -105,3 +109,15 @@ def test_IPH_volume_accuracy():
             corrected = check_volumes(inputs=inputs, complexity=complexity,
                                       overlap=overlap, seed=seed)
             assert rmse(inputs, corrected) < 20
+
+
+def test_load_phantoms():
+    '''
+    tests that all phantoms load successfully
+    '''
+    for name, phantom_class in available_phantoms.items():
+        if isinstance(phantom_class, partial) and issubclass(phantom_class.func,
+                                                             MIDA_Head):
+            continue
+        phantom = phantom_class()
+        print(f'{name} {phantom}')

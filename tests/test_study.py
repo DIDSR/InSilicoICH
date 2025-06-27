@@ -1,73 +1,58 @@
-# %%
 '''
 tests high level Study functionality
 '''
-import numpy as np
-from monai.transforms import RandAffine
-
-from insilicoICH.study import Study
-from insilicoICH import load_phantom
-from insilicoICH import Scanner
-
-age = 6.5
-transform = RandAffine(prob=0.5,
-                       rotate_range=[np.pi/4, np.pi/20, np.pi/20],
-                       translate_range=[10, 10, 10],
-                       scale_range=[0.1, 0.1, 0.1],
-                       padding_mode="border")
+from insilicoICH.study import ICHStudy
 
 
-sphere_lesion_tol = 32
+def test_IPH_study():
+    study = ICHStudy()
+    desired_vol = 5
+    desired_atten = 300
+    study.append('10.5 yr NIHPD Head',
+                 Subtype='IPH', LesionVolume=desired_vol,
+                 LesionAttenuation=desired_atten,
+                 ScanCoverage=(8, 17), Views=100, Seed=206245)
+    study.run_all()
+    images = study.get_images(0)
+    masks = study.get_masks(0)
+    measured_lesion_signal = images[masks.astype(bool)].mean()
+    contrast_err = measured_lesion_signal - desired_atten
+    vol_err = study.results['LesionVolume(mL)'].sum() - desired_vol
+    assert abs(contrast_err) / desired_atten < 0.5
+    assert abs(vol_err) / desired_vol < 0.8
 
 
-def test_sphere_augmented_position_study():
-    phantom = load_phantom(age)
-    phantom.insert_lesion('IPH', volume=5, intensity=300, seed=336)
-    phantom.apply_transform(transform, seed=42)
-    lesion_level_mm = (phantom.get_CT_number_phantom().shape[0]/2 -
-                       phantom._lesion_coords[0][0])*phantom.dz
-    center = lesion_level_mm
-    width = 8
-
-    scanner = Scanner(phantom)
-    study = Study(scanner, 'test')
-    study.run_study('test', zspan=(center-width//2, center+width//2),
-                    views=100)
-    measured_lesion_signal = study.images[study.lesion.astype(bool)].mean()
-    assert measured_lesion_signal > sphere_lesion_tol
-
-shape = 3*[128]
-
-
-def test_epidural_augmented_position_study():
-    phantom = load_phantom(age, shape=shape)
-    phantom.insert_lesion('EDH', volume=5, intensity=300, seed=336)
-    phantom.apply_transform(transform, seed=42)
-    lesion_level_mm = (phantom.get_CT_number_phantom().shape[0]/2 -
-                       phantom._lesion_coords[0][0])*phantom.dz
-    center = lesion_level_mm
-    width = 8
-
-    scanner = Scanner(phantom)
-    study = Study(scanner, 'test')
-    study.run_study('test', zspan=(center-width//2, center+width//2),
-                    views=100)
-    measured_lesion_signal = study.images[study.lesion.astype(bool)].mean()
-    assert measured_lesion_signal > 38
+def test_EDH_study():
+    study = ICHStudy()
+    desired_vol = 5
+    desired_atten = 300
+    study.append('10.5 yr NIHPD Head',
+                 Subtype='EDH', LesionVolume=desired_vol,
+                 LesionAttenuation=desired_atten,
+                 ScanCoverage=(40, 48), Views=100, Seed=206245)
+    study.run_all()
+    images = study.get_images(0)
+    masks = study.get_masks(0)
+    measured_lesion_signal = images[masks.astype(bool)].mean()
+    contrast_err = measured_lesion_signal - desired_atten
+    vol_err = study.results['LesionVolume(mL)'].sum() - desired_vol
+    assert abs(contrast_err) / desired_atten < 0.2
+    assert abs(vol_err) / desired_vol < 0.5
 
 
-def test_subdural_augmented_position_study():
-    phantom = load_phantom(age, shape=shape)
-    phantom.insert_lesion('SDH', volume=5, intensity=300, seed=336)
-    phantom.apply_transform(transform, seed=42)
-    lesion_level_mm = (phantom.get_CT_number_phantom().shape[0]/2 -
-                       phantom._lesion_coords[0][0])*phantom.dz
-    center = lesion_level_mm
-    width = 8
-
-    scanner = Scanner(phantom)
-    study = Study(scanner, 'test')
-    study.run_study('test', zspan=(center-width//2, center+width//2),
-                    views=100)
-    measured_lesion_signal = study.images[study.lesion.astype(bool)].mean()
-    assert measured_lesion_signal > 21
+def test_SDH_study():
+    study = ICHStudy()
+    desired_vol = 5
+    desired_atten = 300
+    study.append('10.5 yr NIHPD Head',
+                 Subtype='SDH', LesionVolume=desired_vol,
+                 LesionAttenuation=desired_atten,
+                 ScanCoverage=(20, 28), Views=100, Seed=206245)
+    study.run_all()
+    images = study.get_images(0)
+    masks = study.get_masks(0)
+    measured_lesion_signal = images[masks.astype(bool)].mean()
+    contrast_err = measured_lesion_signal - desired_atten
+    vol_err = study.results['LesionVolume(mL)'].sum() - desired_vol
+    assert abs(contrast_err) / desired_atten < 0.2
+    assert abs(vol_err) / desired_vol < 0.7

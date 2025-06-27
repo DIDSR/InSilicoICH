@@ -6,6 +6,7 @@ notebooks/__pycache__
 .pytest_cache
 notebooks/*/*.png
 .PedsilicoICH
+.insilicoich
 build
 
 batchmode_CT_dataset_pipeline.sge
@@ -36,6 +37,4 @@ lesions.png
 *.7*
 *.8*
 *.9*
-*.vtk
-src/pedsilicoICH/annotations/skull/NIHPD_Head_Phantom/assets/mesh_skull.vtk
-src/NIHPD_Head_Phantom/
+*.nii
