@@ -151,7 +151,7 @@ def test_mass_effect():
         ]
 
     me_05 = phantom_me_image - phantom_no_me_image
-    assert (np.linalg.norm(me_05) > 300) & (np.linalg.norm(me_05) < 6000)
+    assert (np.linalg.norm(me_05) > 500) & (np.linalg.norm(me_05) < 1100)
 
     phantom_me = load_phantom(age)
     phantom_me.insert_lesion('EDH', volume=vol, mass_effect=1.0, seed=seed)

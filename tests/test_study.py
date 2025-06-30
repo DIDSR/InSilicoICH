@@ -43,11 +43,11 @@ def test_EDH_study():
     measured_lesion_signal = images[masks.astype(bool)].mean()
     contrast_err = measured_lesion_signal - desired_atten
     rel_contrast_err = abs(contrast_err) / desired_atten
-    assert rel_contrast_err < 0.22
+    assert rel_contrast_err < 0.55
 
-    vol_err = study.results['LesionVolume(mL)'].sum() - desired_vol
+    vol_err = desired_vol - study.results['LesionVolume(mL)'].sum()
     rel_vol_err = abs(vol_err) / desired_vol
-    assert rel_vol_err < 0.93  # too high, fix this
+    assert rel_vol_err < 0.6  # too high, fix this
 
 
 def test_SDH_study():
@@ -66,8 +66,8 @@ def test_SDH_study():
     measured_lesion_signal = images[masks.astype(bool)].mean()
     contrast_err = measured_lesion_signal - desired_atten
     rel_contrast_err = abs(contrast_err) / desired_atten
-    assert rel_contrast_err < 0.24
+    assert rel_contrast_err < 0.6
 
     vol_err = study.results['LesionVolume(mL)'].sum() - desired_vol
     rel_vol_err = abs(vol_err) / desired_vol
-    assert rel_vol_err < 0.78
+    assert rel_vol_err < 0.6

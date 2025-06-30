@@ -307,11 +307,12 @@ from {phantom_dir}')
             ski.segmentation.find_boundaries(self.mask.astype(bool),
                                              mode='outer', background=0)
         mask = ski.morphology.binary_dilation(mask, np.ones(3*[3]))
+        mask |= ~self.warp_inclusion_mask
         return mask
 
     @property
     def warp_inclusion_mask(self):
-        return self.mask.astype(bool) & ~self.warp_exclusion_mask
+        return self.mask.astype(bool)
 
     def resize(self, shape=None):
         original_shape = self.csf.shape

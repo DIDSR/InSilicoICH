@@ -187,6 +187,11 @@ class LesionPhantom(Phantom):
         if mass_effect_strength > 0:
             img_w_lesion = self._apply_mass_effect(lesion_mask,
                                                    mass_effect_strength)
+        # correct and erroneaous voxels
+        diff = self.get_CT_number_phantom() - img_w_lesion
+        img_w_lesion[abs(diff) > intensity] =\
+            self.get_CT_number_phantom()[abs(diff) > intensity]
+
         # add texture
         if texture_kwargs:
             lesion_texture = self.get_noise_texture(
@@ -454,7 +459,7 @@ class LesionPhantom(Phantom):
         final_lesion_mask = np.zeros_like(base_img, dtype=bool)
 
         # Iteratively correct the volume
-        for i in range(3): # Try up to 3 times to correct the volume
+        for i in range(3):  # Try up to 3 times to correct the volume
             # --- Generate the lesion mask based on the current area estimate ---
             hemisphere_mask = np.zeros_like(dura_map, dtype=bool)
             mid_y = self.shape[2] // 2
@@ -508,6 +513,8 @@ class LesionPhantom(Phantom):
             for idx, filled_array in all_filled_arrays.items():
                 current_mask[idx] = filled_array
 
+            current_mask &= self.warp_inclusion_mask
+            current_mask &= ~self.warp_exclusion_mask
             # --- Measure and correct ---
             current_volume_ml = np.sum(current_mask) * voxel_volume_ml
 
@@ -521,7 +528,7 @@ class LesionPhantom(Phantom):
                 correction_factor = desired_volume_ml / current_volume_ml
                 center_slice_area_mm2 *= correction_factor
 
-            final_lesion_mask = current_mask # Keep the last result in case loop finishes
+            final_lesion_mask = current_mask  # Keep the last result in case loop finishes
 
         return final_lesion_mask, base_img
 
