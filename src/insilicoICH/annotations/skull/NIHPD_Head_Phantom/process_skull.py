@@ -154,17 +154,77 @@ class SkullProcess(Skull):
 
         return idx
 
-    def mesh_to_voxel_center(self, path_nifti_save):
-        shape, origin, spacing, affine, array = self.get_nifti_info(
-            self.path_mask_brain
+    def save_seg_fracture(
+        self, path_seg_skull, path_seg_skull_fracture, path_save_seg_fracture
+    ):
+        shape, origin, spacing, affine, array_skull = self.get_nifti_info(
+            path_seg_skull
         )
-        indices = np.argwhere(array.astype(int) == 1)
-        offset = [np.min(indices[:, 0]), np.min(indices[:, 1]), np.min(indices[:, 2])]
-        offset[2] = self.get_center_voxel_space()[2]
-        print("offset", offset)
-        print("affine", affine)
 
-        # Load the mesh
+        shape, origin, spacing, affine, array_skull_fracture = self.get_nifti_info(
+            path_seg_skull_fracture
+        )
+
+        diff_fracture = array_skull - array_skull_fracture
+
+        nifti_img = nib.Nifti1Image(diff_fracture, affine)
+
+        # Save as numpy voxel grid
+        nib.save(nifti_img, path_save_seg_fracture)
+
+    def _mesh_to_voxel_nifti(self, path_nifti_save):
+        # Load NIfTI info
+        shape, origin, spacing, affine, array = self.get_nifti_info(self.path_mask_brain)
+        indices = np.argwhere(array.astype(int) == 1)
+        offset = [np.min(indices[:, 0]) + 1, np.min(indices[:, 1]) - 2, np.min(indices[:, 2])]
+
+        # Extract mesh geometry
+        mesh = self.mesh_brain.extract_geometry()
+
+        # Set voxel size
+        voxel_size = 1
+
+        # Get cell centers (triangles/quads/etc.)
+        cell_centers = mesh.cell_centers().points
+
+        # Compute voxel grid bounds
+        min_bounds = cell_centers.min(axis=0)
+
+        # Convert mesh points from world space to voxel indices using inverse affine
+        inv_affine = np.linalg.inv(affine)
+        voxel_indices = nib.affines.apply_affine(inv_affine, cell_centers)
+        voxel_indices = np.round(voxel_indices).astype(int)
+
+        # Initialize empty voxel grid
+        voxels = np.zeros(shape, dtype=np.uint8)
+
+        # # Fill in voxels
+        # for idx in voxel_indices:
+        #     if np.all(idx >= 0) and np.all(idx < shape):
+        #         voxels[tuple(idx)] = 1
+
+        # Fill voxel positions using cell centers
+        for pt in cell_centers:
+            idx = ((pt - min_bounds) / voxel_size).astype(int)
+            if np.all(idx >= 0) and np.all(idx < shape):
+                voxels[tuple(np.add(idx, offset))] = 1
+
+        # (Optional) Flip axes if needed (use only if verified visually)
+        # voxels = np.flip(voxels, axis=1)
+        voxels = np.rot90(voxels, axes=(0, 1), k=2)
+
+        # Create and save NIfTI
+        nifti_img = nib.Nifti1Image(voxels.astype(np.uint8), affine)
+        nib.save(nifti_img, path_nifti_save)
+
+    def _mesh_to_voxel_nifti_skull(self, path_nifti_save):
+        # Load NIfTI info
+        shape, origin, spacing, affine, array = self.get_nifti_info(self.path_mask_brain)
+        indices = np.argwhere(array.astype(int) == 1)
+        offset = [np.min(indices[:, 0]) + 1, np.min(indices[:, 1]) - 2, np.min(indices[:, 2])]
+        offset[2] = self.get_center_voxel_space()[2]
+
+        # Extract mesh geometry
         mesh = self.mesh_skull.extract_geometry()
 
         # Set voxel size
@@ -176,8 +236,18 @@ class SkullProcess(Skull):
         # Compute voxel grid bounds
         min_bounds = cell_centers.min(axis=0)
 
+        # Convert mesh points from world space to voxel indices using inverse affine
+        inv_affine = np.linalg.inv(affine)
+        voxel_indices = nib.affines.apply_affine(inv_affine, cell_centers)
+        voxel_indices = np.round(voxel_indices).astype(int)
+
         # Initialize empty voxel grid
         voxels = np.zeros(shape, dtype=np.uint8)
+
+        # # Fill in voxels
+        # for idx in voxel_indices:
+        #     if np.all(idx >= 0) and np.all(idx < shape):
+        #         voxels[tuple(idx)] = 1
 
         # Fill voxel positions using cell centers
         for pt in cell_centers:
@@ -185,12 +255,57 @@ class SkullProcess(Skull):
             if np.all(idx >= 0) and np.all(idx < shape):
                 voxels[tuple(np.add(idx, offset))] = 1
 
-        voxels = np.flip(voxels, axis=1)
+        # (Optional) Flip axes if needed (use only if verified visually)
+        # voxels = np.flip(voxels, axis=1)
+        voxels = np.rot90(voxels, axes=(0, 1), k=2)
 
+        # Create and save NIfTI
         nifti_img = nib.Nifti1Image(voxels.astype(np.uint8), affine)
-
-        # Save as numpy voxel grid
         nib.save(nifti_img, path_nifti_save)
+
+    # def mesh_to_voxel_center(self, path_nifti_save):
+    #     """
+    #     Save fracture mesh into voxel form.
+
+    #     Args:
+    #         path_nifti_save (str): path to save nifti image.
+    #     """
+    #     shape, origin, spacing, affine, array = self.get_nifti_info(
+    #         self.path_mask_brain
+    #     )
+    #     indices = np.argwhere(array.astype(int) == 1)
+    #     offset = [np.min(indices[:, 0]) + 1, np.min(indices[:, 1]) - 2, np.min(indices[:, 2])]
+    #     offset[2] = self.get_center_voxel_space()[2]
+    #     print("offset", offset)
+    #     print("affine", affine)
+
+    #     # Load the mesh
+    #     mesh = self.mesh_skull.extract_geometry()
+
+    #     # Set voxel size
+    #     voxel_size = 1
+
+    #     # Get cell centers (triangles/quads/etc.)
+    #     cell_centers = mesh.cell_centers().points
+
+    #     # Compute voxel grid bounds
+    #     min_bounds = cell_centers.min(axis=0)
+
+    #     # Initialize empty voxel grid
+    #     voxels = np.zeros(shape, dtype=np.uint8)
+
+    #     # Fill voxel positions using cell centers
+    #     for pt in cell_centers:
+    #         idx = ((pt - min_bounds) / voxel_size).astype(int)
+    #         if np.all(idx >= 0) and np.all(idx < shape):
+    #             voxels[tuple(np.add(idx, offset))] = 1
+
+    #     voxels = np.rot90(voxels, axes=(0, 1), k=2)
+
+    #     nifti_img = nib.Nifti1Image(voxels.astype(np.uint8), affine)
+
+    #     # Save as numpy voxel grid
+    #     nib.save(nifti_img, path_nifti_save)
 
     def get_neighbour_cells_info(self, mesh, ind_maincell):
         """
@@ -403,6 +518,23 @@ if __name__ == "__main__":
     )
     object_skull_process.extract_skull()
     object_skull_process.extract_primary_skull_mesh()
+
+    object_skull_process._mesh_to_voxel_nifti_skull(
+        path_nifti_save=os.path.join(
+            main_directory,
+            "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
+            "skull_seg.nii.gz",
+        )
+    )
+
+    object_skull_process._mesh_to_voxel_nifti(
+        path_nifti_save=os.path.join(
+            main_directory,
+            "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
+            "brain_mesh_to_seg_2.nii.gz",
+        )
+    )
+
     object_skull_process.add_fracture()
 
     object_skull_process.save_mesh(
@@ -414,10 +546,28 @@ if __name__ == "__main__":
         ),
     )
 
-    object_skull_process.mesh_to_voxel_center(
+    object_skull_process._mesh_to_voxel_nifti_skull(
         path_nifti_save=os.path.join(
             main_directory,
             "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
             "skull_fracture_seg.nii.gz",
         )
+    )
+
+    object_skull_process.save_seg_fracture(
+        os.path.join(
+            main_directory,
+            "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
+            "skull_seg.nii.gz",
+        ),
+        os.path.join(
+            main_directory,
+            "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
+            "skull_fracture_seg.nii.gz",
+        ),
+        os.path.join(
+            main_directory,
+            "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
+            "fracture_seg.nii.gz",
+        ),
     )
