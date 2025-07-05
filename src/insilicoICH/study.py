@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pydicom
 import pandas as pd
-import tomllib
+import tomli
 from scipy.ndimage import center_of_mass
 from monai.transforms import RandAffine
 
@@ -394,13 +394,13 @@ def recruitment_cli(arg_list: list[str] | None = None):
     args = parser.parse_args(arg_list)
     pkg_dir = Path(__file__).parent
     with open(pkg_dir / 'configs/default.toml', 'rb') as f:
-        config = tomllib.load(f)
+        config = tomli.load(f)
         config = flatten_dict(config)
         config['LesionVolume'] = pkg_dir / config['LesionVolume']
         config['LesionAttenuation'] = pkg_dir / config['LesionAttenuation']
     if args.config:
         with open(args.config, 'rb') as f:
-            user_config = tomllib.load(f)
+            user_config = tomli.load(f)
             user_config = flatten_dict(user_config)
         args.config = None
         config.update(user_config)

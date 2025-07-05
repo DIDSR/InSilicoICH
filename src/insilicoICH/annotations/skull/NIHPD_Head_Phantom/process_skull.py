@@ -92,7 +92,7 @@ class SkullProcess(Skull):
         """
         Removes the skull mesh from the lower hemisphere. (not in use. function needs to be updated)
         """
-        grid = self.mesh_skull.cast_to_unstructured_grid()
+        grid = self.skull_mesh.cast_to_unstructured_grid()
 
         np_points = np.array(
             [grid.GetPoint(i) for i in range(grid.GetNumberOfPoints())]
@@ -118,7 +118,7 @@ class SkullProcess(Skull):
 
         # Remove those cells
         grid.remove_cells(cell_ids_below, inplace=True)
-        self.mesh_skull = grid.extract_surface()
+        self.skull_mesh = grid.extract_surface()
 
     def get_nifti_info(self, nifti_path):
         img = nib.load(nifti_path)
@@ -217,7 +217,7 @@ class SkullProcess(Skull):
         nifti_img = nib.Nifti1Image(voxels.astype(np.uint8), affine)
         nib.save(nifti_img, path_nifti_save)
 
-    def _mesh_to_voxel_nifti_skull(self, path_nifti_save):
+    def mesh_to_voxel_nifti_skull(self, path_nifti_save):
         # Load NIfTI info
         shape, origin, spacing, affine, array = self.get_nifti_info(self.path_mask_brain)
         indices = np.argwhere(array.astype(int) == 1)
@@ -225,7 +225,7 @@ class SkullProcess(Skull):
         offset[2] = self.get_center_voxel_space()[2]
 
         # Extract mesh geometry
-        mesh = self.mesh_skull.extract_geometry()
+        mesh = self.skull_mesh.extract_geometry()
 
         # Set voxel size
         voxel_size = 1
@@ -280,7 +280,7 @@ class SkullProcess(Skull):
     #     print("affine", affine)
 
     #     # Load the mesh
-    #     mesh = self.mesh_skull.extract_geometry()
+    #     mesh = self.skull_mesh.extract_geometry()
 
     #     # Set voxel size
     #     voxel_size = 1
@@ -329,21 +329,21 @@ class SkullProcess(Skull):
 
         # Perform ray trace
         for start, stop in zip(list_start, list_stop):
-            points, inds = self.mesh_skull.ray_trace(start, stop)
+            points, inds = self.skull_mesh.ray_trace(start, stop)
             list_indice_intersect.extend(inds)
 
             for ind in inds:
                 list_indice_intersect.extend(
-                    self.get_neighbour_cells_info(self.mesh_skull, ind)
+                    self.get_neighbour_cells_info(self.skull_mesh, ind)
                 )
 
-        self.mesh_skull = self.mesh_skull.extract_surface()
+        self.skull_mesh = self.skull_mesh.extract_surface()
 
         if len(list_indice_intersect) > 0:
             non_intersected = np.setdiff1d(
-                np.arange(self.mesh_skull.n_cells), list_indice_intersect
+                np.arange(self.skull_mesh.n_cells), list_indice_intersect
             )
-            self.mesh_skull = self.mesh_skull.extract_cells(non_intersected)
+            self.skull_mesh = self.skull_mesh.extract_cells(non_intersected)
 
     def get_angular_spacing_specific_cell_trace_degree(self, mesh, start, stop):
         """
@@ -409,7 +409,7 @@ class SkullProcess(Skull):
         )
         delta_shift_degree_phi, delta_shift_degree_theta = (
             self.get_angular_spacing_specific_cell_trace_degree(
-                self.mesh_skull,
+                self.skull_mesh,
                 self.skull_center,
                 np.add(self.skull_center, np.multiply(direction, 100)),
             )
@@ -499,7 +499,7 @@ class SkullProcess(Skull):
         mesh_sphere, center, radius = self._get_bounding_sphere_mesh(mesh)
         mesh = self.remove_cells_inside_sphere(mesh=mesh, center=center, radius=radius)
 
-        self.mesh_skull = mesh
+        self.skull_mesh = mesh
 
 
 if __name__ == "__main__":
@@ -519,7 +519,7 @@ if __name__ == "__main__":
     object_skull_process.extract_skull()
     object_skull_process.extract_primary_skull_mesh()
 
-    object_skull_process._mesh_to_voxel_nifti_skull(
+    object_skull_process.mesh_to_voxel_nifti_skull(
         path_nifti_save=os.path.join(
             main_directory,
             "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
@@ -527,26 +527,18 @@ if __name__ == "__main__":
         )
     )
 
-    object_skull_process._mesh_to_voxel_nifti(
-        path_nifti_save=os.path.join(
-            main_directory,
-            "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
-            "brain_mesh_to_seg_2.nii.gz",
-        )
-    )
-
     object_skull_process.add_fracture()
 
     object_skull_process.save_mesh(
-        mesh=object_skull_process.mesh_skull,
+        mesh=object_skull_process.skull_mesh,
         filepath=os.path.join(
             main_directory,
             "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
-            "mesh_skull.vtk",
+            "skull_mesh.vtk",
         ),
     )
 
-    object_skull_process._mesh_to_voxel_nifti_skull(
+    object_skull_process.mesh_to_voxel_nifti_skull(
         path_nifti_save=os.path.join(
             main_directory,
             "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",

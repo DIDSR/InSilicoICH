@@ -98,7 +98,26 @@ class HeadPhantom(LesionPhantom):
 
     def get_warp_inclusion_mask(self):
         return self.get_CT_number_phantom() > -900
+    
+    def save_volume_nifti(self, volume: np.ndarray, affine: np.ndarray, path_save: str):
+        """
+        Saves volume as nifti with the given geometry as an affine matrix
+        """
+        nifti_img = nib.Nifti1Image(volume, affine)
+        nib.save(nifti_img, path_save)
 
+    def get_nifti_info(self, nifti_path):
+        """
+        Returns the nifti geometry.
+        """
+        img = nib.load(nifti_path)
+        array = img.get_fdata()
+        shape = img.shape  # (z, y, x) or (x, y, z), depending on orientation
+        affine = img.affine  # 4x4 affine transformation matrix
+        spacing = np.sqrt((affine[:3, :3] ** 2).sum(axis=0))  # voxel spacing
+        origin = affine[:3, 3]  # origin (translation component)
+
+        return shape, origin, spacing, affine, array
 
 class MIDA_Head(HeadPhantom):
     name = 'MIDA Head'
@@ -244,13 +263,14 @@ class NIHPD_Head(HeadPhantom):
     url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
 
     def __init__(self, phantom_dir, age: float, symmetric=False, shape=None,
-                 skull_seg_method='otsu', add_sutures=True):
+                 skull_seg_method='otsu', add_sutures=False, add_fractures=True):
         phantom_dir = Path(phantom_dir)
         self.age = age
         self.patient_name = f'{age} yr {NIHPD_Head.name}'
         self.symmetric = symmetric
         self.skull_seg_method = skull_seg_method
         self.add_sutures = add_sutures
+        self.add_fractures = add_fractures
         if not phantom_dir.exists():
             print(f'''
 `PHANTOM_DIRECTORY` {phantom_dir} not found, now downloading NIHPD phantoms
@@ -419,6 +439,41 @@ from {phantom_dir}')
         sutures = ski.morphology.skeletonize(sutures)
         sutures = ski.morphology.dilation(sutures, np.ones(3*[thickness]))
         return sutures
+    
+    def get_fractures(self, thickness=2, thresh=30):
+        """
+        returns fracture mask to the self skull
+
+        :param thickness: thickness in pixels of the fracture
+        :returns: boolean fracture mask that can be used to set skull fracture
+            values
+        """
+        src_dir = Path(__file__).parents[1]
+        fname = src_dir / 'annotations/skull/NIHPD_Head_Phantom/assets/fracture_seg.nii.gz' # 0: background, 1: fracture
+        data = sitk.GetArrayFromImage(sitk.ReadImage(fname)).transpose(0, 1, 2)[::-1, ::-1] # changed from (2, 1, 0)
+        skull = self.get_skull_map()
+        dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
+        if (dx < 0) | (dy < 0) | (dz < 0):
+            resizewithcrop = ResizeWithPadOrCrop(spatial_size=skull.shape)
+            data = resizewithcrop(data[None])[0].numpy()
+            dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
+
+        dx1 = dx2 = dx//2
+        if dx % 2 == 1:
+            dx2 += 1
+        dy1 = dy2 = dy//2
+        if dy % 2 == 1:
+            dy2 += 1
+        dz1 = dz2 = dz//2
+        if dz % 2 == 1:
+            dz2 += 1
+        data = np.pad(data, ((dx1, dx2), (dy1, dy2), (dz1, dz2))) > 0
+        suture_dist = distance_transform_edt(~data)
+        sutures = skull & (suture_dist < thresh)
+        sutures = ski.morphology.skeletonize(sutures)
+        sutures = ski.morphology.dilation(sutures, np.ones(3*[thickness]))
+        # data = data > 0
+        return data
 
     def assign_HUs(self, feature_range=(-100, 100)):
         phantom = self.csf*self.materials['CSF'] +\
@@ -439,6 +494,10 @@ from {phantom_dir}')
         if self.add_sutures:
             sutures = self.get_sutures()
             phantom[sutures] = 0  # assume water HU
+        if self.add_fractures:
+            print("assign_HUs: adding fractures")
+            fractures = self.get_fractures()
+            phantom[fractures] = 0  # assume water HU
         phantom[phantom < 0] = self.materials['air']
 
         # # TODO: dura map currently overlaps with new skull methods, need fix
