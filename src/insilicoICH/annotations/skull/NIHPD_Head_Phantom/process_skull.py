@@ -11,17 +11,23 @@ from skull import Skull
 from pyransac3d import Sphere
 import random
 import nibabel as nib
+import tomli
+import tomli_w
 
 main_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), *[".."] * 5))
 sys.path.append(main_directory)
 
 
 class SkullProcess(Skull):
-    def __init__(self, path_mesh_brainmask: str, path_mask_brain: str):
+    def __init__(self, path_mesh_brainmask: str, path_mask_brain: str, path_file_config: str):
         super().__init__()
-        self.mesh_brain = self.load_mesh(path_mesh_brainmask)
+        self.path_mesh_brainmask = path_mesh_brainmask
+        self.mesh_brain = None
         self.skull_center = None
         self.path_mask_brain = path_mask_brain
+        self.config = None
+        self.path_file_config = path_file_config
+        self.skull_mesh = None
 
     def load_mesh(self, path_mesh_brainmask: str):
         return pv.read(path_mesh_brainmask)
@@ -32,6 +38,21 @@ class SkullProcess(Skull):
     def save_mesh(self, mesh: pv.PolyData, filepath: str):
         mesh.save(filepath)
         print("Saved", filepath)
+
+    def initialize(self) -> None:
+        """
+        Initialize with the configuration file.
+        """        
+        if not os.path.exists(self.path_file_config):
+            with open(self.path_file_config, "wb") as f:
+                tomli_w.dump({}, f)
+            print("Created empty config.toml")
+
+        with open(self.path_file_config, "rb") as file_config:
+            self.config = tomli.load(file_config)
+            print("Reading", self.path_file_config)
+
+        self.mesh_brain = self.load_mesh(self.path_mesh_brainmask)
 
     def _get_bounding_sphere_mesh(self, mesh: pv.PolyData) -> pv.PolyData:
         """
@@ -105,6 +126,12 @@ class SkullProcess(Skull):
             np_points, maxIteration=maxIteration
         )
         z_center = self.skull_center[2]
+
+        self.config.setdefault("skull_mesh_params", {})
+        self.config["skull_mesh_params"]["center"] = self.skull_center
+
+        with open(self.path_file_config, "wb") as f:
+            tomli_w.dump(self.config, f)
 
         # Get cell centers
         cell_centers = grid.cell_centers()
@@ -198,11 +225,6 @@ class SkullProcess(Skull):
         # Initialize empty voxel grid
         voxels = np.zeros(shape, dtype=np.uint8)
 
-        # # Fill in voxels
-        # for idx in voxel_indices:
-        #     if np.all(idx >= 0) and np.all(idx < shape):
-        #         voxels[tuple(idx)] = 1
-
         # Fill voxel positions using cell centers
         for pt in cell_centers:
             idx = ((pt - min_bounds) / voxel_size).astype(int)
@@ -263,50 +285,6 @@ class SkullProcess(Skull):
         nifti_img = nib.Nifti1Image(voxels.astype(np.uint8), affine)
         nib.save(nifti_img, path_nifti_save)
 
-    # def mesh_to_voxel_center(self, path_nifti_save):
-    #     """
-    #     Save fracture mesh into voxel form.
-
-    #     Args:
-    #         path_nifti_save (str): path to save nifti image.
-    #     """
-    #     shape, origin, spacing, affine, array = self.get_nifti_info(
-    #         self.path_mask_brain
-    #     )
-    #     indices = np.argwhere(array.astype(int) == 1)
-    #     offset = [np.min(indices[:, 0]) + 1, np.min(indices[:, 1]) - 2, np.min(indices[:, 2])]
-    #     offset[2] = self.get_center_voxel_space()[2]
-    #     print("offset", offset)
-    #     print("affine", affine)
-
-    #     # Load the mesh
-    #     mesh = self.skull_mesh.extract_geometry()
-
-    #     # Set voxel size
-    #     voxel_size = 1
-
-    #     # Get cell centers (triangles/quads/etc.)
-    #     cell_centers = mesh.cell_centers().points
-
-    #     # Compute voxel grid bounds
-    #     min_bounds = cell_centers.min(axis=0)
-
-    #     # Initialize empty voxel grid
-    #     voxels = np.zeros(shape, dtype=np.uint8)
-
-    #     # Fill voxel positions using cell centers
-    #     for pt in cell_centers:
-    #         idx = ((pt - min_bounds) / voxel_size).astype(int)
-    #         if np.all(idx >= 0) and np.all(idx < shape):
-    #             voxels[tuple(np.add(idx, offset))] = 1
-
-    #     voxels = np.rot90(voxels, axes=(0, 1), k=2)
-
-    #     nifti_img = nib.Nifti1Image(voxels.astype(np.uint8), affine)
-
-    #     # Save as numpy voxel grid
-    #     nib.save(nifti_img, path_nifti_save)
-
     def get_neighbour_cells_info(self, mesh, ind_maincell):
         """
         Get the list of indices of the neighbor cells.
@@ -345,13 +323,13 @@ class SkullProcess(Skull):
             )
             self.skull_mesh = self.skull_mesh.extract_cells(non_intersected)
 
-    def get_angular_spacing_specific_cell_trace_degree(self, mesh, start, stop):
+    def get_angular_spacing_specific_cell_trace_degree(self, start, stop):
         """
         Get angular spacing for shifting the angle for removing mesh to add fracture.
         (start is the center of skull here)
         """
         # Perform ray tracing
-        points, ind = mesh.ray_trace(start, stop)
+        points, ind = self.skull_mesh.ray_trace(start, stop)
 
         if len(ind) == 0:
             print("No intersection found.")
@@ -359,7 +337,7 @@ class SkullProcess(Skull):
             hit_cell_index = ind[0]
 
             # Details about the target cell
-            center_hit_cell = mesh.cell_centers().points[hit_cell_index]
+            center_hit_cell = self.skull_mesh.cell_centers().points[hit_cell_index]
             cell_center_rel_origin = np.subtract(center_hit_cell, start)
             r_hit_cell, phi_hit_cell, theta_hit_cell = pv.cartesian_to_spherical(
                 *cell_center_rel_origin
@@ -367,9 +345,9 @@ class SkullProcess(Skull):
 
             list_neighbor_phi_radian = []
             list_neighbor_theta_radian = []
-            neighbors = mesh.cell_neighbors(hit_cell_index)
+            neighbors = self.skull_mesh.cell_neighbors(hit_cell_index)
             for i, neighbor in enumerate(neighbors):
-                pt = mesh.cell_centers().points[neighbor]
+                pt = self.skull_mesh.cell_centers().points[neighbor]
                 pt_rel_origin = np.subtract(pt, start)
                 r, phi, theta = pv.cartesian_to_spherical(*pt_rel_origin)
                 list_neighbor_phi_radian.append(phi)
@@ -400,6 +378,9 @@ class SkullProcess(Skull):
         """
         Add fracture by removing meshes with given procedure.
         """
+        if self.skull_center is None:
+            self.skull_center = self.config["skull_mesh_params"]["center"]
+
         phi_degree = 30
         theta_degree = 0
 
@@ -407,9 +388,9 @@ class SkullProcess(Skull):
         direction = pv.spherical_to_cartesian(
             1, np.deg2rad(phi_degree), np.deg2rad(theta_degree)
         )
+
         delta_shift_degree_phi, delta_shift_degree_theta = (
             self.get_angular_spacing_specific_cell_trace_degree(
-                self.skull_mesh,
                 self.skull_center,
                 np.add(self.skull_center, np.multiply(direction, 100)),
             )
@@ -513,11 +494,27 @@ if __name__ == "__main__":
         main_directory, "src/NIHPD_Head_Phantom", "nihpd_asym_04.5-08.5_mask.nii"
     )
 
-    object_skull_process = SkullProcess(
-        path_mesh_brainmask=path_mesh_brainmask, path_mask_brain=path_mask_brain
+    path_file_config = os.path.join(
+        main_directory,
+        "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
+        "config.toml",
     )
+    
+    object_skull_process = SkullProcess(
+        path_mesh_brainmask=path_mesh_brainmask, path_mask_brain=path_mask_brain, path_file_config=path_file_config
+    )
+    object_skull_process.initialize()
     object_skull_process.extract_skull()
     object_skull_process.extract_primary_skull_mesh()
+
+    object_skull_process.save_mesh(
+        mesh=object_skull_process.skull_mesh,
+        filepath=os.path.join(
+            main_directory,
+            "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
+            "skull_mesh.vtk",
+        ),
+    )
 
     object_skull_process.mesh_to_voxel_nifti_skull(
         path_nifti_save=os.path.join(
@@ -528,15 +525,6 @@ if __name__ == "__main__":
     )
 
     object_skull_process.add_fracture()
-
-    object_skull_process.save_mesh(
-        mesh=object_skull_process.skull_mesh,
-        filepath=os.path.join(
-            main_directory,
-            "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
-            "skull_mesh.vtk",
-        ),
-    )
 
     object_skull_process.mesh_to_voxel_nifti_skull(
         path_nifti_save=os.path.join(

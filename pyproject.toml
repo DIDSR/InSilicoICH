@@ -17,6 +17,7 @@ dependencies = [
   "SimpleITK",
   "pydicom",
   "requests",
+  "tomli-w"
   # "VITools @ git+https://github.com/DIDSR/VITools.git"
 ]
 classifiers = [
