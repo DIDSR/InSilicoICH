@@ -7,7 +7,7 @@ import sys
 import numpy as np
 import pyvista as pv
 import vtk
-from skull import Skull
+from .skull import Skull
 from pyransac3d import Sphere
 import random
 import nibabel as nib
@@ -401,7 +401,7 @@ class SkullProcess(Skull):
         Save multiple fractures with the given parameters.
         """
         for n in range(n_fractures):
-            length=random.randint(min_max_fracture_length[0], min_max_fracture_length[1])
+            length = random.randint(min_max_fracture_length[0], min_max_fracture_length[1])
             phi_degree = random.uniform(0, self.threshold_degree_phi)
             theta_degree = random.uniform(0, 360)
 
@@ -534,35 +534,35 @@ class SkullProcess(Skull):
         self.skull_mesh = mesh
 
 
-if __name__ == "__main__":
-    path_mesh_brainmask = os.path.join(
-        main_directory,
-        "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
-        "mesh_brain.vtk",
-    )
+# if __name__ == "__main__":
+#     path_mesh_brainmask = os.path.join(
+#         main_directory,
+#         "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
+#         "mesh_brain.vtk",
+#     )
 
-    path_mask_brain = os.path.join(
-        main_directory, "src/NIHPD_Head_Phantom", "nihpd_asym_04.5-08.5_mask.nii"
-    )
+#     path_mask_brain = os.path.join(
+#         main_directory, "src/NIHPD_Head_Phantom", "nihpd_asym_04.5-08.5_mask.nii"
+#     )
 
-    path_file_config = os.path.join(
-        main_directory,
-        "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
-        "config.toml",
-    )
+#     path_file_config = os.path.join(
+#         main_directory,
+#         "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
+#         "config.toml",
+#     )
     
-    object_skull_process = SkullProcess(
-        path_mesh_brainmask=path_mesh_brainmask, path_mask_brain=path_mask_brain, path_file_config=path_file_config
-    )
-    object_skull_process.initialize()
-    object_skull_process.extract_skull()
-    object_skull_process.extract_primary_skull_mesh()
+#     object_skull_process = SkullProcess(
+#         path_mesh_brainmask=path_mesh_brainmask, path_mask_brain=path_mask_brain, path_file_config=path_file_config
+#     )
+#     object_skull_process.initialize()
+#     object_skull_process.extract_skull()
+#     object_skull_process.extract_primary_skull_mesh()
 
-    object_skull_process.save_mesh(
-        mesh=object_skull_process.skull_mesh,
-        filepath=os.path.join(
-            main_directory,
-            "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
-            "skull_mesh.vtk",
-        ),
-    )
+#     object_skull_process.save_mesh(
+#         mesh=object_skull_process.skull_mesh,
+#         filepath=os.path.join(
+#             main_directory,
+#             "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
+#             "skull_mesh.vtk",
+#         ),
+#     )

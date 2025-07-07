@@ -25,6 +25,8 @@ from scipy.ndimage import distance_transform_edt
 from .base_phantoms import LesionPhantom, resize, get_mean_age, get_transformation_src_dst
 from .utils import download_and_extract_archive
 from VITools.hooks import hookimpl
+from ..annotations.skull.NIHPD_Head_Phantom.skull_fracture import SkullFracture
+import random
 
 
 load_dotenv()
@@ -271,6 +273,27 @@ class NIHPD_Head(HeadPhantom):
         self.skull_seg_method = skull_seg_method
         self.add_sutures = add_sutures
         self.add_fractures = add_fractures
+        self.dict_skull_paths = {
+            "path_mesh_brainmask": os.path.join(
+                Path(__file__).parents[1],
+                "annotations/skull/NIHPD_Head_Phantom/assets",
+                "mesh_brain.vtk",
+            ),
+            "path_mask_brain": os.path.join(
+                Path(__file__).parents[2],
+                "NIHPD_Head_Phantom/nihpd_asym_04.5-08.5_mask.nii"
+            ),
+            "path_file_config": os.path.join(
+                Path(__file__).parents[1],
+                "annotations/skull/NIHPD_Head_Phantom/assets",
+                "config.toml",
+            ),
+            "path_skull_mesh": os.path.join(
+                Path(__file__).parents[1],
+                "annotations/skull/NIHPD_Head_Phantom/assets",
+                "skull_mesh.vtk",
+            )
+        }
         if not phantom_dir.exists():
             print(f'''
 `PHANTOM_DIRECTORY` {phantom_dir} not found, now downloading NIHPD phantoms
@@ -439,6 +462,25 @@ from {phantom_dir}')
         sutures = ski.morphology.skeletonize(sutures)
         sutures = ski.morphology.dilation(sutures, np.ones(3*[thickness]))
         return sutures
+
+    def fetch_fracture(self):
+        """
+        Fetch fracture for NIHPD from SkullFracture class.
+        """
+        object_skull_fracture = SkullFracture(
+            path_mesh_brainmask=self.dict_skull_paths["path_mesh_brainmask"], path_mask_brain=self.dict_skull_paths["path_mask_brain"], path_file_config=self.dict_skull_paths["path_file_config"],
+            path_skull_mesh=self.dict_skull_paths["path_skull_mesh"]
+        )
+        object_skull_fracture.initialize()
+        object_skull_fracture.load_data()
+
+        min_max_fracture_length=[50, 800]
+        length = random.randint(min_max_fracture_length[0], min_max_fracture_length[1])
+        phi_degree = random.uniform(0, 100) # 100 is constant
+        theta_degree = random.uniform(0, 360)
+        nifti_fracture_seg = object_skull_fracture.get_nifti_fracture(length=length, phi_degree=phi_degree, theta_degree=theta_degree)
+
+        return nifti_fracture_seg
     
     def get_fractures(self, thickness=2, thresh=30):
         """
@@ -448,9 +490,10 @@ from {phantom_dir}')
         :returns: boolean fracture mask that can be used to set skull fracture
             values
         """
-        src_dir = Path(__file__).parents[1]
-        fname = src_dir / 'annotations/skull/NIHPD_Head_Phantom/assets/fracture_seg.nii.gz' # 0: background, 1: fracture
-        data = sitk.GetArrayFromImage(sitk.ReadImage(fname)).transpose(0, 1, 2)[::-1, ::-1] # changed from (2, 1, 0)
+        # src_dir = Path(__file__).parents[1]
+        # fname = src_dir / 'annotations/skull/NIHPD_Head_Phantom/assets/fracture_seg.nii.gz' # 0: background, 1: fracture
+        # data = sitk.GetArrayFromImage(sitk.ReadImage(fname)).transpose(0, 1, 2)[::-1, ::-1] # changed from (2, 1, 0)
+        data = self.fetch_fracture().get_fdata().transpose(0, 1, 2)[::-1, ::-1] # changed from (2, 1, 0)
         skull = self.get_skull_map()
         dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
         if (dx < 0) | (dy < 0) | (dz < 0):
