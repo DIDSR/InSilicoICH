@@ -30,6 +30,7 @@ class SkullFracture(SkullProcess):
     def load_data(self):
         self.skull_mesh = self.load_mesh(self.path_skull_mesh)
         self.skull_mesh = self.skull_mesh.extract_surface()
+        self.skull_center = self.config["skull_mesh_params"]["center"]
 
 
 if __name__ == "__main__":
@@ -62,30 +63,10 @@ if __name__ == "__main__":
     object_skull_fracture.initialize()
     object_skull_fracture.load_data()
 
-    object_skull_fracture.add_fracture()
+    # Save particular fracture generation
+    nifti_fracture_seg = object_skull_fracture.get_nifti_fracture(length=200, phi_degree=30, theta_degree=0)
+    PATH_DIR_SAVE_SAMPLE = ""
+    nib.save(nifti_fracture_seg, os.path.join(PATH_DIR_SAVE_SAMPLE, "NIHPD_Head_Phantom_fracture_sample.nii.gz"))
 
-    object_skull_fracture.mesh_to_voxel_nifti_skull(
-        path_nifti_save=os.path.join(
-            main_directory,
-            "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
-            "skull_fracture_seg.nii.gz",
-        )
-    )
-
-    object_skull_fracture.save_seg_fracture(
-        os.path.join(
-            main_directory,
-            "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
-            "skull_seg.nii.gz",
-        ),
-        os.path.join(
-            main_directory,
-            "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
-            "skull_fracture_seg.nii.gz",
-        ),
-        os.path.join(
-            main_directory,
-            "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
-            "fracture_seg.nii.gz",
-        ),
-    )
+    # Save multiple fractures
+    object_skull_fracture.save_fractures(PATH_DIR_SAVE_SAMPLE)

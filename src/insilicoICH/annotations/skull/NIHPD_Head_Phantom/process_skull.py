@@ -28,6 +28,9 @@ class SkullProcess(Skull):
         self.config = None
         self.path_file_config = path_file_config
         self.skull_mesh = None
+        self.skull_fracture_mesh = None
+        self.threshold_degree_phi = 100
+        self.nifti_skull_seg = None
 
     def load_mesh(self, path_mesh_brainmask: str):
         return pv.read(path_mesh_brainmask)
@@ -181,6 +184,19 @@ class SkullProcess(Skull):
 
         return idx
 
+    def get_nifti_fracture_seg(
+        self, nifti_skull_seg, nifti_skull_fracture_seg):
+        affine = nifti_skull_seg.affine
+
+        array_skull = nifti_skull_seg.get_fdata()
+        array_skull_fracture = nifti_skull_fracture_seg.get_fdata()
+
+        diff_fracture = array_skull - array_skull_fracture
+
+        nifti_fracture_seg = nib.Nifti1Image(diff_fracture, affine)
+
+        return nifti_fracture_seg
+
     def save_seg_fracture(
         self, path_seg_skull, path_seg_skull_fracture, path_save_seg_fracture
     ):
@@ -239,7 +255,7 @@ class SkullProcess(Skull):
         nifti_img = nib.Nifti1Image(voxels.astype(np.uint8), affine)
         nib.save(nifti_img, path_nifti_save)
 
-    def mesh_to_voxel_nifti_skull(self, path_nifti_save):
+    def mesh_to_voxel_nifti_skull(self, mesh, path_nifti_save=None):
         # Load NIfTI info
         shape, origin, spacing, affine, array = self.get_nifti_info(self.path_mask_brain)
         indices = np.argwhere(array.astype(int) == 1)
@@ -247,7 +263,7 @@ class SkullProcess(Skull):
         offset[2] = self.get_center_voxel_space()[2]
 
         # Extract mesh geometry
-        mesh = self.skull_mesh.extract_geometry()
+        mesh = mesh.extract_geometry()
 
         # Set voxel size
         voxel_size = 1
@@ -283,7 +299,11 @@ class SkullProcess(Skull):
 
         # Create and save NIfTI
         nifti_img = nib.Nifti1Image(voxels.astype(np.uint8), affine)
-        nib.save(nifti_img, path_nifti_save)
+
+        if path_nifti_save is not None:
+            nib.save(nifti_img, path_nifti_save)
+
+        return nifti_img
 
     def get_neighbour_cells_info(self, mesh, ind_maincell):
         """
@@ -305,23 +325,25 @@ class SkullProcess(Skull):
 
         list_indice_intersect = []
 
+        self.skull_fracture_mesh = self.skull_mesh.copy()
+
         # Perform ray trace
         for start, stop in zip(list_start, list_stop):
-            points, inds = self.skull_mesh.ray_trace(start, stop)
+            points, inds = self.skull_fracture_mesh.ray_trace(start, stop)
             list_indice_intersect.extend(inds)
 
             for ind in inds:
                 list_indice_intersect.extend(
-                    self.get_neighbour_cells_info(self.skull_mesh, ind)
+                    self.get_neighbour_cells_info(self.skull_fracture_mesh, ind)
                 )
 
-        self.skull_mesh = self.skull_mesh.extract_surface()
+        self.skull_fracture_mesh = self.skull_fracture_mesh.extract_surface()
 
         if len(list_indice_intersect) > 0:
             non_intersected = np.setdiff1d(
-                np.arange(self.skull_mesh.n_cells), list_indice_intersect
+                np.arange(self.skull_fracture_mesh.n_cells), list_indice_intersect
             )
-            self.skull_mesh = self.skull_mesh.extract_cells(non_intersected)
+            self.skull_fracture_mesh = self.skull_fracture_mesh.extract_cells(non_intersected)
 
     def get_angular_spacing_specific_cell_trace_degree(self, start, stop):
         """
@@ -374,15 +396,43 @@ class SkullProcess(Skull):
                 average_list_angular_spacing_degree_theta,
             )
 
-    def add_fracture(self):
+    def save_fractures(self, dir_save_nifti_fracture: str, n_fractures=10, min_max_fracture_length=[50, 800]):
+        """
+        Save multiple fractures with the given parameters.
+        """
+        for n in range(n_fractures):
+            length=random.randint(min_max_fracture_length[0], min_max_fracture_length[1])
+            phi_degree = random.uniform(0, self.threshold_degree_phi)
+            theta_degree = random.uniform(0, 360)
+
+            nifti_fracture_seg = self.get_nifti_fracture(length=length, phi_degree=phi_degree, theta_degree=theta_degree)
+            
+            nib.save(nifti_fracture_seg, os.path.join(dir_save_nifti_fracture, "NIHPD_Head_Phantom_fracture_" + str(n + 1) + ".nii.gz"))
+
+    def get_nifti_fracture(self, length, phi_degree, theta_degree):
+        """
+        Get fractures with the given parameters.
+        """
+        if self.nifti_skull_seg is None:
+            self.nifti_skull_seg = self.mesh_to_voxel_nifti_skull(
+                mesh=self.skull_mesh
+            )
+
+        self.add_fracture(length, phi_degree, theta_degree)
+
+        nifti_skull_fracture_seg = self.mesh_to_voxel_nifti_skull(
+                mesh=self.skull_fracture_mesh
+            )
+        nifti_fracture_seg = self.get_nifti_fracture_seg(self.nifti_skull_seg, nifti_skull_fracture_seg)
+
+        return nifti_fracture_seg
+
+    def add_fracture(self, length, phi_degree, theta_degree):
         """
         Add fracture by removing meshes with given procedure.
         """
         if self.skull_center is None:
             self.skull_center = self.config["skull_mesh_params"]["center"]
-
-        phi_degree = 30
-        theta_degree = 0
 
         # Degrees to shift to next point
         direction = pv.spherical_to_cartesian(
@@ -402,7 +452,7 @@ class SkullProcess(Skull):
         delta_shift_degree_theta *= continuity_factor
 
         # Number of iterations to try removing cells to remove (depends on direction, may have duplicates (less number of removals))
-        n_iterations = 3000
+        n_iterations = length
 
         list_start = []
         list_direction = []
@@ -415,6 +465,9 @@ class SkullProcess(Skull):
         pointer = list_switch[random.randint(0, len(list_switch) - 1)]
 
         for i in range(n_iterations):
+            if phi_degree > self.threshold_degree_phi:
+                break
+
             direction = pv.spherical_to_cartesian(
                 1, np.deg2rad(phi_degree), np.deg2rad(theta_degree)
             )
@@ -468,11 +521,9 @@ class SkullProcess(Skull):
         # phi is the polar angle (in radians)
         # Convert to degrees for comparison
         phi_degrees = np.rad2deg(phi)
-        threshold_degree = 100
-
-        # Find cells where phi > threshold_degree
-        cells_to_remove = np.where(phi_degrees > threshold_degree)[0]
-        # print("Number of cells removed =", len(cells_to_remove))
+        
+        # Find cells where phi > threshold_degree_phi
+        cells_to_remove = np.where(phi_degrees > self.threshold_degree_phi)[0]
 
         # Remove the identified cells
         mesh.remove_cells(cells_to_remove, inplace=True)
@@ -513,41 +564,5 @@ if __name__ == "__main__":
             main_directory,
             "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
             "skull_mesh.vtk",
-        ),
-    )
-
-    object_skull_process.mesh_to_voxel_nifti_skull(
-        path_nifti_save=os.path.join(
-            main_directory,
-            "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
-            "skull_seg.nii.gz",
-        )
-    )
-
-    object_skull_process.add_fracture()
-
-    object_skull_process.mesh_to_voxel_nifti_skull(
-        path_nifti_save=os.path.join(
-            main_directory,
-            "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
-            "skull_fracture_seg.nii.gz",
-        )
-    )
-
-    object_skull_process.save_seg_fracture(
-        os.path.join(
-            main_directory,
-            "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
-            "skull_seg.nii.gz",
-        ),
-        os.path.join(
-            main_directory,
-            "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
-            "skull_fracture_seg.nii.gz",
-        ),
-        os.path.join(
-            main_directory,
-            "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
-            "fracture_seg.nii.gz",
         ),
     )
