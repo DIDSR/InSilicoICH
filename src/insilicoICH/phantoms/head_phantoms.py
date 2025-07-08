@@ -273,16 +273,22 @@ class NIHPD_Head(HeadPhantom):
         self.skull_seg_method = skull_seg_method
         self.add_sutures = add_sutures
         self.add_fractures = add_fractures
+        if not phantom_dir.exists():
+            print(f'''
+`PHANTOM_DIRECTORY` {phantom_dir} not found, now downloading NIHPD phantoms
+from {NIHPD_Head.url}
+
+If you have already downloaded NIHPD and MIDA head phantoms, please see
+`load_phantom` for details on how to add their locations.
+''')
+            download_and_extract_archive(NIHPD_Head.url, phantom_dir)
         self.dict_skull_paths = {
             "path_mesh_brainmask": os.path.join(
                 Path(__file__).parents[1],
                 "annotations/skull/NIHPD_Head_Phantom/assets",
                 "mesh_brain.vtk",
             ),
-            "path_mask_brain": os.path.join(
-                Path(__file__).parents[2],
-                "NIHPD_Head_Phantom/nihpd_asym_04.5-08.5_mask.nii"
-            ),
+            "path_mask_brain": phantom_dir / "nihpd_asym_04.5-08.5_mask.nii",
             "path_file_config": os.path.join(
                 Path(__file__).parents[1],
                 "annotations/skull/NIHPD_Head_Phantom/assets",
@@ -294,15 +300,6 @@ class NIHPD_Head(HeadPhantom):
                 "skull_mesh.vtk",
             )
         }
-        if not phantom_dir.exists():
-            print(f'''
-`PHANTOM_DIRECTORY` {phantom_dir} not found, now downloading NIHPD phantoms
-from {NIHPD_Head.url}
-
-If you have already downloaded NIHPD and MIDA head phantoms, please see
-`load_phantom` for details on how to add their locations.
-''')
-            download_and_extract_archive(NIHPD_Head.url, phantom_dir)
         super().__init__(phantom_dir, shape, age=age, patient_name=self.patient_name)
 
     def load_phantom(self, phantom_dir):
