@@ -1,6 +1,11 @@
 import numpy as np
+import pandas as pd
+from tqdm import tqdm
+from skimage.measure import label
 from skimage.feature import graycomatrix, graycoprops
 from skimage.measure import marching_cubes, mesh_surface_area
+
+from data import load_hssayeni_image_mask_pair
 
 
 def calculate_glcm_metrics_3d(volume, mask, distances=[1], angles=[0, np.pi/4, np.pi/2, 3*np.pi/4], levels=32):
@@ -195,3 +200,61 @@ def calculate_compactness(binary_mask):
     compactness = (36 * np.pi * volume**2) / (surface_area**3)
 
     return compactness
+
+
+def calculate_ICH_features_Hssayeni(ct_ich_dataset_path, return_images=False):
+    patients = pd.read_csv(ct_ich_dataset_path / 'Patient_demographics.csv', index_col=0)
+    lesions = pd.read_csv(ct_ich_dataset_path / 'hemorrhage_diagnosis_raw_ct.csv')
+
+    contrast = []
+    correlation = []
+    patient_numbers = []
+    z_slices = []
+    images = []
+    masks = []
+    volumes = []
+    attenuation = []
+    sphericity = []
+    subtypes = []
+
+    target_spacing = (1, 1, 1)
+    available_lesions = ['Intraparenchymal', 'Epidural', 'Subdural', 'Intraventricular', 'Subarachnoid']
+
+    for id in tqdm(patients.index[~patients.index.isna()].astype(int)):
+        volume, mask, resample_factor = load_hssayeni_image_mask_pair(ct_ich_dataset_path, id, target_spacing=target_spacing, return_resample_factor=True)
+        if volume is None:
+            continue
+        if mask.sum() == 0:
+            continue
+        mask = label(mask)
+        lesion_values = np.unique(mask)[1:]
+        for lesion_value in lesion_values:
+            lesion_mask = np.zeros_like(mask).astype(bool)
+            lesion_mask[(mask == lesion_value) & (volume > 0) & (volume <= 200)] = True # includes resegmentation described by https://www.frontiersin.org/journals/neuroscience/articles/10.3389/fnins.2023.1225342/full#supplementary-material
+            volume_voxel = lesion_mask.sum()
+            volume_mL = volume_voxel*target_spacing[0]**3/1000
+            volumes.append(volume_mL)
+            attenuation.append(volume[lesion_mask].mean())
+
+            glcm_metrics = calculate_glcm_metrics_3d(volume, lesion_mask, distances=[3, 5, 7], levels=32)
+            contrast.append(glcm_metrics['contrast'])
+            correlation.append(glcm_metrics['correlation'])
+            patient_numbers.append(id)
+            z = int(lesion_mask.sum(axis=(1, 2)).argmax() / resample_factor[2])
+            z_slices.append(z)
+            row = lesions[(lesions['PatientNumber'] == id) & (lesions['SliceNumber'] == z)]
+            lesion = ''
+            for candidate in available_lesions:
+                if row[candidate].item():
+                    lesion = lesion + candidate + ' '
+            subtypes.append(lesion)
+
+            images.append(volume[z])
+            masks.append(mask[z])
+            sphericity.append(calculate_sphericity(lesion_mask))
+
+    hssayeni = pd.DataFrame({'ID': patient_numbers, 'subtype': subtypes, 'volume': volumes, 'attenuation': attenuation, 'glcm contrast': contrast, 'glcm correlation': correlation, 'sphericity': sphericity, 'z location': z_slices})
+    hssayeni['dataset'] = 'hssayeni'
+    if return_images:
+        hssayeni, images, masks
+    return hssayeni
