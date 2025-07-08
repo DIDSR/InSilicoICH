@@ -484,12 +484,10 @@ from {phantom_dir}')
         returns fracture mask to the self skull
 
         :param thickness: thickness in pixels of the fracture
+        :param thresh: distance threshold for fracture mask, smaller values means closer to the skull surface
         :returns: boolean fracture mask that can be used to set skull fracture
             values
         """
-        # src_dir = Path(__file__).parents[1]
-        # fname = src_dir / 'annotations/skull/NIHPD_Head_Phantom/assets/fracture_seg.nii.gz' # 0: background, 1: fracture
-        # data = sitk.GetArrayFromImage(sitk.ReadImage(fname)).transpose(0, 1, 2)[::-1, ::-1] # changed from (2, 1, 0)
         data = self.fetch_fracture().get_fdata().transpose(0, 1, 2)[::-1, ::-1] # changed from (2, 1, 0)
         skull = self.get_skull_map()
         dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
@@ -509,11 +507,9 @@ from {phantom_dir}')
             dz2 += 1
         data = np.pad(data, ((dx1, dx2), (dy1, dy2), (dz1, dz2))) > 0
         suture_dist = distance_transform_edt(~data)
-        sutures = skull & (suture_dist < thresh)
-        sutures = ski.morphology.skeletonize(sutures)
-        sutures = ski.morphology.dilation(sutures, np.ones(3*[thickness]))
-        # data = data > 0
-        return data
+        fractures = skull & (suture_dist < thresh)
+        fractures = ski.morphology.dilation(fractures, np.ones(3*[thickness]))
+        return fractures
 
     def assign_HUs(self, feature_range=(-100, 100)):
         phantom = self.csf*self.materials['CSF'] +\
