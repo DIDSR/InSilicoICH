@@ -5,7 +5,7 @@ notebooks/__pycache__
 .InSilicoICH
 .pytest_cache
 notebooks/*/*.png
-.PedsilicoICH
+.pyradiomics
 .insilicoich
 build
 

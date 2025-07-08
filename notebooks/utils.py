@@ -142,3 +142,22 @@ def study_viewer(metadata):
              name=metadata.name.unique(),
              display=display_settings.keys(),
              slice_idx=IntSlider(value=slices[len(slices)//2], min=min(slices), max=max(slices)))
+
+
+def generate_distinct_colors(num_colors, colormap_name='viridis'):
+    """
+    Generates a list of distinct colors from a Matplotlib colormap.
+
+    Args:
+        num_colors (int): The desired number of distinct colors.
+        colormap_name (str): The name of the Matplotlib colormap to use.
+                             Common options include 'viridis', 'plasma', 'inferno',
+                             'magma', 'cividis', 'tab10', 'Paired', etc.
+
+    Returns:
+        list: A list of RGBA tuples representing the distinct colors.
+    """
+    cmap = plt.colormaps[colormap_name]
+    # Sample the colormap evenly across its range
+    colors = [cmap(i) for i in np.linspace(0, 1, num_colors)]
+    return colors
