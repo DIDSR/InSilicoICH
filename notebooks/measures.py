@@ -1,14 +1,48 @@
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 from skimage.measure import label
 from skimage.feature import graycomatrix, graycoprops
 from skimage.measure import marching_cubes, mesh_surface_area
+from tqdm.auto import tqdm
+from typing import List, Tuple, Optional
+import nibabel as nib
+from scipy.ndimage import zoom
 
-from data import load_hssayeni_image_mask_pair
+
+def load_hssayeni_image_mask_pair(
+    ct_ich_dataset_path: Path,
+    patient_id: int,
+    target_spacing: Tuple[float, float, float] = (1.0, 1.0, 1.0)
+) -> Tuple[Optional[np.ndarray], Optional[np.ndarray], Optional[np.ndarray]]:
+    """
+    Loads and resamples a CT image and its mask to a uniform isotropic spacing.
+    (This is an improved version of the function from the previous turn)
+    """
+    img_file = ct_ich_dataset_path / 'ct_scans' / f'{int(patient_id):03d}.nii'
+    mask_file = ct_ich_dataset_path / 'masks' / f'{int(patient_id):03d}.nii'
+
+    if not (img_file.exists() and mask_file.exists()):
+        return None, None, None
+
+    img_nii = nib.load(img_file)
+    mask_nii = nib.load(mask_file)
+
+    original_spacing = img_nii.header.get_zooms()[:3]
+    resample_factor = [orig / new for orig, new in zip(original_spacing, target_spacing)]
+
+    img_data = zoom(img_nii.get_fdata(), resample_factor, order=3, prefilter=True)
+    mask_data = zoom(mask_nii.get_fdata(), resample_factor, order=0, prefilter=False)
+
+    img_vol = np.rot90(img_data, 1).transpose(2, 0, 1)
+    mask = np.rot90(mask_data, 1).transpose(2, 0, 1)
+
+    return img_vol, mask, np.array(resample_factor)
 
 
-def calculate_glcm_metrics_3d(volume, mask, distances=[1], angles=[0, np.pi/4, np.pi/2, 3*np.pi/4], levels=32):
+def calculate_glcm_metrics_3d(volume, mask, distances=[1],
+                              angles=[0, np.pi/4, np.pi/2, 3*np.pi/4], levels=32):
     """
     Calculates 3D Gray-Level Co-occurrence Matrix (GLCM) metrics for a
     region of interest (ROI) by averaging metrics from 2D slices.
@@ -202,59 +236,248 @@ def calculate_compactness(binary_mask):
     return compactness
 
 
-def calculate_ICH_features_Hssayeni(ct_ich_dataset_path, return_images=False):
-    patients = pd.read_csv(ct_ich_dataset_path / 'Patient_demographics.csv', index_col=0)
-    lesions = pd.read_csv(ct_ich_dataset_path / 'hemorrhage_diagnosis_raw_ct.csv')
+def calculate_ich_features_hssayeni(
+    ct_ich_dataset_path: str,
+    return_images: bool = False
+) -> pd.DataFrame | Tuple[pd.DataFrame, List[np.ndarray], List[np.ndarray]]:
+    """
+    Calculates 3D shape and texture features for each hemorrhage in the Hssayeni dataset.
 
-    contrast = []
-    correlation = []
-    patient_numbers = []
-    z_slices = []
-    images = []
-    masks = []
-    volumes = []
-    attenuation = []
-    sphericity = []
-    subtypes = []
+    This function iterates through each patient, loads the resampled CT image and mask,
+    identifies individual hemorrhage lesions, and calculates a set of radiomic features
+    for each one.
 
-    target_spacing = (1, 1, 1)
+    Args:
+        ct_ich_dataset_path (str): Path to the root of the dataset directory.
+        return_images (bool): If True, also returns lists of the 2D image and mask
+                              slices corresponding to each lesion.
+
+    Returns:
+        pd.DataFrame: A DataFrame where each row corresponds to a single hemorrhage
+                      lesion and columns correspond to the calculated features.
+        or
+        Tuple[pd.DataFrame, List, List]: DataFrame and lists of image/mask slices
+                                         if return_images is True.
+    """
+    dataset_path = Path(ct_ich_dataset_path)
+    patients_df = pd.read_csv(dataset_path / 'Patient_demographics.csv', index_col=0)
+    lesions_df = pd.read_csv(dataset_path / 'hemorrhage_diagnosis_raw_ct.csv')
+
+    all_lesion_features = []
+    image_slices, mask_slices = [], []
+
+    # Define radiomics parameters
+    target_spacing = (1.0, 1.0, 1.0)
+    glcm_distances = [3, 5, 7]
+    glcm_levels = 32
+    # HU windowing for resegmentation, as per referenced paper
+    # This isolates voxels more likely to be acute blood
+    hu_min, hu_max = 0, 200
+
     available_lesions = ['Intraparenchymal', 'Epidural', 'Subdural', 'Intraventricular', 'Subarachnoid']
 
-    for id in tqdm(patients.index[~patients.index.isna()].astype(int)):
-        volume, mask, resample_factor = load_hssayeni_image_mask_pair(ct_ich_dataset_path, id, target_spacing=target_spacing, return_resample_factor=True)
-        if volume is None:
+    patient_ids = patients_df.index[~patients_df.index.isna()].astype(int)
+    for patient_id in tqdm(patient_ids, desc="Processing Patients"):
+
+        image_vol, mask_vol, resample_factor = load_hssayeni_image_mask_pair(dataset_path, patient_id, target_spacing)
+
+        if image_vol is None or mask_vol.sum() == 0:
             continue
-        if mask.sum() == 0:
-            continue
-        mask = label(mask)
-        lesion_values = np.unique(mask)[1:]
-        for lesion_value in lesion_values:
-            lesion_mask = np.zeros_like(mask).astype(bool)
-            lesion_mask[(mask == lesion_value) & (volume > 0) & (volume <= 200)] = True # includes resegmentation described by https://www.frontiersin.org/journals/neuroscience/articles/10.3389/fnins.2023.1225342/full#supplementary-material
+
+        labeled_mask, num_lesions = label(mask_vol, return_num=True)
+
+        for lesion_idx in range(1, num_lesions + 1):
+            # --- Per-Lesion Processing ---
+
+            # Create a binary mask for the current lesion with HU windowing
+            lesion_mask = (labeled_mask == lesion_idx) & (image_vol > hu_min) & (image_vol < hu_max)
+
             volume_voxel = lesion_mask.sum()
-            volume_mL = volume_voxel*target_spacing[0]**3/1000
-            volumes.append(volume_mL)
-            attenuation.append(volume[lesion_mask].mean())
+            if volume_voxel == 0:
+                continue
 
-            glcm_metrics = calculate_glcm_metrics_3d(volume, lesion_mask, distances=[3, 5, 7], levels=32)
-            contrast.append(glcm_metrics['contrast'])
-            correlation.append(glcm_metrics['correlation'])
-            patient_numbers.append(id)
-            z = int(lesion_mask.sum(axis=(1, 2)).argmax() / resample_factor[2])
-            z_slices.append(z)
-            row = lesions[(lesions['PatientNumber'] == id) & (lesions['SliceNumber'] == z)]
-            lesion = ''
-            for candidate in available_lesions:
-                if row[candidate].item():
-                    lesion = lesion + candidate + ' '
-            subtypes.append(lesion)
+            # 1. Calculate Basic Features
+            volume_ml = (volume_voxel * np.prod(target_spacing)) / 1000.0
+            mean_attenuation = image_vol[lesion_mask].mean()
 
-            images.append(volume[z])
-            masks.append(mask[z])
-            sphericity.append(calculate_sphericity(lesion_mask))
+            # 2. Calculate Shape & Texture Features
+            sphericity_val = calculate_sphericity(lesion_mask)
+            glcm_metrics = calculate_glcm_metrics_3d(image_vol, lesion_mask, distances=glcm_distances, levels=glcm_levels)
 
-    hssayeni = pd.DataFrame({'ID': patient_numbers, 'subtype': subtypes, 'volume': volumes, 'attenuation': attenuation, 'glcm contrast': contrast, 'glcm correlation': correlation, 'sphericity': sphericity, 'z location': z_slices})
-    hssayeni['dataset'] = 'hssayeni'
+            # 3. Determine Lesion Subtype (Robustly)
+            # Find the original z-slice with the largest cross-section for this lesion
+            z_slice_resampled = lesion_mask.sum(axis=(1, 2)).argmax()
+            z_slice_original = int(round(z_slice_resampled / resample_factor[2]))
+
+            lesion_type_rows = lesions_df[(lesions_df['PatientNumber'] == patient_id) & (lesions_df['SliceNumber'] == z_slice_original)]
+
+            subtype_str = ''
+            if not lesion_type_rows.empty:
+                # Concatenate all true subtypes for that slice
+                subtype_str = ' '.join([
+                    lesion for lesion in available_lesions if lesion_type_rows.iloc[0][lesion]
+                ]).strip()
+
+            # 4. Store Results for this Lesion
+            lesion_data = {
+                'ID': patient_id,
+                'lesion_index': lesion_idx,
+                'subtype': subtype_str if subtype_str else 'Unknown',
+                'volume_ml': volume_ml,
+                'mean_attenuation': mean_attenuation,
+                'sphericity': sphericity_val,
+                'glcm_contrast': glcm_metrics['contrast'],
+                'glcm_correlation': glcm_metrics['correlation'],
+                'z_location_resampled': z_slice_resampled,
+                'dataset': 'hssayeni'
+            }
+            all_lesion_features.append(lesion_data)
+
+            if return_images:
+                image_slices.append(image_vol[z_slice_resampled])
+                mask_slices.append(labeled_mask[z_slice_resampled])
+
+    # Convert list of dictionaries to DataFrame (more efficient)
+    features_df = pd.DataFrame(all_lesion_features)
+    features_df['ID'] = pd.Categorical(features_df['ID'])
+    features_df['subtype'] = pd.Categorical(features_df['subtype'])
+    features_df['lesion_index'] = pd.Categorical(features_df['lesion_index'])
     if return_images:
-        hssayeni, images, masks
-    return hssayeni
+        return features_df, image_slices, mask_slices
+
+    return features_df
+
+
+def load_bhsd_image_mask_pair(
+    bhsd_path: str | Path,
+    patient_id: str,
+    target_spacing: Tuple[float, float, float] = (1.0, 1.0, 1.0)
+) -> Tuple[Optional[np.ndarray], Optional[np.ndarray], Optional[np.ndarray]]:
+    """
+    Loads and resamples a CT image and its mask to a uniform isotropic spacing.
+    (This is an improved version of the function from the previous turn)
+    """
+    bhsd_path = Path(bhsd_path)
+    img_file = bhsd_path / 'images' / patient_id
+    mask_file = bhsd_path / 'ground_truths' / patient_id
+
+    if not (img_file.exists() and mask_file.exists()):
+        return None, None, None
+
+    img_nii = nib.load(img_file)
+    mask_nii = nib.load(mask_file)
+
+    original_spacing = img_nii.header.get_zooms()[:3]
+    resample_factor = [orig / new for orig, new in zip(original_spacing, target_spacing)]
+
+    img_data = zoom(img_nii.get_fdata(), resample_factor, order=3, prefilter=True)
+    mask_data = zoom(mask_nii.get_fdata(), resample_factor, order=0, prefilter=False)
+
+    img_vol = np.rot90(img_data, 1).transpose(2, 0, 1)
+    mask = np.rot90(mask_data, 1).transpose(2, 0, 1)
+
+    return img_vol, mask.astype(int), np.array(resample_factor)
+
+
+def calculate_ich_features_bhsd(
+    bhsd_dataset_path: str,
+    return_images: bool = False
+) -> pd.DataFrame | Tuple[pd.DataFrame, List[np.ndarray], List[np.ndarray]]:
+    """
+    Calculates 3D shape and texture features for each hemorrhage in the BHSD dataset.
+
+    This function iterates through each patient, loads the resampled CT image and mask,
+    identifies individual hemorrhage lesions, and calculates a set of radiomic features
+    for each one.
+
+    Args:
+        bhsd_dataset_path (str): Path to the root of the dataset directory.
+        return_images (bool): If True, also returns lists of the 2D image and mask
+                              slices corresponding to each lesion.
+
+    Returns:
+        pd.DataFrame: A DataFrame where each row corresponds to a single hemorrhage
+                      lesion and columns correspond to the calculated features.
+        or
+        Tuple[pd.DataFrame, List, List]: DataFrame and lists of image/mask slices
+                                         if return_images is True.
+    """
+    dataset_path = Path(bhsd_dataset_path)
+    img_path = dataset_path / 'images'
+
+    all_lesion_features = []
+    image_slices, mask_slices = [], []
+
+    # Define radiomics parameters
+    target_spacing = (1.0, 1.0, 1.0)
+    glcm_distances = [3, 5, 7]
+    glcm_levels = 32
+    # HU windowing for resegmentation, as per referenced paper
+    # This isolates voxels more likely to be acute blood
+    hu_min, hu_max = 0, 200
+
+    available_lesions = {2: 'Intraparenchymal', 1: 'Epidural', 5: 'Subdural', 3: 'Intraventricular', 4: 'Subarachnoid'}
+
+    patient_ids = list(map(lambda o: o.name,  img_path.glob('*.nii.gz')))
+    for patient_id in tqdm(patient_ids, desc="Processing Patients"):
+
+        image_vol, mask_vol, resample_factor = load_bhsd_image_mask_pair(dataset_path, patient_id, target_spacing)
+
+        if image_vol is None or mask_vol.sum() == 0:
+            continue
+
+        labeled_mask, num_lesions = label(mask_vol, return_num=True)
+
+        for lesion_idx in range(1, num_lesions + 1):
+            # --- Per-Lesion Processing ---
+
+            # Create a binary mask for the current lesion with HU windowing
+            lesion_mask = (labeled_mask == lesion_idx) & (image_vol > hu_min) & (image_vol < hu_max)
+            volume_voxel = lesion_mask.sum()
+            if volume_voxel == 0:
+                continue
+
+            subtype_str = available_lesions[mask_vol[lesion_mask].max()]
+
+            # 1. Calculate Basic Features
+            volume_ml = (volume_voxel * np.prod(target_spacing)) / 1000.0
+            mean_attenuation = image_vol[lesion_mask].mean()
+
+            # 2. Calculate Shape & Texture Features
+            sphericity_val = calculate_sphericity(lesion_mask)
+            glcm_metrics = calculate_glcm_metrics_3d(image_vol, lesion_mask, distances=glcm_distances, levels=glcm_levels)
+
+            # 3. Determine Lesion Subtype (Robustly)
+            # Find the original z-slice with the largest cross-section for this lesion
+            z_slice_resampled = lesion_mask.sum(axis=(1, 2)).argmax()
+            z_slice_original = int(round(z_slice_resampled / resample_factor[2]))
+
+
+            # 4. Store Results for this Lesion
+            lesion_data = {
+                'ID': patient_id,
+                'lesion_index': lesion_idx,
+                'subtype': subtype_str if subtype_str else 'Unknown',
+                'volume_ml': volume_ml,
+                'mean_attenuation': mean_attenuation,
+                'sphericity': sphericity_val,
+                'glcm_contrast': glcm_metrics['contrast'],
+                'glcm_correlation': glcm_metrics['correlation'],
+                'z_location_resampled': z_slice_resampled,
+                'dataset': 'hssayeni'
+            }
+            all_lesion_features.append(lesion_data)
+
+            if return_images:
+                image_slices.append(image_vol[z_slice_resampled])
+                mask_slices.append(labeled_mask[z_slice_resampled])
+
+    # Convert list of dictionaries to DataFrame (more efficient)
+    features_df = pd.DataFrame(all_lesion_features)
+    features_df['ID'] = pd.Categorical(features_df['ID'])
+    features_df['subtype'] = pd.Categorical(features_df['subtype'])
+    features_df['lesion_index'] = pd.Categorical(features_df['lesion_index'])
+    if return_images:
+        return features_df, image_slices, mask_slices
+
+    return features_df
