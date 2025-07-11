@@ -359,6 +359,7 @@ class SkullProcess(Skull):
 
         if len(ind) == 0:
             print("No intersection found.")
+            return (-1, -1)
         else:
             hit_cell_index = ind[0]
 
@@ -449,6 +450,9 @@ class SkullProcess(Skull):
                 np.add(self.skull_center, np.multiply(direction, 100)),
             )
         )
+
+        if delta_shift_degree_phi == -1 and delta_shift_degree_theta == -1:
+            print("phi_degree, theta_degree", phi_degree, theta_degree)
 
         # Allow some duplicates for better continuity
         continuity_factor = 0.8

@@ -461,7 +461,7 @@ from {phantom_dir}')
         sutures = ski.morphology.dilation(sutures, np.ones(3*[thickness]))
         return sutures
 
-    def fetch_fracture(self):
+    def fetch_fracture(self, length, phi_degree, theta_degree):
         """
         Fetch fracture for NIHPD from SkullFracture class.
         """
@@ -472,15 +472,11 @@ from {phantom_dir}')
         object_skull_fracture.initialize()
         object_skull_fracture.load_data()
 
-        min_max_fracture_length=[50, 800]
-        length = random.randint(min_max_fracture_length[0], min_max_fracture_length[1])
-        phi_degree = random.uniform(0, 100) # 100 is constant
-        theta_degree = random.uniform(0, 360)
         nifti_fracture_seg = object_skull_fracture.get_nifti_fracture(length=length, phi_degree=phi_degree, theta_degree=theta_degree)
 
         return nifti_fracture_seg
     
-    def get_fractures(self, thickness=2, thresh=30):
+    def get_fractures(self, length: int = random.randint(50, 200), phi_degree: float = random.uniform(0, 100), theta_degree: float = random.uniform(0, 360)):
         """
         returns fracture mask to the self skull
 
@@ -489,7 +485,9 @@ from {phantom_dir}')
         :returns: boolean fracture mask that can be used to set skull fracture
             values
         """
-        data = self.fetch_fracture().get_fdata().transpose(0, 1, 2)[::-1, ::-1] # changed from (2, 1, 0)
+        assert phi_degree < 100 and phi_degree > 0, "requirement 0 < phi_degree < 100 is not met"
+
+        data = self.fetch_fracture(length=length, phi_degree=phi_degree, theta_degree=theta_degree).get_fdata().transpose(0, 1, 2)[::-1, ::-1] # changed from (2, 1, 0)
         skull = self.get_skull_map()
         dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
         if (dx < 0) | (dy < 0) | (dz < 0):
@@ -518,11 +516,26 @@ from {phantom_dir}')
 
         # Perform ray casting projection
         # Note: centroid is considered as the center of the 3D array
-        projected_fractures = projector.centroid_ray_casting(
-            step_size=0.5
+        fractures_proj = projector.centroid_ray_casting()
+        fractures_proj_closing = projector.morph_closing(array=fractures_proj, kernel_size=3)
+
+        fractures = fractures_proj_closing.astype(bool)
+
+        self.save_volume_nifti(
+            skull.astype(np.int32),
+            np.eye(4),
+            "/home/dhaval.kadia/code/research/PedSilicoICH/InSilicoICH/src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets/check_skull.nii"
         )
-        fractures = projector.morph_closing(array=projected_fractures, kernel_size=3)
-        fractures = fractures.astype(bool)
+        self.save_volume_nifti(
+            data_int,
+            np.eye(4),
+            "/home/dhaval.kadia/code/research/PedSilicoICH/InSilicoICH/src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets/check_fracture.nii"
+        )
+        self.save_volume_nifti(
+            fractures.astype(np.int32),
+            np.eye(4),
+            "/home/dhaval.kadia/code/research/PedSilicoICH/InSilicoICH/src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets/check_fracture_projected.nii"
+        )
 
         return fractures
 
