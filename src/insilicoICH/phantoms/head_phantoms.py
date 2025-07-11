@@ -521,22 +521,6 @@ from {phantom_dir}')
 
         fractures = fractures_proj_closing.astype(bool)
 
-        self.save_volume_nifti(
-            skull.astype(np.int32),
-            np.eye(4),
-            "/home/dhaval.kadia/code/research/PedSilicoICH/InSilicoICH/src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets/check_skull.nii"
-        )
-        self.save_volume_nifti(
-            data_int,
-            np.eye(4),
-            "/home/dhaval.kadia/code/research/PedSilicoICH/InSilicoICH/src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets/check_fracture.nii"
-        )
-        self.save_volume_nifti(
-            fractures.astype(np.int32),
-            np.eye(4),
-            "/home/dhaval.kadia/code/research/PedSilicoICH/InSilicoICH/src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets/check_fracture_projected.nii"
-        )
-
         return fractures
 
     def assign_HUs(self, feature_range=(-100, 100)):
