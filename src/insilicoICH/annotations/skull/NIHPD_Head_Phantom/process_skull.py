@@ -42,6 +42,11 @@ class SkullProcess(Skull):
         mesh.save(filepath)
         print("Saved", filepath)
 
+    def save_nifti(self, array, affine, path_save):
+        nifti_img = nib.Nifti1Image(array, affine)
+        nib.save(nifti_img, path_save)
+        print("saved", path_save)
+
     def initialize(self) -> None:
         """
         Initialize with the configuration file.
@@ -53,7 +58,6 @@ class SkullProcess(Skull):
 
         with open(self.path_file_config, "rb") as file_config:
             self.config = tomli.load(file_config)
-            print("Reading", self.path_file_config)
 
         self.mesh_brain = self.load_mesh(self.path_mesh_brainmask)
 

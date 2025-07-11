@@ -1,0 +1,220 @@
+import numpy as np
+from .process_skull import SkullProcess
+import os
+import sys
+import skimage as ski
+
+main_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), *[".."] * 5))
+sys.path.append(main_directory)
+
+class SkullFractureProjector:
+    """
+    Complete skull fracture projection system using centroid-based ray casting.
+    """
+    
+    def __init__(self, skull_mask, fracture_annotations):
+        self.skull_mask = skull_mask
+        self.fracture_annotations = fracture_annotations
+        self.projected_fractures = None
+
+    def morph_closing(self, array: np.ndarray, kernel_size: int):
+        array_closed = ski.morphology.closing(array, np.ones(3*[kernel_size]))
+
+        return array_closed
+    
+    def centroid_ray_casting(self, skull_mask=None, fracture_annotations=None, centroid=None,
+                           intensity_falloff=True, step_size=0.5):
+        """
+        Project fracture annotations radially through thick skull using centroid-based ray casting.
+        
+        Parameters:
+        skull_mask: 3D binary array where 1 = skull, 0 = background
+        fracture_annotations: 3D binary array where 1 = fracture on inner surface
+        intensity_falloff: bool, whether to apply distance-based intensity reduction
+        step_size: float, ray marching step size for accuracy
+        
+        Returns:
+        projected_fractures: 3D array with fractures projected through skull thickness
+        """
+        if skull_mask is None:
+            skull_mask = self.skull_mask
+        if fracture_annotations is None:
+            fracture_annotations = self.fracture_annotations
+            
+        if skull_mask is None or fracture_annotations is None:
+            raise ValueError("Skull mask and fracture annotations must be provided")
+        
+        if centroid is None:
+            # print("Computing skull centroid...")
+            # # Find skull centroid using center of mass
+            # skull_coords = np.where(skull_mask > 0)
+            # centroid = np.array([np.mean(coords) for coords in skull_coords])
+
+            # considering the center of the volume for simplicity (real skull center is close)
+            shape_skull_mask = skull_mask.shape
+            centroid = [int(shape_skull_mask[0] / 2), int(shape_skull_mask[1] / 2), int(shape_skull_mask[2] / 2)]
+        
+        print("Identifying fracture points...")
+        # Get fracture points with their intensities
+        fracture_coords = np.where(fracture_annotations > 0)
+        fracture_points = np.column_stack(fracture_coords)
+        # fracture_intensities = fracture_annotations[fracture_coords]
+        
+        print(f"Found {len(fracture_points)} fracture points")
+        print(f"Skull centroid at: {centroid}")
+        
+        # Initialize output with float values for intensity
+        projected_fractures = np.zeros_like(skull_mask, dtype=np.float32)
+        
+        print("Casting rays through skull...")
+        for i, point in enumerate(fracture_points):
+            # if i % 100 == 0:
+            #     print(f"Processing fracture point {i+1}/{len(fracture_points)}")
+                
+            # intensity = fracture_intensities[i]
+            ray_points = self._cast_ray_through_skull(centroid, point, skull_mask, step_size)
+            
+            # Apply intensity with optional distance falloff
+            for j, rp in enumerate(ray_points):
+                if all(0 <= rp[k] < skull_mask.shape[k] for k in range(3)):
+                    # if intensity_falloff:
+                    #     # Reduce intensity with distance from inner surface
+                    #     falloff_factor = max(0.1, 1.0 - j / max(1, len(ray_points)))
+                    #     final_intensity = intensity * falloff_factor
+                    # else:
+                    #     final_intensity = intensity
+                    
+                    # current_val = projected_fractures[tuple(rp)]
+                    # projected_fractures[tuple(rp)] = max(current_val, final_intensity)
+
+                    projected_fractures[tuple(rp)] = 1
+                    
+        
+        self.projected_fractures = projected_fractures
+        print("Ray casting complete!")
+        return projected_fractures
+    
+    def _cast_ray_through_skull(self, centroid, surface_point, skull_mask, step_size=0.5):
+        """
+        Cast ray from centroid through surface point, collecting all skull voxels along the way.
+        """
+        # Calculate ray direction
+        direction = surface_point - centroid
+        direction_norm = np.linalg.norm(direction)
+        
+        if direction_norm == 0:
+            return []
+            
+        direction = direction / direction_norm
+        
+        # Ray parameters
+        max_distance = np.linalg.norm(np.array(skull_mask.shape))
+        
+        ray_points = []
+        
+        # March along ray
+        for t in np.arange(0, max_distance, step_size):
+            current_point = centroid + t * direction
+            current_voxel = np.round(current_point).astype(int)
+            
+            # Check bounds
+            if not all(0 <= current_voxel[i] < skull_mask.shape[i] for i in range(3)):
+                break
+                
+            # If we hit skull, add to ray points
+            if skull_mask[tuple(current_voxel)] > 0:
+                ray_points.append(current_voxel)
+            # If we've passed through skull and hit background, stop
+            elif len(ray_points) > 0:
+                break
+        
+        return ray_points
+    
+    def analyze_projection_results(self):
+        """
+        Analyze and compare original vs projected fractures.
+        """
+        if self.projected_fractures is None:
+            print("No projection results to analyze. Run ray casting first.")
+            return
+            
+        print("\n=== Projection Analysis ===")
+        
+        # Basic statistics
+        original_fractures = np.sum(self.fracture_annotations > 0)
+        projected_fractures = np.sum(self.projected_fractures > 0)
+        skull_volume = np.sum(self.skull_mask > 0)
+        
+        print(f"Original fracture voxels: {original_fractures}")
+        print(f"Projected fracture voxels: {projected_fractures}")
+        print(f"Skull volume: {skull_volume}")
+        print(f"Expansion factor: {projected_fractures / max(1, original_fractures):.2f}x")
+        print(f"Skull coverage: {projected_fractures / skull_volume * 100:.2f}%")
+        
+        # Intensity analysis
+        intensities = self.projected_fractures[self.projected_fractures > 0]
+        if len(intensities) > 0:
+            print(f"\nIntensity Statistics:")
+            print(f"  Range: {intensities.min():.3f} - {intensities.max():.3f}")
+            print(f"  Mean: {intensities.mean():.3f}")
+            print(f"  Std: {intensities.std():.3f}")
+        
+        # Fracture region analysis
+        unique_fractures = np.unique(self.fracture_annotations[self.fracture_annotations > 0])
+        print(f"\nFracture Regions: {len(unique_fractures)}")
+        
+        for frac_id in unique_fractures:
+            original_size = np.sum(self.fracture_annotations == frac_id)
+            # Find corresponding projected voxels (approximate)
+            projected_size = np.sum(self.projected_fractures > 0)  # This is simplified
+            print(f"  Fracture {frac_id}: {original_size} -> ~{projected_size//len(unique_fractures)} voxels")
+
+
+# if __name__ == "__main__":
+#     path_mesh_brainmask = os.path.join(
+#         main_directory,
+#         "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
+#         "mesh_brain.vtk",
+#     )
+
+#     path_mask_brain = os.path.join(
+#         main_directory, "src/NIHPD_Head_Phantom", "nihpd_asym_04.5-08.5_mask.nii"
+#     )
+
+#     path_file_config = os.path.join(
+#         main_directory,
+#         "src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets",
+#         "config.toml",
+#     )
+
+#     object_skull_fracture = SkullProcess(
+#         path_mesh_brainmask=path_mesh_brainmask, path_mask_brain=path_mask_brain, path_file_config=path_file_config
+#     )
+
+#     shape, origin, spacing, affine, array_extracted_skull = object_skull_fracture.get_nifti_info(
+#             "/home/dhaval.kadia/code/research/PedSilicoICH/InSilicoICH/src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets/extracted_skull.nii"
+#         )
+
+#     shape, origin, spacing, affine, array_fracture_seg = object_skull_fracture.get_nifti_info(
+#             "/home/dhaval.kadia/code/research/PedSilicoICH/InSilicoICH/src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets/NIHPD_Head_Phantom_fracture_1.nii.gz"
+#         )
+    
+#     # Initialize the projector
+#     projector = SkullFractureProjector(skull_mask=array_extracted_skull,
+#                                        fracture_annotations=array_fracture_seg)
+    
+#     shape_skull_mask = array_extracted_skull.shape
+#     centroid = [int(shape_skull_mask[0] / 2), int(shape_skull_mask[1] / 2), 82]
+
+#     # Perform ray casting projection
+#     print("\n3. Performing centroid-based ray casting...")
+#     projected_fractures = projector.centroid_ray_casting(
+#         centroid=centroid,
+#         step_size=0.5
+#     )
+
+#     projected_fractures = projector.morph_closing(array=projected_fractures, kernel_size=3)
+
+#     object_skull_fracture.save_nifti(projected_fractures, affine,
+#                                      "/home/dhaval.kadia/code/research/PedSilicoICH/InSilicoICH/src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets/fracture_projected_seg_closing.nii")
+    

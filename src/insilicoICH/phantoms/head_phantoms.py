@@ -27,6 +27,7 @@ from .utils import download_and_extract_archive
 from VITools.hooks import hookimpl
 from ..annotations.skull.NIHPD_Head_Phantom.skull_fracture import SkullFracture
 import random
+from ..annotations.skull.NIHPD_Head_Phantom.fracture_projector import SkullFractureProjector
 
 
 load_dotenv()
@@ -506,9 +507,23 @@ from {phantom_dir}')
         if dz % 2 == 1:
             dz2 += 1
         data = np.pad(data, ((dx1, dx2), (dy1, dy2), (dz1, dz2))) > 0
-        suture_dist = distance_transform_edt(~data)
-        fractures = skull & (suture_dist < thresh)
-        fractures = ski.morphology.dilation(fractures, np.ones(3*[thickness]))
+        # fracture_dist = distance_transform_edt(~data)
+        # fractures = skull & (fracture_dist < thresh)
+        # fractures = ski.morphology.dilation(fractures, np.ones(3*[thickness]))
+        
+        skull_int = skull.astype(np.int32)
+        data_int = data.astype(np.int32)
+        projector = SkullFractureProjector(skull_mask=skull_int,
+                                       fracture_annotations=data_int)
+
+        # Perform ray casting projection
+        # Note: centroid is considered as the center of the 3D array
+        projected_fractures = projector.centroid_ray_casting(
+            step_size=0.5
+        )
+        fractures = projector.morph_closing(array=projected_fractures, kernel_size=3)
+        fractures = fractures.astype(bool)
+
         return fractures
 
     def assign_HUs(self, feature_range=(-100, 100)):
@@ -531,7 +546,6 @@ from {phantom_dir}')
             sutures = self.get_sutures()
             phantom[sutures] = 0  # assume water HU
         if self.add_fractures:
-            print("assign_HUs: adding fractures")
             fractures = self.get_fractures()
             phantom[fractures] = 0  # assume water HU
         phantom[phantom < 0] = self.materials['air']
