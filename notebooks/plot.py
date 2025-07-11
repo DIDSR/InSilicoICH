@@ -1,11 +1,14 @@
+import math
+from typing import List, Tuple
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import math
-from skimage.measure import regionprops
 from matplotlib import patches
-from typing import List, Tuple
+from skimage.measure import regionprops
 from scipy.ndimage import find_objects
+from tqdm.auto import tqdm
+import pandas as pd
 
 
 def ct_windowed(image: np.ndarray, window: int = 80, level: int = 40) -> np.ndarray:
@@ -47,7 +50,9 @@ def create_ich_lesion_montage(
     dataframe: pd.DataFrame,
     show_bbox: bool = True,
     show_mask: bool = True,
-    display_window: str = 'brain'
+    display_window: str = 'brain',
+    title: str = '',
+    filename: str = None
 ) -> None:
     """
     Creates and displays a square montage of ICH lesions with annotations.
@@ -67,6 +72,7 @@ def create_ich_lesion_montage(
         show_bbox (bool): If True, draws a bounding box around the lesion.
         show_mask (bool): If True, overlays a colored mask on the lesion.
         display_window (str): The CT window to apply. 'brain' is standard.
+        filename (str): If provided, saves the montage to this file instead of displaying.
     """
     num_lesions = len(images)
     if num_lesions == 0:
@@ -132,7 +138,7 @@ def create_ich_lesion_montage(
             f"ID: {id}, Lesion: {row['lesion_index']}\n"
             f"{row['subtype']}\n"
             f"Vol: {row['volume_ml']:.2f}mL, Sph: {row.get('sphericity', 0):.2f}\n"
-            f"Contr: {row['glcm_contrast']:.2f}, Corr: {row['glcm_correlation']:.2f}"
+            f"Contr: {row['contrast']:.2f}, Corr: {row['correlation']:.2f}"
         )
         ax.text(
             0.03, 0.97, ann_text,
@@ -146,7 +152,12 @@ def create_ich_lesion_montage(
     for j in range(num_lesions, len(axes)):
         axes[j].axis('off')
 
-    plt.show()
+    fig.suptitle(title, fontsize=16)
+    if filename:
+        plt.savefig(filename, bbox_inches='tight', dpi=600)
+        print(f"Montage saved to {filename}")
+    else:
+        plt.show()
 
 
 def visualize_ich_projections(img, labeled_mask):
@@ -226,3 +237,54 @@ def visualize_ich_slices(img, labeled_mask):
 
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
         plt.show()
+
+
+def get_lesion_slices_efficiently(dataframe, loader):
+    """
+    Efficiently extracts 2D image and mask slices corresponding to lesions in a dataframe.
+
+    This function groups lesions by patient ID to ensure each 3D volume is loaded
+    from disk only once, significantly speeding up the process.
+
+    Args:
+        dataframe (pd.DataFrame): A dataframe containing lesion features, including
+                                  'ID' and 'z_location_resampled' columns.
+        loader (DatasetLoader): An instantiated data loader object capable of
+                                loading patient data via a `load_patient_data` method.
+
+    Returns:
+        tuple[list, list]: A tuple containing two lists: the extracted 2D image
+                           slices and the corresponding 2D mask slices.
+    """
+    # Ensure the dataframe is sorted by patient ID to process sequentially
+    # This isn't strictly necessary with groupby but can be good practice.
+    dataframe = dataframe.sort_values('ID').reset_index()
+
+    images = [None] * len(dataframe)
+    masks = [None] * len(dataframe)
+
+    # Group by patient ID to process one patient at a time
+    for patient_id, group in tqdm(dataframe.groupby('ID'), desc="Extracting Slices"):
+
+        # Load the full 3D data for the current patient ONCE
+        img_vol, mask_vol, _ = loader.load_patient_data(patient_id)
+
+        if img_vol is None:
+            # Skip if the patient data can't be loaded
+            continue
+
+        # For each lesion from this patient, find its 2D slice
+        for idx, row in group.iterrows():
+            z_slice = row['z_location_resampled']
+
+            # Place the slice in the correct position in the output lists
+            # This preserves the original dataframe's order
+            original_index = row['index']
+            images[original_index] = img_vol[z_slice]
+            masks[original_index] = mask_vol[z_slice]
+
+    # Filter out any None values if some patients failed to load
+    final_images = [img for img in images if img is not None]
+    final_masks = [mask for mask in masks if mask is not None]
+
+    return final_images, final_masks
