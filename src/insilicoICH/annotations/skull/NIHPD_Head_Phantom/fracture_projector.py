@@ -1,8 +1,9 @@
 import numpy as np
-from .process_skull import SkullProcess
 import os
 import sys
 import skimage as ski
+import random
+import pyvista as pv
 
 main_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), *[".."] * 5))
 sys.path.append(main_directory)
@@ -12,10 +13,11 @@ class SkullFractureProjector:
     Complete skull fracture projection system using centroid-based ray casting.
     """
     
-    def __init__(self, skull_mask, fracture_annotations):
+    def __init__(self, skull_mask, fracture_annotations=None):
         self.skull_mask = skull_mask
         self.fracture_annotations = fracture_annotations
         self.projected_fractures = None
+        self.threshold_degree_phi = 100
 
     def morph_closing(self, array: np.ndarray, kernel_size: int):
         array_closed = ski.morphology.closing(array, np.ones(3*[kernel_size]))
@@ -94,18 +96,18 @@ class SkullFractureProjector:
         print("Ray casting complete!")
         return projected_fractures
     
-    def _cast_ray_through_skull(self, centroid, surface_point, skull_mask, step_size=0.5):
+    def _cast_ray_through_skull(self, centroid, direction, skull_mask, step_size=0.5):
         """
         Cast ray from centroid through surface point, collecting all skull voxels along the way.
         """
-        # Calculate ray direction
-        direction = surface_point - centroid
-        direction_norm = np.linalg.norm(direction)
+        # # Calculate ray direction
+        # direction = surface_point - centroid
+        # direction_norm = np.linalg.norm(direction)
         
-        if direction_norm == 0:
-            return []
+        # if direction_norm == 0:
+        #     return []
             
-        direction = direction / direction_norm
+        # direction = direction / direction_norm
         
         # Ray parameters
         max_distance = np.linalg.norm(np.array(skull_mask.shape))
@@ -114,7 +116,7 @@ class SkullFractureProjector:
         
         # March along ray
         for t in np.arange(0, max_distance, step_size):
-            current_point = centroid + t * direction
+            current_point = centroid + np.multiply(t,  direction)
             current_voxel = np.round(current_point).astype(int)
             
             # Check bounds
@@ -129,6 +131,132 @@ class SkullFractureProjector:
                 break
         
         return ray_points
+    
+    def _polar_to_direction(self, phi_degree, theta_degree):
+        """
+        Convert polar coordinates to 3D direction vector.
+        """
+        phi_rad = np.deg2rad(phi_degree)
+        theta_rad = np.deg2rad(theta_degree)
+        
+        # Spherical to Cartesian conversion
+        x = np.sin(theta_rad) * np.cos(phi_rad)
+        y = np.sin(theta_rad) * np.sin(phi_rad)
+        z = np.cos(theta_rad)
+        
+        return np.array([x, y, z])
+
+    def _get_angular_spacing(self):
+        """
+        Calculate angular spacing for the random walk.
+        You'll need to implement this based on your existing get_angular_spacing_specific_cell_trace_degree method.
+        """
+        # Placeholder - replace with your actual implementation
+        # This should return appropriate delta values for phi and theta
+        return .5, .5  # Default small angular steps
+
+    def centroid_ray_casting_random_walk(self, skull_mask=None, length=100, 
+                                   phi_degree=random.uniform(0, 60), theta_degree=random.uniform(0, 360),
+                                   step_size=0.5, centroid=None):
+        """
+        Generate fractures using ray casting with polar random walk directions.
+        
+        Parameters:
+        skull_mask: 3D binary array where 1 = skull, 0 = background
+        length: int, number of iterations for random walk
+        initial_phi_degree: float, starting phi angle in degrees
+        initial_theta_degree: float, starting theta angle in degrees
+        step_size: float, ray marching step size for accuracy
+        centroid: tuple/list, skull centroid coordinates
+        
+        Returns:
+        projected_fractures: 3D array with fractures projected through skull thickness
+        """
+        if skull_mask is None:
+            skull_mask = self.skull_mask
+            
+        if skull_mask is None:
+            raise ValueError("Skull mask must be provided")
+        
+        if centroid is None:
+            # Use center of the volume for simplicity
+            shape_skull_mask = skull_mask.shape
+            centroid = np.array([int(shape_skull_mask[0] / 2), 
+                            int(shape_skull_mask[1] / 2), 
+                            shape_skull_mask[2] - 82])     # Note: temprary fix
+        
+        print(f"Starting random walk fracture generation with {length} iterations")
+        print(f"Skull centroid at: {centroid}")
+        
+        # Initialize output
+        projected_fractures = np.zeros_like(skull_mask, dtype=np.float32)
+        
+        # Random walk control parameters (from original code)
+        list_switch = [2, 3]
+        switch_counter = 1
+        list_reset_counter_wait = [10, 20, 30, 40, 50]
+        list_reset_counter_wait_index = 0
+        pointer = list_switch[random.randint(0, len(list_switch) - 1)]
+        
+        # Calculate angular spacing (you'll need to implement this based on your existing method)
+        delta_shift_degree_phi, delta_shift_degree_theta = self._get_angular_spacing()
+        
+        # Allow some duplicates for better continuity
+        continuity_factor = 0.8
+        delta_shift_degree_phi *= continuity_factor
+        delta_shift_degree_theta *= continuity_factor
+        
+        print("Casting rays with random walk...")
+        
+        for i in range(length):
+            if hasattr(self, 'threshold_degree_phi') and phi_degree > self.threshold_degree_phi:
+                break
+
+            # Note: temporary fix with 180 - phi_degree    
+            # Convert polar coordinates to direction vector
+            direction = pv.spherical_to_cartesian(
+                1, np.deg2rad(180 - phi_degree), np.deg2rad(theta_degree)
+            )
+            
+            # # Calculate surface point by extending from centroid
+            # max_radius = 100 #np.linalg.norm(np.array(skull_mask.shape))
+            # surface_point = centroid + direction * max_radius
+            
+            # Cast ray and get voxels to mark as fracture
+            ray_points = self._cast_ray_through_skull(centroid, direction, skull_mask, step_size)
+            
+            # Mark ray points as fracture
+            for rp in ray_points:
+                if all(0 <= rp[k] < skull_mask.shape[k] for k in range(3)):
+                    projected_fractures[tuple(rp)] = 1
+            
+            # Random walk logic (from original code)
+            if (switch_counter % list_reset_counter_wait[list_reset_counter_wait_index] == 0):
+                list_reset_counter_wait_index = random.randint(0, len(list_reset_counter_wait) - 1)
+                switch_counter = 1
+                pointer = list_switch[random.randint(0, len(list_switch) - 1)]
+            
+            switch_counter += 1
+            
+            # Update angles based on pointer
+            if pointer == 0:
+                phi_degree += delta_shift_degree_phi * random.choice([-1, 1])
+            elif pointer == 1:
+                theta_degree += delta_shift_degree_theta * random.choice([-1, 1])
+            elif pointer == 2:
+                phi_degree += delta_shift_degree_phi * random.choice([-1, 1])
+                theta_degree += delta_shift_degree_theta
+            elif pointer == 3:
+                phi_degree += delta_shift_degree_phi
+                theta_degree += delta_shift_degree_theta * random.choice([-1, 1])
+            elif pointer == 4:
+                phi_degree += delta_shift_degree_phi * random.choice([-1, 1])
+                theta_degree += delta_shift_degree_theta * random.choice([-1, 1])
+        
+        self.projected_fractures = projected_fractures
+        print("Random walk ray casting complete!")
+        
+        return projected_fractures
     
     def analyze_projection_results(self):
         """

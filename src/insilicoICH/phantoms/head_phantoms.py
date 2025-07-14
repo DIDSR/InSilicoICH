@@ -274,6 +274,7 @@ class NIHPD_Head(HeadPhantom):
         self.skull_seg_method = skull_seg_method
         self.add_sutures = add_sutures
         self.add_fractures = add_fractures
+        self.threshold_degree_phi = 100
         if not phantom_dir.exists():
             print(f'''
 `PHANTOM_DIRECTORY` {phantom_dir} not found, now downloading NIHPD phantoms
@@ -476,7 +477,7 @@ from {phantom_dir}')
 
         return nifti_fracture_seg
     
-    def get_fractures(self, length: int = random.randint(50, 200), phi_degree: float = random.uniform(0, 100), theta_degree: float = random.uniform(0, 360)):
+    def get_fractures(self, axis=[2, 1, 0], length: int = random.randint(50, 200), phi_degree: float = random.uniform(0, 60), theta_degree: float = random.uniform(0, 360)):
         """
         returns fracture mask to the self skull
 
@@ -485,41 +486,49 @@ from {phantom_dir}')
         :returns: boolean fracture mask that can be used to set skull fracture
             values
         """
-        assert phi_degree < 100 and phi_degree > 0, "requirement 0 < phi_degree < 100 is not met"
+        assert phi_degree <= self.threshold_degree_phi and phi_degree > 0, "requirement 0 < phi_degree < 100 is not met"
 
-        data = self.fetch_fracture(length=length, phi_degree=phi_degree, theta_degree=theta_degree).get_fdata().transpose(0, 1, 2)[::-1, ::-1] # changed from (2, 1, 0)
+        # data = self.fetch_fracture(length=length, phi_degree=phi_degree, theta_degree=theta_degree).get_fdata().transpose(0, 1, 2)[::-1, ::-1] # changed from (2, 1, 0)
         skull = self.get_skull_map()
-        dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
-        if (dx < 0) | (dy < 0) | (dz < 0):
-            resizewithcrop = ResizeWithPadOrCrop(spatial_size=skull.shape)
-            data = resizewithcrop(data[None])[0].numpy()
-            dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
+        # dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
+        # if (dx < 0) | (dy < 0) | (dz < 0):
+        #     resizewithcrop = ResizeWithPadOrCrop(spatial_size=skull.shape)
+        #     data = resizewithcrop(data[None])[0].numpy()
+        #     dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
 
-        dx1 = dx2 = dx//2
-        if dx % 2 == 1:
-            dx2 += 1
-        dy1 = dy2 = dy//2
-        if dy % 2 == 1:
-            dy2 += 1
-        dz1 = dz2 = dz//2
-        if dz % 2 == 1:
-            dz2 += 1
-        data = np.pad(data, ((dx1, dx2), (dy1, dy2), (dz1, dz2))) > 0
+        # dx1 = dx2 = dx//2
+        # if dx % 2 == 1:
+        #     dx2 += 1
+        # dy1 = dy2 = dy//2
+        # if dy % 2 == 1:
+        #     dy2 += 1
+        # dz1 = dz2 = dz//2
+        # if dz % 2 == 1:
+        #     dz2 += 1
+        # data = np.pad(data, ((dx1, dx2), (dy1, dy2), (dz1, dz2))) > 0
         # fracture_dist = distance_transform_edt(~data)
         # fractures = skull & (fracture_dist < thresh)
         # fractures = ski.morphology.dilation(fractures, np.ones(3*[thickness]))
         
-        skull_int = skull.astype(np.int32)
-        data_int = data.astype(np.int32)
-        projector = SkullFractureProjector(skull_mask=skull_int,
-                                       fracture_annotations=data_int)
+        skull_int = skull.astype(np.int32).transpose(axis[0], axis[1], axis[2])[:, ::-1, :]
+        projector = SkullFractureProjector(skull_mask=skull_int)
 
         # Perform ray casting projection
         # Note: centroid is considered as the center of the 3D array
-        fractures_proj = projector.centroid_ray_casting()
-        fractures_proj_closing = projector.morph_closing(array=fractures_proj, kernel_size=3)
+        fractures_proj = projector.centroid_ray_casting_random_walk(length=length, phi_degree=phi_degree, theta_degree=theta_degree)
 
-        fractures = fractures_proj_closing.astype(bool)
+        skull_int = skull_int.transpose(axis[0], axis[1], axis[2])[:, ::-1, :]
+        fractures_proj = fractures_proj.transpose(axis[0], axis[1], axis[2])[:, ::-1, :]
+
+        self.save_volume_nifti(skull_int, np.eye(4),
+                               "/home/dhaval.kadia/code/research/PedSilicoICH/InSilicoICH/src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets/vx_skull_int.nii")
+        self.save_volume_nifti(fractures_proj, np.eye(4),
+                               "/home/dhaval.kadia/code/research/PedSilicoICH/InSilicoICH/src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets/vx_fractures_proj.nii")
+
+
+        # fractures_proj_closing = projector.morph_closing(array=fractures_proj, kernel_size=3)
+        
+        fractures = fractures_proj.astype(bool)
 
         return fractures
 
