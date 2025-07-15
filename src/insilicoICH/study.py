@@ -114,11 +114,11 @@ class ICHStudy(Study):
         for i in range(study_count):
             phantom_class = get_available_phantoms()[base_df['Phantom'].iloc[i]]
             params = {}
-            
+
             lesion_type = None
             if hasattr(phantom_class, 'func') and issubclass(phantom_class.func, LesionPhantom):
                 lesion_type = rng.choice(subtype)
-            
+
             params['Subtype'] = lesion_type
             params['LesionVolume'] = 0
             params['LesionAttenuation'] = 0
@@ -134,7 +134,7 @@ class ICHStudy(Study):
                 for _ in range(100):
                     intensity = att_manager.sample(lesion_type, rng)
                     if intensity >= rules['att_limit']: break
-                
+ 
                 params['LesionVolume'] = vol
                 params['LesionAttenuation'] = intensity
                 if lesion_type == 'IPH':
@@ -163,7 +163,7 @@ class ICHStudy(Study):
                 seed=series.CaseSeed,
                 edema=int(series.Edema)
             )
-        
+
         # Check for augmentation flag, disable on Windows if needed
         if series.AddAugmentation and os.name != 'nt':
             if hasattr(phantom, 'apply_transform'):
@@ -176,14 +176,14 @@ class ICHStudy(Study):
                     mode='nearest'
                 )
                 phantom.apply_transform(transform, seed=series.CaseSeed)
-        
+
         return phantom
 
     def run_study(self, patient_id: int = 0):
         """Runs the CT simulation and generates post-simulation metadata and masks."""
         results = super().run_study(patient_id)
         series = self.metadata.iloc[patient_id]
-        
+
         # Initialize default values
         mask_path, lesion_coords, vol_by_slice_ml, slice_intensity = None, None, 0, 0
 
@@ -195,7 +195,7 @@ class ICHStudy(Study):
                 slice_thickness=series.SliceThickness,
                 fov=series.FOV
             )
-            
+
             # --- Create a temporary study object to write the mask ---
             # This avoids modifying the main scanner's recon attribute
             mask_scanner = self.scanner.__class__(self.scanner.phantom)
@@ -203,17 +203,17 @@ class ICHStudy(Study):
             dicom_path = Path(series.OutputDirectory) / 'lesion_masks'
             patient_name = self.scanner.phantom.patient_name
             mask_path = mask_scanner.write_to_dicom(dicom_path / f'{patient_name}_mask.dcm')
-            
+
             # Calculate metrics from the mask
             dcm = pydicom.dcmread(mask_path[0])
             spacings = [float(dcm.SliceThickness)] + list(map(float, dcm.PixelSpacing))
             voxel_vol_ml = np.prod(spacings) / 1000.0
-            
+
             vol_by_slice_ml = mask_vol.sum(axis=(1, 2)) * voxel_vol_ml
-            
+
             z, y, x = center_of_mass(mask_vol) # Note: order is z,y,x for numpy
             lesion_coords = f"[{z:.1f}, {y:.1f}, {x:.1f}]"
-            
+
             slice_intensity = np.zeros_like(vol_by_slice_ml)
             if hasattr(self.scanner.phantom, 'lesion_intensity'):
                 slice_intensity[vol_by_slice_ml > 0] = self.scanner.phantom.lesion_intensity
@@ -226,7 +226,7 @@ class ICHStudy(Study):
         results.loc[rows, 'MassEffect'] = series.MassEffect
         results.loc[rows, 'LesionLocation(z,y,x)'] = lesion_coords
         results.loc[rows, 'MaskFilePath'] = mask_path
-        
+
         return results
 
 # =============================================================================

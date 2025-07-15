@@ -128,11 +128,12 @@ class LesionPhantom(Phantom):
         if mass_effect_strength > 0:
             img_w_lesion = self._apply_mass_effect(lesion.mask,
                                                    mass_effect_strength)
-            lesion.mass_effect = mass_effect_strength
+        lesion.mass_effect = mass_effect_strength
         # correct and erroneaous voxels
+        intensity_hu = lesion.image[lesion.mask].mean()
         diff = self.get_CT_number_phantom() - img_w_lesion
-        img_w_lesion[abs(diff) > lesion.intensity_hu] =\
-            self.get_CT_number_phantom()[abs(diff) > lesion.intensity_hu]
+        img_w_lesion[abs(diff) > intensity_hu] =\
+            self.get_CT_number_phantom()[abs(diff) > intensity_hu]
 
         img_w_lesion[lesion.mask] = lesion.image[lesion.mask]
 
