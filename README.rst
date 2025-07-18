@@ -95,7 +95,7 @@ See example conda install instructions `here <https://docs.anaconda.com/minicond
 
 **Phantom downloads**
 
-Base phantom files (currently NIHPD and MIDA) should be stored in a common phantom directory, defined as environment variable 'PHANTOM_DIRECTORY'. MIDA phantom files must be `downloaded manually <https://itis.swiss/virtual-population/regional-human-models/mida-model/>`_, while NIHPD files are downloaded automatically or can be found `here <https://www.bic.mni.mcgill.ca/ServicesAtlases/NIHPD-obj1>`_.
+Base phantom files (currently NIHPD and `MIDA <https://cdrh-rst.fda.gov/mida-multimodal-imaging-based-model-human-head-and-neck>`_) should be stored in a common phantom directory, defined as environment variable 'PHANTOM_DIRECTORY'. MIDA phantom files must be `downloaded manually <https://itis.swiss/virtual-population/regional-human-models/mida-model/>`_, while NIHPD files are downloaded automatically or can be found `here <https://www.bic.mni.mcgill.ca/ServicesAtlases/NIHPD-obj1>`_.
 
 Two options are available:
 
