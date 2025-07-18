@@ -462,15 +462,10 @@ from {phantom_dir}')
         sutures = ski.morphology.skeletonize(sutures)
         sutures = ski.morphology.dilation(sutures, np.ones(3*[thickness]))
         return sutures
-    
-    def get_fractures(self, length: int = random.randint(50, 200), phi_degree: float = random.uniform(0, 60), theta_degree: float = random.uniform(0, 360)):
-        """
-        returns fracture mask to the self skull
 
-        :param thickness: thickness in pixels of the fracture
-        :param thresh: distance threshold for fracture mask, smaller values means closer to the skull surface
-        :returns: boolean fracture mask that can be used to set skull fracture
-            values
+    def fetch_fractures_seg(self, length, phi_degree, theta_degree):
+        """
+        Fetch the skull fracture with given parameters.
         """
         assert phi_degree <= self.threshold_degree_phi and phi_degree > 0, "requirement 0 < phi_degree < 100 is not met"
 
@@ -486,7 +481,19 @@ from {phantom_dir}')
         skull_int = skull_int.transpose(2, 1, 0)[:, ::-1, :]
         fractures_proj = fractures_proj.transpose(2, 1, 0)[:, ::-1, :]
         self.fracture_seg = fractures_proj
-        
+    
+        return fractures_proj
+    
+    def get_fractures(self, length: int = random.randint(50, 200), phi_degree: float = random.uniform(0, 60), theta_degree: float = random.uniform(0, 360)):
+        """
+        returns fracture mask to the self skull
+
+        :param thickness: thickness in pixels of the fracture
+        :param thresh: distance threshold for fracture mask, smaller values means closer to the skull surface
+        :returns: boolean fracture mask that can be used to set skull fracture
+            values
+        """
+        fractures_proj = self.fetch_fractures_seg(length=length, phi_degree=phi_degree, theta_degree=theta_degree)
         fractures = fractures_proj.astype(bool)
 
         return fractures
