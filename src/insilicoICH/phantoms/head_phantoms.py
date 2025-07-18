@@ -463,12 +463,25 @@ from {phantom_dir}')
         sutures = ski.morphology.dilation(sutures, np.ones(3*[thickness]))
         return sutures
 
-    def fetch_fractures_seg(self, length: int = random.randint(50, 200), phi_degree: float = random.uniform(0, 60), theta_degree: float = random.uniform(0, 360)):
+    def fetch_fractures_seg(self, length=None, phi_degree=None, theta_degree=None, seed=None):
         """
         Fetch the skull fracture with given parameters.
         """
+        if seed is not None:
+            random.seed(seed)
+
+        if length is None:
+            length = random.randint(50, 200)
+
+        if phi_degree is None:
+            phi_degree = random.uniform(0, 60)
+
+        if theta_degree is None:
+            theta_degree = random.uniform(0, 360)
+
         assert phi_degree <= self.threshold_degree_phi and phi_degree > 0, "requirement 0 < phi_degree < 100 is not met"
 
+        print(phi_degree, theta_degree)
         skull = self.get_skull_map()
         
         skull_int = skull.astype(np.int32).transpose(2, 1, 0)[:, ::-1, :]
@@ -484,7 +497,7 @@ from {phantom_dir}')
     
         return fractures_proj
     
-    def get_fractures(self, length: int = random.randint(50, 200), phi_degree: float = random.uniform(0, 60), theta_degree: float = random.uniform(0, 360)):
+    def get_fractures(self, length=None, phi_degree=None, theta_degree=None, seed=None):
         """
         returns fracture mask to the self skull
 
@@ -493,6 +506,15 @@ from {phantom_dir}')
         :returns: boolean fracture mask that can be used to set skull fracture
             values
         """
+        if length is None:
+            length = random.randint(50, 200)
+
+        if phi_degree is None:
+            phi_degree = random.uniform(0, 60)
+
+        if theta_degree is None:
+            theta_degree = random.uniform(0, 360)
+
         fractures_proj = self.fetch_fractures_seg(length=length, phi_degree=phi_degree, theta_degree=theta_degree)
         fractures = fractures_proj.astype(bool)
 
