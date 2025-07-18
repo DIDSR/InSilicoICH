@@ -515,7 +515,7 @@ from {phantom_dir}')
         if theta_degree is None:
             theta_degree = random.uniform(0, 360)
 
-        fractures_proj = self.fetch_fractures_seg(length=length, phi_degree=phi_degree, theta_degree=theta_degree)
+        fractures_proj = self.fetch_fractures_seg(length=length, phi_degree=phi_degree, theta_degree=theta_degree, seed=seed)
         fractures = fractures_proj.astype(bool)
 
         return fractures
