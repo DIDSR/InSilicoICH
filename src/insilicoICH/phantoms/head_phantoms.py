@@ -275,6 +275,7 @@ class NIHPD_Head(HeadPhantom):
         self.add_sutures = add_sutures
         self.add_fractures = add_fractures
         self.threshold_degree_phi = 100
+        self.frectures_seg = None
         if not phantom_dir.exists():
             print(f'''
 `PHANTOM_DIRECTORY` {phantom_dir} not found, now downloading NIHPD phantoms
@@ -461,23 +462,8 @@ from {phantom_dir}')
         sutures = ski.morphology.skeletonize(sutures)
         sutures = ski.morphology.dilation(sutures, np.ones(3*[thickness]))
         return sutures
-
-    def fetch_fracture(self, length, phi_degree, theta_degree):
-        """
-        Fetch fracture for NIHPD from SkullFracture class.
-        """
-        object_skull_fracture = SkullFracture(
-            path_mesh_brainmask=self.dict_skull_paths["path_mesh_brainmask"], path_mask_brain=self.dict_skull_paths["path_mask_brain"], path_file_config=self.dict_skull_paths["path_file_config"],
-            path_skull_mesh=self.dict_skull_paths["path_skull_mesh"]
-        )
-        object_skull_fracture.initialize()
-        object_skull_fracture.load_data()
-
-        nifti_fracture_seg = object_skull_fracture.get_nifti_fracture(length=length, phi_degree=phi_degree, theta_degree=theta_degree)
-
-        return nifti_fracture_seg
     
-    def get_fractures(self, axis=[2, 1, 0], length: int = random.randint(50, 200), phi_degree: float = random.uniform(0, 60), theta_degree: float = random.uniform(0, 360)):
+    def get_fractures(self, length: int = random.randint(50, 200), phi_degree: float = random.uniform(0, 60), theta_degree: float = random.uniform(0, 360)):
         """
         returns fracture mask to the self skull
 
@@ -490,19 +476,29 @@ from {phantom_dir}')
 
         skull = self.get_skull_map()
         
-        skull_int = skull.astype(np.int32).transpose(axis[0], axis[1], axis[2])[:, ::-1, :]
+        skull_int = skull.astype(np.int32).transpose(2, 1, 0)[:, ::-1, :]
         projector = SkullFractureProjector(skull_mask=skull_int)
 
         # Perform ray casting projection
         # Note: centroid is considered as the center of the 3D array
         fractures_proj = projector.centroid_ray_casting_random_walk(length=length, phi_degree=phi_degree, theta_degree=theta_degree)
 
-        skull_int = skull_int.transpose(axis[0], axis[1], axis[2])[:, ::-1, :]
-        fractures_proj = fractures_proj.transpose(axis[0], axis[1], axis[2])[:, ::-1, :]
+        skull_int = skull_int.transpose(2, 1, 0)[:, ::-1, :]
+        fractures_proj = fractures_proj.transpose(2, 1, 0)[:, ::-1, :]
+        self.fracture_seg = fractures_proj
         
         fractures = fractures_proj.astype(bool)
 
         return fractures
+
+    def get_fracture_seg_slice_labels(self):
+        """
+        Returns the binary array with 1 where fracture present in slice, and 0 where not present.
+        """
+        assert self.fracture_seg is not None, "self.fracture_seg is not available, refer get_fractures()"
+        binary_mask = np.any(self.fracture_seg > 0, axis=(1, 2)).astype(np.uint8)
+
+        return binary_mask
 
     def assign_HUs(self, feature_range=(-100, 100)):
         phantom = self.csf*self.materials['CSF'] +\
@@ -524,7 +520,7 @@ from {phantom_dir}')
             sutures = self.get_sutures()
             phantom[sutures] = 0  # assume water HU
         if self.add_fractures:
-            fractures = self.get_fractures()
+            fractures = self.get_fractures(phi_degree=5)
             phantom[fractures] = 0  # assume water HU
         phantom[phantom < 0] = self.materials['air']
 
