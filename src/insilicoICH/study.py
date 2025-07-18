@@ -7,6 +7,7 @@ import sys
 from argparse import ArgumentParser
 from pathlib import Path
 from typing import Dict, List, Optional
+from functools import partial
 
 import numpy as np
 import pandas as pd
@@ -15,8 +16,9 @@ import tomllib
 from monai.transforms import RandAffine
 from scipy.ndimage import center_of_mass
 
-from VITools import Study, get_available_phantoms
+from VITools import Study, get_available_phantoms, load_vol
 from .phantoms.head_phantoms import LesionPhantom
+from .lesion_definition import LesionFactory
 
 # --- Constants and Configuration ---
 LESION_TYPES = list(LesionPhantom.lesion_types)
@@ -89,15 +91,27 @@ class ICHStudy(Study):
         lesion_volume: Dict | str | Path = None,
         lesion_attenuation: Dict | str | Path = None,
         edema_range: List[int] = [0, 15],
-        mass_effect: bool = True,
+        mass_effect: list[bool | float] = [0.1, 0.9],
+        texture_contrast: List[float] = [0, 3],
+        texture_scale: List[float] = [8, 16],
+        complexity: List[int] = [1, 4],
+        smoothness: List[float] = [0.1, 0.4],
+        irregularity: List[float] = [0.1, 0.4],
+        eccentricity: List[float] = [0.4, 0.8],
         add_augmentation: bool = True,
         **kwargs
     ) -> pd.DataFrame:
         """
         Generates a DataFrame of study parameters by sampling from distributions.
         """
-        base_df = super().generate_from_distributions(phantoms, study_count, **kwargs)
-        rng = np.random.default_rng(base_df['GlobalSeed'].iloc[0])
+        phantoms = [(k, v) for k, v in get_available_phantoms().items() if k in phantoms]
+        lesion_phantoms = [
+            k for k, v in phantoms if
+            isinstance(v, partial) and
+            issubclass(v.func, LesionPhantom)
+            ]
+        base_df = super().generate_from_distributions(lesion_phantoms, study_count, **kwargs)
+        rng = np.random.default_rng(base_df['global_seed'].iloc[0])
 
         # Use the DistributionManager for clean handling of inputs
         vol_manager = DistributionManager(lesion_volume)
@@ -112,17 +126,17 @@ class ICHStudy(Study):
 
         study_params = []
         for i in range(study_count):
-            phantom_class = get_available_phantoms()[base_df['Phantom'].iloc[i]]
+            phantom_class = get_available_phantoms()[base_df['phantom'].iloc[i]]
             params = {}
 
             lesion_type = None
             if hasattr(phantom_class, 'func') and issubclass(phantom_class.func, LesionPhantom):
                 lesion_type = rng.choice(subtype)
 
-            params['Subtype'] = lesion_type
-            params['LesionVolume'] = 0
-            params['LesionAttenuation'] = 0
-            params['Edema'] = 0
+            params['subtype'] = lesion_type
+            params['lesion_volume'] = 0
+            params['lesion_attenuation'] = 0
+            params['edema'] = 0
 
             if lesion_type:
                 rules = lesion_rules[lesion_type]
@@ -134,16 +148,23 @@ class ICHStudy(Study):
                 for _ in range(100):
                     intensity = att_manager.sample(lesion_type, rng)
                     if intensity >= rules['att_limit']: break
- 
-                params['LesionVolume'] = vol
-                params['LesionAttenuation'] = intensity
+
+                params['lesion_volume'] = vol
+                params['lesion_attenuation'] = intensity
                 if lesion_type == 'IPH':
-                    params['Edema'] = rng.choice(range(*edema_range))
+                    params['edema'] = rng.choice(range(*edema_range)) # uniform distributions may not be most appropriate here
+                    # may need to switch to normal distribution by providing mean/stddev instead of range
+                    params['texture_contrast'] = rng.uniform(*texture_contrast)
+                    params['texture_scale'] = rng.uniform(*texture_scale)
+                    params['complexity'] = rng.integers(*complexity)
+                    params['smoothness'] = rng.uniform(*smoothness)
+                    params['irregularity'] = rng.uniform(*irregularity)
+                    params['eccentricity'] = rng.uniform(*eccentricity)
 
             age = phantom_class.keywords.get('age', 0)
-            params['Age'] = age
-            params['MassEffect'] = mass_effect
-            params['AddAugmentation'] = add_augmentation
+            params['age'] = age
+            params['mass_effect'] = rng.uniform(low=min(mass_effect), high=max(mass_effect)) if mass_effect else False
+            params['add_augmentation'] = add_augmentation
             study_params.append(params)
 
         ich_df = pd.DataFrame(study_params)
@@ -151,21 +172,45 @@ class ICHStudy(Study):
 
     def load_phantom(self, patient_id: int = 0):
         """Loads the base phantom and inserts a lesion based on study parameters."""
-        series = self.metadata.iloc[patient_id]
         phantom = super().load_phantom(patient_id)
+        series = self.metadata.iloc[patient_id]
 
-        if pd.notna(series.Subtype) and series.LesionVolume > 0 and hasattr(phantom, 'insert_lesion'):
-            phantom.insert_lesion(
-                subtype=series.Subtype,
-                volume=series.LesionVolume,
-                intensity=series.LesionAttenuation,
-                mass_effect=series.MassEffect,
-                seed=series.CaseSeed,
-                edema=int(series.Edema)
+        if pd.notna(series.get('subtype')) and series.get('lesion_volume', 0) > 0:
+            # This part assumes Lesion objects from your other module are available
+            # and can be created via a factory.
+            if series.subtype in ['SDH', 'EDH']:
+                boundary = phantom.get_dura_map()
+            elif series.subtype == 'IPH':
+                boundary = phantom.get_material_mask('white matter')
+            else:
+                boundary = None
+
+            lesion_params = {
+                'spacings': phantom.spacings,
+                'seed': series.case_seed,
+                'boundary': boundary
+            }
+
+            lesion_obj = LesionFactory.create(series.subtype, **lesion_params)
+            lesion_obj.generate(
+                volume_ml=series.lesion_volume,
+                intensity_hu=series.lesion_attenuation,
+                texture_contrast=getattr(series, 'texture_contrast', 0),
+                texture_scale=getattr(series, 'texture_scale', 12),
+                complexity=getattr(series, 'complexity', 0),
+                smoothness=getattr(series, 'smoothness', 0.2),
+                irregularity=getattr(series, 'irregularity', 0.2),
+                eccentricity=getattr(series, 'eccentricity', 0.6),
+                edema=getattr(series, 'edema', 0),
+                # Pass other relevant params from series to generate...
             )
 
+            # This assumes your phantom has an `insert_lesion` method
+            # that takes a generated lesion object.
+            phantom.insert_lesion(lesion_obj, mass_effect=series.mass_effect)
+
         # Check for augmentation flag, disable on Windows if needed
-        if series.AddAugmentation and os.name != 'nt':
+        if series.add_augmentation and os.name != 'nt':
             if hasattr(phantom, 'apply_transform'):
                 transform = RandAffine(
                     prob=1.0,
@@ -175,7 +220,7 @@ class ICHStudy(Study):
                     padding_mode="border",
                     mode='nearest'
                 )
-                phantom.apply_transform(transform, seed=series.CaseSeed)
+                phantom.apply_transform(transform, seed=series.case_seed)
 
         return phantom
 
@@ -187,20 +232,21 @@ class ICHStudy(Study):
         # Initialize default values
         mask_path, lesion_coords, vol_by_slice_ml, slice_intensity = None, None, 0, 0
 
-        if pd.notna(series.Subtype):
+        if pd.notna(series.subtype):
             # Generate and write lesion mask
+            # startZ, endZ = self.scanner.scan_coverage
             mask_vol = self.scanner.get_lesion_mask(
-                startZ=self.scanner.ScanCoverage[0],
-                endZ=self.scanner.ScanCoverage[1],
-                slice_thickness=series.SliceThickness,
-                fov=series.FOV
+                startZ=self.scanner.scan_coverage[0],
+                endZ=self.scanner.scan_coverage[1],
+                slice_thickness=series.slice_thickness,
+                fov=series.fov
             )
 
             # --- Create a temporary study object to write the mask ---
             # This avoids modifying the main scanner's recon attribute
-            mask_scanner = self.scanner.__class__(self.scanner.phantom)
+            mask_scanner = self.scanner
             mask_scanner.recon = mask_vol
-            dicom_path = Path(series.OutputDirectory) / 'lesion_masks'
+            dicom_path = Path(series.output_directory) / 'lesion_masks'
             patient_name = self.scanner.phantom.patient_name
             mask_path = mask_scanner.write_to_dicom(dicom_path / f'{patient_name}_mask.dcm')
 
@@ -219,20 +265,34 @@ class ICHStudy(Study):
                 slice_intensity[vol_by_slice_ml > 0] = self.scanner.phantom.lesion_intensity
 
         # Update results DataFrame
-        rows = results.CaseID == f'case_{patient_id:04d}'
-        results.loc[rows, 'Subtype'] = series.Subtype
-        results.loc[rows, 'LesionVolume(mL)'] = vol_by_slice_ml
-        results.loc[rows, 'LesionAttenuation(HU)'] = slice_intensity
-        results.loc[rows, 'MassEffect'] = series.MassEffect
-        results.loc[rows, 'LesionLocation(z,y,x)'] = lesion_coords
-        results.loc[rows, 'MaskFilePath'] = mask_path
+        rows = results.case_id == f'case_{patient_id:04d}'
+        results.loc[rows, 'subtype'] = series.subtype
+        results.loc[rows, 'lesion_volume(mL)'] = vol_by_slice_ml
+        results.loc[rows, 'lesion_attenuation(HU)'] = slice_intensity
+        results.loc[rows, 'mass_effect'] = series.mass_effect
+        results.loc[rows, 'lesion_location(z,y,x)'] = lesion_coords
+        results.loc[rows, 'mask_file_path'] = mask_path
 
         return results
+
+    def get_masks(self, patientid: int = 0):
+        """
+        Retrieve the lesion mask volume(s) for a given patient.
+
+        Parameters:
+            patientid (int): Index of the patient/case.
+
+        Returns:
+            np.ndarray: Loaded mask volume(s).
+        """
+        return load_vol(self.results[self.results.case_id ==
+                                     f'case_{patientid:04d}']['mask_file_path'])
 
 # =============================================================================
 # MODULE 3: COMMAND-LINE INTERFACE (CLI)
 # Refactored CLI logic for clarity and separation of concerns.
 # =============================================================================
+
 
 def _flatten_dict(layered_dict: Dict) -> Dict:
     """Helper to flatten nested dictionaries from TOML files."""
@@ -241,6 +301,7 @@ def _flatten_dict(layered_dict: Dict) -> Dict:
         if isinstance(v, dict):
             config.update(v)
     return config
+
 
 def load_and_merge_configs(
     default_config_path: Path,
@@ -253,7 +314,7 @@ def load_and_merge_configs(
         config = tomllib.load(f)
         config = _flatten_dict(config)
         # Resolve relative paths for distributions
-        for key in ['LesionVolume', 'LesionAttenuation']:
+        for key in ['lesion_volume', 'lesion_attenuation']:
             if key in config:
                 config[key] = default_config_path.parent / config[key]
 
@@ -262,24 +323,25 @@ def load_and_merge_configs(
         with open(user_config_path, 'rb') as f:
             user_config = tomllib.load(f)
             config.update(_flatten_dict(user_config))
-    
+
     # 3. Override with CLI arguments (only non-None values)
     cli_config = {k: v for k, v in cli_args.items() if v is not None}
     config.update(cli_config)
 
     # Final cleanup
-    if 'Subtype' in config:
-        config['Subtype'] = [s or None for s in config['Subtype']]
-        
+    if 'subtype' in config:
+        config['subtype'] = [s or None for s in config['subtype']]
+
     return config
+
 
 def recruit_patients_cli(arg_list: Optional[List[str]] = None):
     """CLI for generating a study plan (recruiting patients)."""
     parser = ArgumentParser(description="Generates a study plan CSV from parameter distributions.")
     parser.add_argument('config', nargs='?', help="Path to user-defined TOML config file.")
     # Add all other arguments... (kept brief for example)
-    parser.add_argument('--OutputDirectory', '-o', type=str, default='results')
-    parser.add_argument('--StudyCount', type=int)
+    parser.add_argument('--output_directory', '-o', type=str, default='results')
+    parser.add_argument('--study_count', type=int)
     args = parser.parse_args(arg_list)
 
     pkg_dir = Path(__file__).parent
@@ -289,26 +351,31 @@ def recruit_patients_cli(arg_list: Optional[List[str]] = None):
         cli_args=vars(args)
     )
 
-    output_dir = Path(config['OutputDirectory'])
+    output_dir = Path(config['output_directory'])
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Filter available phantoms by age
-    age_range = config.pop('Age', (0, 120))
+    age_range = config.pop('age', (0, 120))
     available_phantoms = get_available_phantoms()
-    valid_phantoms = {
-        k: v for k, v in available_phantoms.items()
-        if age_range[0] < v.keywords.get('age', -1) < age_range[1]
-    }
+    valid_phantoms = {}
+    for k, v in available_phantoms.items():
+        if not isinstance(v, partial):
+            continue
+        if not hasattr(v.func, 'keywords'):
+            continue
+        if age_range[0] < v.keywords.get('age', -1) < age_range[1]:
+            valid_phantoms[k] = v
 
     if not valid_phantoms:
         print(f"No phantoms found in age range {age_range}. Exiting.")
         return
 
     df = ICHStudy.generate_from_distributions(list(valid_phantoms.keys()), **config)
-    
+
     save_name = output_dir / f"{output_dir.name}_study_plan.csv"
     df.to_csv(save_name, index=False)
     print(f"Study plan with {len(df)} cases saved to: {save_name}")
+
 
 def run_simulation_cli(arg_list: Optional[List[str]] = None):
     """CLI for running simulations from a study plan CSV."""
@@ -320,12 +387,13 @@ def run_simulation_cli(arg_list: Optional[List[str]] = None):
     input_csv_path = args.input_csv
     if not input_csv_path and not sys.stdin.isatty():
         input_csv_path = sys.stdin.read().strip()
-    
+
     if not input_csv_path:
         parser.error("An input CSV file is required either as an argument or via stdin.")
-        
+
     print(f"Running study from: {input_csv_path}")
     ICHStudy(input_csv_path).run_all(parallel=args.parallel)
+
 
 if __name__ == '__main__':
     # A simple router to decide which CLI to run

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from insilicoICH.study import insilicoich_cli, recruitment_cli
+from insilicoICH.study import run_simulation_cli, recruit_patients_cli
 
 test_dir = Path(__file__).parent.absolute()
 
@@ -13,11 +13,11 @@ def test_cli():
 
     inclusion_criteria = test_dir / 'test_inclusion_criteria.toml'
 
-    recruitment_cli([str(inclusion_criteria), "--OutputDirectory", str(output_dir)])
+    recruit_patients_cli([str(inclusion_criteria), "--output_directory", str(output_dir)])
 
     input_csv = output_dir / (output_dir.name + '.csv')
 
-    insilicoich_cli([str(input_csv)])
+    run_simulation_cli([str(input_csv)])
 
     input_df = pd.read_csv(input_csv)
     output_df = pd.concat([pd.read_csv(o) for o in

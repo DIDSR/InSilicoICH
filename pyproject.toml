@@ -36,8 +36,8 @@ Homepage = "https://github.com/DIDSR/InSilicoICH"
 Issues = "https://github.com/DIDSR/InSilicoICH/issues"
 
 [project.scripts]
-generate = "insilicoICH.study:insilicoich_cli"
-recruit = "insilicoICH.study:recruitment_cli"
+generate = "insilicoICH.study:run_simulation_cli"
+recruit = "insilicoICH.study:recruit_patients_cli"
 
 [project.entry-points."VITools"] # Must match PROJECT_NAME
 head_phantoms = "insilicoICH.phantoms.head_phantoms"

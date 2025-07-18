@@ -7,6 +7,8 @@ import numpy as np
 from test_phantoms import load_phantom
 from VITools.scanner import Scanner
 
+from insilicoICH.lesion_definition import LesionFactory
+
 # https://radiopaedia.org/articles/windowing-ct?lang=us
 display_settings = {
     'brain': (80, 40),
@@ -107,9 +109,12 @@ def test_lesion_characteristics(age=15.75, views=100,
             print(f'{intensity} HU, {volume} mL')
             phantom = load_phantom(age, shape=None)
             phantom.patient_name = lesion_type
-            phantom.insert_lesion(lesion_type=lesion_type, volume=volume,
-                                  intensity=intensity,
-                                  mass_effect=mass_effect, seed=42)
+            lesion = LesionFactory.create('EDH', spacings=phantom.spacings,
+                                          boundary=phantom.get_dura_map(),
+                                          seed=42)
+            lesion.generate(volume_ml=volume, intensity_hu=intensity)
+
+            phantom.insert_lesion(lesion, mass_effect=mass_effect)
             params.append((lesion_type, intensity, volume))
             phantoms.append(phantom.get_CT_number_phantom()[
                 phantom.lesions[0].coords_voxel[0]

@@ -129,13 +129,15 @@ def generate_3d_perlin_texture(depth=32, height=128, width=128, scale=50.0,
 # Defines the common interface and shared functionality for all lesion types.
 # =============================================================================
 
+
 class Lesion(abc.ABC):
     """Abstract base class for a procedurally generated lesion."""
 
-    def __init__(self, lesion_type: str, spacings: tuple, seed: Optional[int] = None):
+    def __init__(self, lesion_type: str, spacings: tuple, seed: Optional[int] = None, **kwargs):
         self.lesion_type = lesion_type
         self.dz, self.dx, self.dy = spacings
         self.voxel_volume_ml = (self.dx * self.dy * self.dz) / 1000.0
+        self.volume_ml = 0.
         self.seed = seed if seed is not None else np.random.randint(0, 2**31 - 1)
         self.rng = np.random.default_rng(self.seed)
 
@@ -172,14 +174,10 @@ class Lesion(abc.ABC):
     def intensity_HU(self) -> float:
         return self.image[self.mask].mean()
 
-    @property
-    def volume_ml(self) -> float:
-        return self.achieved_volume_ml
-
     def __repr__(self):
         """Provides a string representation of the lesion."""
         return (f"Lesion(type={self.lesion_type}, "
-                f"achieved_volume_ml={self.achieved_volume_ml:.2f}, "
+                f"volume_ml={self.volume_ml:.2f}, "
                 f"coords_voxel={self.coords_voxel}, "
                 f"seed={self.seed})")
 # =============================================================================
@@ -196,14 +194,49 @@ class DuralLesion(Lesion):
         'SDH': {'length_vol_ratio': 11, 'coverage_log_coeff': 10.38, 'coverage_log_intercept': 24.48},
     }
 
-    def __init__(self, lesion_type: str, dura_map: np.ndarray, **kwargs):
+    def __init__(self, lesion_type: str, boundary: np.ndarray, **kwargs):
         super().__init__(lesion_type=lesion_type, **kwargs)
         if lesion_type not in self.SHAPE_CONFIG:
             raise ValueError(f"DuralLesion requires type in {list(self.SHAPE_CONFIG.keys())}")
-        self.dura_map = dura_map
+        self.dura_map = boundary
 
-    def generate(self, volume_ml: float, intensity_hu: float,
-                 texture_contrast: float, texture_scale: float = 15, **kwargs) -> "DuralLesion":
+    def generate(self, volume_ml: float, intensity_hu: float = 40,
+                 texture_contrast: float = 0., texture_scale: float = 15, **kwargs) -> "DuralLesion":
+        """
+        Generates the 3D lesion mask and textured image for a dural-based hemorrhage.
+
+        This method orchestrates the procedural generation of a dural lesion (EDH or SDH).
+        The process begins by estimating the required z-axis coverage and central
+        slice area based on the target volume and lesion type. It then enters an
+        iterative loop to generate a 3D mask that accurately matches the target volume.
+
+        In each iteration, it finds appropriate start and end points on a central
+        slice of the dura map. A 2D lesion shape is created between these points
+        and then propagated to adjacent slices with a tapering effect to create a
+        realistic, three-dimensional object. The volume of this generated mask is
+        measured, and if it is not within a 10% tolerance of the target volume,
+        the parameters are adjusted, and the process repeats.
+
+        Once a suitable mask is generated, a procedural noise texture is applied
+        to create the final image. This method modifies the instance in place,
+        setting the `mask`, `image`, `volume_ml`, and `coords_voxel` attributes.
+
+        Args:
+            volume_ml (float): The target volume of the lesion in milliliters (mL).
+            intensity_hu (float): The mean Hounsfield Unit (HU) value for the
+                lesion's texture.
+            texture_contrast (float): The standard deviation of the texture as a
+                percentage of the mean intensity. A value of 0 results in a
+                uniform (flat) lesion intensity.
+            texture_scale (float, optional): The characteristic scale of the noise
+                texture features. Defaults to 15.
+            **kwargs: Catches unused keyword arguments for forward compatibility.
+
+        Returns:
+            DuralLesion: The instance of the class (`self`), allowing for method chaining.
+                         The instance's `mask`, `image`, `volume_ml`, and
+                         `coords_voxel` attributes are populated.
+        """
         config = self.SHAPE_CONFIG[self.lesion_type]
 
         # 1. Estimate lesion dimensions from volume
@@ -258,7 +291,7 @@ class DuralLesion(Lesion):
             final_mask = current_mask  # Keep the last attempt
 
         self.mask = final_mask
-        self.achieved_volume_ml = np.sum(self.mask) * self.voxel_volume_ml
+        self.volume_ml = np.sum(self.mask) * self.voxel_volume_ml
         self.coords_voxel = tuple(map(int, center_of_mass(self.mask)))
 
         # 3. Generate textured image
@@ -328,14 +361,66 @@ class DuralLesion(Lesion):
 class RoundLesion(Lesion):
     """Generates parenchymal lesions (IPH) using deformed implicit surfaces."""
 
-    def __init__(self, boundary_mask: np.ndarray, lesion_type='IPH', **kwargs):
+    def __init__(self, boundary: np.ndarray, lesion_type='IPH', **kwargs):
         super().__init__(lesion_type=lesion_type, **kwargs)
-        self.boundary_mask = boundary_mask
+        self.boundary_mask = boundary
 
     def generate(self, volume_ml: float, intensity_hu: float, eccentricity: float = 0.5,
                  irregularity: float = 0.5, smoothness: float = 0.5, complexity: int = 3,
                  edema_hu: float = 0, edema_thickness: int = 5, texture_contrast: float = 0,
                  texture_scale: float = 10.0, **kwargs) -> "RoundLesion":
+        """
+        Generates the 3D mask and textured image for an intraparenchymal hemorrhage.
+
+        This method uses a sophisticated procedural technique based on deformed
+        implicit surfaces to create realistic, irregular lesion shapes. The core
+        process is as follows:
+
+        1.  **Placement**: A valid center for the lesion is randomly chosen within
+            the provided `boundary_mask`, ensuring the lesion fits.
+        2.  **Base Shape**: One or more base ellipsoids are defined. Their shape is
+            controlled by `volume_ml` and `eccentricity`. If `complexity` is
+            greater than one, multiple smaller, slightly offset ellipsoids are used.
+        3.  **Deformation**: Each ellipsoid's surface is treated as an implicit
+            surface and is deformed using 3D Perlin noise. The `irregularity`
+            parameter controls the amplitude of this deformation, while `smoothness`
+            controls the frequency (scale) of the noise features.
+        4.  **Volume Matching**: The deformed implicit surfaces are combined, and a
+            binary search algorithm is used to find the precise threshold that
+            creates a 3D mask matching the target `volume_ml`.
+        5.  **Edema & Texture**: An optional layer of perihematomal edema is added
+            around the core lesion, with a smooth intensity falloff. A final
+            heterogeneous texture is applied to the lesion core itself.
+
+        This method modifies the instance in place, setting the `mask`, `image`,
+        `volume_ml`, and `coords_voxel` attributes.
+
+        Args:
+            volume_ml (float): The target volume of the lesion's core in mL.
+            intensity_hu (float): The mean Hounsfield Unit (HU) for the lesion core.
+            eccentricity (float, optional): Controls the elongation of the base
+                ellipsoid(s). 0 is a sphere, ~0.9 is highly elongated. Defaults to 0.5.
+            irregularity (float, optional): The magnitude of surface deformation.
+                0 results in a smooth ellipsoid. Defaults to 0.5.
+            smoothness (float, optional): The scale of the surface noise features.
+                Higher values create larger, smoother bumps. Defaults to 0.5.
+            complexity (int, optional): The number of overlapping deformed ellipsoids
+                to combine for the final shape. Defaults to 3.
+            edema_hu (float, optional): The peak HU value of the surrounding edema.
+                If 0, no edema is added. Defaults to 0.
+            edema_thickness (int, optional): The thickness of the edema layer in voxels.
+                Defaults to 5. Adding edema thickness will keep a constant
+                volume but may decrease average attenuation as a result.
+            texture_contrast (float, optional): The standard deviation of the core
+                texture as a percentage of `intensity_hu`. 0 creates a flat texture.
+                Defaults to 0.
+            texture_scale (float, optional): The characteristic scale of the noise
+                texture features. Defaults to 10.0.
+            **kwargs: Catches unused keyword arguments for forward compatibility.
+
+        Returns:
+            RoundLesion: The instance of the class (`self`), allowing for method chaining.
+        """
 
         target_voxel_count = volume_ml / self.voxel_volume_ml
 
@@ -380,21 +465,22 @@ class RoundLesion(Lesion):
         lesion_core_mask = final_surface < high
 
         # 4. Generate edema and final textured image
-        self.mask = lesion_core_mask
+        self.mask = lesion_core_mask.copy()
         self.image = np.zeros_like(self.boundary_mask, dtype=np.float32)
 
-        if edema_thickness > 0:
+        if (edema_thickness > 0) & (edema_hu > 0):
             # Create a smooth falloff for the edema
             dist_transform = distance_transform_edt(lesion_core_mask)
             edema_mask = (dist_transform > 0) & (dist_transform < edema_thickness)
-            edema_intensity = np.exp(-0.5 * (dist_transform - 1)) * edema_hu
+            edema_intensity = np.exp(-0.125 * (dist_transform)) * edema_hu
             self.image[edema_mask] = edema_intensity[edema_mask]
             self.mask |= edema_mask
+            lesion_core_mask &= ~edema_mask  # Core is only the high-intensity part
 
         texture = self._get_noise_texture(self.mask.shape, intensity_hu, texture_contrast, scale=texture_scale)
-        self.image[lesion_core_mask] = texture[lesion_core_mask] # Apply texture only to the core
+        self.image[lesion_core_mask] = texture[lesion_core_mask]  # Apply texture only to the core
 
-        self.achieved_volume_ml = np.sum(lesion_core_mask) * self.voxel_volume_ml
+        self.volume_ml = np.sum(self.mask) * self.voxel_volume_ml
         self.coords_voxel = tuple(map(int, center_of_mass(self.mask)))
 
         return self
@@ -422,8 +508,7 @@ class LesionFactory:
         Args:
             lesion_type (str): The type of lesion to create ('EDH', 'SDH', 'IPH').
             **kwargs: Arguments specific to the lesion type constructor.
-                      For DuralLesion, expects 'dura_map'.
-                      For RoundLesion, expects 'boundary_mask'.
+                      For RoundLesion, DuralLesion, expects 'boundary'.
 
         Returns:
             An instance of a Lesion subclass.
