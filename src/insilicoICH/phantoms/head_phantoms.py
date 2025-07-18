@@ -463,7 +463,7 @@ from {phantom_dir}')
         sutures = ski.morphology.dilation(sutures, np.ones(3*[thickness]))
         return sutures
 
-    def fetch_fractures_seg(self, length, phi_degree, theta_degree):
+    def fetch_fractures_seg(self, length: int = random.randint(50, 200), phi_degree: float = random.uniform(0, 60), theta_degree: float = random.uniform(0, 360)):
         """
         Fetch the skull fracture with given parameters.
         """
