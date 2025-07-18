@@ -46,7 +46,7 @@ class DistributionManager:
         """Loads distributions from a CSV file with value and weight columns."""
         df = pd.read_csv(path)
         for lesion_type in LESION_TYPES:
-            val_col = f'{lesion_type}_volume' if 'volume' in df.columns[0] else f'{lesion_type}_HU'
+            val_col = f'{lesion_type}_volume' if 'IPH_volume' in df.columns else f'{lesion_type}_HU'
             weight_col = f'{lesion_type}_weight'
             if val_col in df.columns and weight_col in df.columns:
                 subset_df = df[[val_col, weight_col]].dropna()
@@ -90,7 +90,7 @@ class ICHStudy(Study):
         subtype: List[Optional[str]] = [None] + LESION_TYPES,
         lesion_volume: Dict | str | Path = None,
         lesion_attenuation: Dict | str | Path = None,
-        edema_range: List[int] = [0, 15],
+        edema: List[int] = [0, 15],
         mass_effect: list[bool | float] = [0.1, 0.9],
         texture_contrast: List[float] = [0, 3],
         texture_scale: List[float] = [8, 16],
@@ -152,7 +152,7 @@ class ICHStudy(Study):
                 params['lesion_volume'] = vol
                 params['lesion_attenuation'] = intensity
                 if lesion_type == 'IPH':
-                    params['edema'] = rng.choice(range(*edema_range)) # uniform distributions may not be most appropriate here
+                    params['edema'] = rng.choice(range(*edema)) # uniform distributions may not be most appropriate here
                     # may need to switch to normal distribution by providing mean/stddev instead of range
                     params['texture_contrast'] = rng.uniform(*texture_contrast)
                     params['texture_scale'] = rng.uniform(*texture_scale)
@@ -163,6 +163,7 @@ class ICHStudy(Study):
 
             age = phantom_class.keywords.get('age', 0)
             params['age'] = age
+            mass_effect = [0.4, 0.6] if mass_effect is True else mass_effect
             params['mass_effect'] = rng.uniform(low=min(mass_effect), high=max(mass_effect)) if mass_effect else False
             params['add_augmentation'] = add_augmentation
             study_params.append(params)
@@ -359,22 +360,21 @@ def recruit_patients_cli(arg_list: Optional[List[str]] = None):
     available_phantoms = get_available_phantoms()
     valid_phantoms = {}
     for k, v in available_phantoms.items():
-        if not isinstance(v, partial):
+        if (not isinstance(v, partial)) and (not hasattr(v, 'keywords')):
             continue
-        if not hasattr(v.func, 'keywords'):
-            continue
+
         if age_range[0] < v.keywords.get('age', -1) < age_range[1]:
             valid_phantoms[k] = v
 
     if not valid_phantoms:
         print(f"No phantoms found in age range {age_range}. Exiting.")
         return
-
+    config.pop('config', None)  # Remove config key if present
     df = ICHStudy.generate_from_distributions(list(valid_phantoms.keys()), **config)
 
     save_name = output_dir / f"{output_dir.name}_study_plan.csv"
     df.to_csv(save_name, index=False)
-    print(f"Study plan with {len(df)} cases saved to: {save_name}")
+    print(save_name)
 
 
 def run_simulation_cli(arg_list: Optional[List[str]] = None):

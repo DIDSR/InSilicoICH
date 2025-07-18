@@ -433,6 +433,7 @@ class RoundLesion(Lesion):
 
         # 2. Generate and combine deformed implicit surfaces
         all_surfaces = []
+        complexity = int(complexity)
         radius_scaler = np.cbrt(1 / complexity)
         for i in range(complexity):
             sub_seed = self.seed + i

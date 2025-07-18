@@ -15,7 +15,7 @@ def test_cli():
 
     recruit_patients_cli([str(inclusion_criteria), "--output_directory", str(output_dir)])
 
-    input_csv = output_dir / (output_dir.name + '.csv')
+    input_csv = output_dir / (output_dir.name + '_study_plan.csv')
 
     run_simulation_cli([str(input_csv)])
 
