@@ -93,7 +93,7 @@ class ICHStudy(Study):
         edema: List[int] = [0, 15],
         mass_effect: list[bool | float] = [0.1, 0.9],
         texture_contrast: List[float] = [0, 3],
-        texture_scale: List[float] = [8, 16],
+        texture_scale: List[float] = [8, 64],
         complexity: List[int] = [1, 4],
         smoothness: List[float] = [0.1, 0.4],
         irregularity: List[float] = [0.1, 0.4],
