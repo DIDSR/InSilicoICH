@@ -1,114 +1,46 @@
-'''
-module for working with phantoms
-'''
+"""
+Refactored module for creating and manipulating medical imaging phantoms with
+lesions.
+"""
 
-import os
+from typing import List, Tuple, Union
 
 import numpy as np
-import skimage as ski
-from skimage.morphology import binary_erosion
 from monai.transforms import Resize, RandAffine, Affine
-
 from scipy.ndimage import (center_of_mass,
-                           distance_transform_edt)
+                           distance_transform_edt,
+                           map_coordinates)
 
 from VITools import Phantom
 
-from ..artifact_generation import transform_image_label_pair
+# Assuming these are local modules with the specified functions.
+# For this example, placeholder functions are used where necessary.
+from .. import lesion_definition as ld
 
-from ..lesion_definition import (elliptical_lesion,
-                                 insert_dural,
-                                 warp_slice,
-                                 get_perimeter)
-
-
-def sphere_radius_from_volume(volume):
-    '''
-    Converts volume in mL to radii in mm
-    '''
-    return np.power(3/4/np.pi*volume*1000, 1/3)
+# --- Type Aliases for Clarity ---
+Shape3D = Tuple[int, int, int]
+Spacing3D = Tuple[float, float, float]
 
 
-def calculate_eccentricity(a, b):
-    if a > b:
-        return np.sqrt(1 - b**2/a**2)
-    else:
-        return np.sqrt(1 - a**2/b**2)
-
-
-def get_closest_key(key, dictionary):
-    diffs = {abs(k - key): k for k in dictionary}
-    return diffs[min([o for o in diffs])]
-
-
-def calc_mean_eccentricity(a, b, c):
-    return np.mean([calculate_eccentricity(a, b),
-                    calculate_eccentricity(a, c),
-                    calculate_eccentricity(b, c)])
-
-
-def get_eccentricity_dict():
-    eccentricity_dict = {}
-    sample_range = np.linspace(0.1, 1, 10)
-    for a in sample_range:
-        for b in sample_range:
-            for c in sample_range:
-                sample_eccentricity = calculate_eccentricity(a, b), \
-                                      calculate_eccentricity(a, c), \
-                                      calculate_eccentricity(b, c)
-                sample_eccentricity = np.round(
-                    np.stack(sample_eccentricity).mean(), decimals=2)
-                eccentricity_dict[float(sample_eccentricity)] =\
-                    list(map(float, (a, b, c)))
-    return {c: eccentricity_dict[c] for c in sorted(eccentricity_dict)}
-
-
-def get_semi_major_axes(eccentricity, seed=None):
-    eccentricity_dict = get_eccentricity_dict()
-    key = get_closest_key(eccentricity, eccentricity_dict)
-    foci = eccentricity_dict[key]
-    rng = np.random.default_rng(seed)
-    rng.shuffle(foci)
-    return np.array(foci)
-
-
-def get_transformation_src_dst(lesion: np.ndarray[bool],
-                               strength: int = 0):
-    '''
-    returns `src` and `dst` arrays to insert `lesion` into an img of the same
-    shape. e.g. of the head and applies a mass effect warping of the local
-    tissues.
-
-    This function takes a solid lesion and extracts the perimeter as the input
-     `dst` to `warp_slice` and applies the perimeter `strength` to determine
-    how many erosions make up the `src` input to `warp` slice, where higher
-    strength yields a greater degree of warping by creating a greater distance
-    between `src` and `dst`. See `warp_slice` for more details.
-    :param lesion: a 2D binary image of the lesion, must be same shape as img
-    '''
-    if (strength < 0) or (strength > 1):
-        raise ValueError(f'strength {strength} is not in allowed range [0, 1]')
-    footprint = int(strength*np.ceil(distance_transform_edt(lesion).max()))
-    dst = get_perimeter(lesion)
-    src = get_perimeter(ski.morphology.binary_erosion(lesion,
-                                                      np.ones(2*[footprint])))
-    return src, dst
+def resize(array: np.ndarray, shape: Shape3D, **kwargs) -> np.ndarray:
+    """Internal helper to resize a 3D array using MONAI."""
+    resize_transform = Resize(max(shape), size_mode='longest', **kwargs)
+    # MONAI transforms expect a channel-first format (C, H, W, D)
+    resized_array = resize_transform(array[None])[0]
+    return resized_array
 
 
 def get_mean_age(age_range: str):
     return (float(age_range.split('-')[1])+float(age_range.split('-')[0]))/2
 
 
-def resize(phantom, shape, **kwargs):
-    resize = Resize(max(shape), size_mode='longest', **kwargs)
-    resized = resize(phantom[None])[0]
-    return resized
-
-
 class LesionPhantom(Phantom):
-    '''
-    A Phantom object with methods for inserting lesions.
-    '''
+    """
+    A Phantom object with methods for inserting realistic lesions.
+
+    Phantoms are responsible for loading from different sources, resizing, and
+    managing side effects from inserting lesions such as mass effect.
+    """
     lesion_types = {'IPH': {
         'volume': [0, 100],
         'intensity': [-100, 100],
@@ -129,268 +61,187 @@ class LesionPhantom(Phantom):
         }
                     }
 
-    def __init__(self, img: np.ndarray, spacings: tuple = (1, 1, 1), **kwargs):
-        '''
-        Initializes a LesionPhantom object.
-
-        Parameters:
-        - img: numpy.ndarray, image data of the phantom.
-        :param spacings: tuple, voxel spacings (dz, dx, dy). Default is (1, 1, 1).
-        '''
+    def __init__(self, img: np.ndarray, spacings: Spacing3D = (1.0, 1.0, 1.0), **kwargs):
         super().__init__(img, spacings, **kwargs)
-        self._lesion = []
-        self._lesion_coords = []
-        self.lesion_type = []
-        self.lesion_intensity = []  # HU
-        self.mass_effect = False
-        self.warp_exclusion_mask = self.get_warp_exclusion_mask()
-        self.warp_inclusion_mask = self.get_warp_inclusion_mask()
-
-    def get_warp_exclusion_mask(self):
-        return np.zeros(self.shape, dtype=bool)
-
-    def get_warp_inclusion_mask(self):
-        return np.ones(self.shape, dtype=bool)
-
-    def resize(self, shape: tuple, **kwargs) -> None:
-        '''
-        Resizes the phantom array to the given shape and adjusts the spacings accordingly.
-
-        :param shape: tuple, new shape for the phantom array
-        '''
-        super().resize(shape, **kwargs)
-        self.warp_exclusion_mask = resize(self.warp_exclusion_mask, shape, **kwargs).astype(bool)
-        self.warp_inclusion_mask = resize(self.warp_inclusion_mask, shape, **kwargs).astype(bool)
-
-    def get_lesion_volume(self, unit='mL'):
-        '''
-        Calculates the volume of the lesion in either milliliters (mL) or cubic millimeters (mm3).
-
-        :param unit: str, unit of the lesion volume. Default is 'mL'.
-        :return: float, volume of the lesion.
-        '''
-        vol_mm3 = self.dx * self.dy * self.dz * self.get_lesion_mask().sum()
-        if unit == 'mm3':
-            return vol_mm3
-        if unit == 'mL':
-            return vol_mm3 / 1000
-
-    def __repr__(self) -> str:
-        '''
-        Returns a string representation of the LesionPhantom object.
-
-        :return: str, string representation of the LesionPhantom object.
-        '''
-        repr = super().__repr__() + f'''
-        Number of lesions: {len(self._lesion_coords)}
-        Lesion locations [voxel index (z, x, y)]: {self._lesion_coords}
-        Mass effect: {self.mass_effect}
-        '''
-        return repr
+        self.lesions: List[ld.Lesion] = []
 
     @property
-    def spacings(self):
-        '''
-        Returns the voxel spacings of the phantom.
+    def warp_exclusion_mask(self) -> np.ndarray:
+        """Defines a mask of pixels that should not be warped (e.g., skull)."""
+        # This could be customized in a subclass, e.g., by segmenting the skull.
+        return self.get_skull_map() > 0
 
-        :return: tuple, voxel spacings (dz, dx, dy).
-        '''
-        return self.dz, self.dx, self.dy
+    @property
+    def warp_inclusion_mask(self) -> np.ndarray:
+        """Defines a mask of pixels that are allowed to be warped (e.g., brain tissue)."""
+        # Typically, this is the brain mask, excluding skull and air.
+        return self.get_brain_mask() > 0
 
-    def insert_lesion(self, lesion_type, volume=5, intensity=50,
-                      mass_effect=False, seed=None, **kwargs):
-        '''
-        Inserts a lesion of a specified type into the phantom array.
+    def resize(self, shape: Shape3D, **kwargs) -> None:
+        """Resizes the phantom array and adjusts spacings."""
+        # Note: Resizing will invalidate existing lesion masks.
+        if self.lesions:
+            print("Warning: Resizing phantom after lesion insertion. Lesion masks are now invalid.")
+            self.lesions = []
+        super().resize(shape, **kwargs)
 
-        :param lesion_type: str, type of the lesion. Options include 'IPH' (intraparenchymal), 'EDH' (epidural), and 'SDH' (subdural).
-        :param volume: float, volume of the lesion in mL. Default is 5.
-        :param intensity: int, CT number of the lesion in HU. Default is 50.
-        :param mass_effect: bool, whether to apply mass effect processing to displace brain tissue following lesion insertion. Default is False.
-        :param seed: int, optional seed for reproducible lesion insertion. Default is None.
-        :param kwargs: additional keyword arguments to pass to the lesion insertion function.
-        :return: self, the updated LesionPhantom object.
-        '''
-        if volume <= 0:
-            return self
-        self.lesion_type.append(lesion_type)
-        self.mass_effect = mass_effect
-        if lesion_type == 'IPH':
-            img_w_lesion, lesion_image, lesion_coords = \
-                self.add_round_lesion(volume=volume, intensity=intensity,
-                                      mass_effect=mass_effect, seed=seed, **kwargs)
-        elif lesion_type in ['EDH', 'SDH']:
-            img_w_lesion, lesion_image, lesion_coords = \
-                self._add_dural_lesion(volume, lesion_type, intensity,
-                                       mass_effect=mass_effect, seed=seed)
-        else:
-            raise ValueError(f'unknown lesion type passed: {lesion_type}. '
-                             'Currently accepts IPH (intraparenchymal), EDH (epidural), or SDH (subdural).')
+    def get_lesion_volume(self) -> float:
+        """Calculates the total volume of all lesions in mL."""
+        return sum(lesion.volume_ml for lesion in self.lesions)
+
+    def __repr__(self) -> str:
+        """Provides a detailed string representation of the phantom."""
+        base_repr = super().__repr__()
+        lesion_details = f"Number of lesions: {len(self.lesions)}\n"
+        if self.lesions:
+            for i, lesion in enumerate(self.lesions):
+                lesion_details += (
+                    f"  - Lesion {i+1}: {lesion.lesion_type}, "
+                    f"Volume: {lesion.volume_ml:.2f} mL, "
+                    f"Center: {lesion.coords_voxel}\n"
+                    f"Mass effect strength: {lesion.mass_effect}"
+                )
+        return f"{base_repr}\n{lesion_details}"
+
+    def insert_lesion(
+        self,
+        lesion: ld.Lesion,
+        mass_effect: Union[bool, float] = False,
+    ):
+        """
+        Primary method to insert a lesion of a specified type into the phantom.
+
+        Args:
+            lesion: Lesion object.
+            mass_effect: If False/0.0, no mass effect. If True, uses 1.0.
+                         A float controls the warp strength.
+        """
+        # add mass_effect
+        img_w_lesion = self.get_CT_number_phantom().copy()
+        img_w_lesion[lesion.mask] = lesion.image[lesion.mask]
+        mass_effect_strength = 0
+        if mass_effect is True:
+            mass_effect_strength = 1.0
+        elif isinstance(mass_effect, (float, int)):
+            mass_effect_strength = float(mass_effect)
+
+        if mass_effect_strength > 0:
+            img_w_lesion = self._apply_mass_effect(lesion.mask,
+                                                   mass_effect_strength)
+        lesion.mass_effect = mass_effect_strength
+        # correct and erroneaous voxels
+        intensity_hu = lesion.image[lesion.mask].mean()
+        diff = self.get_CT_number_phantom() - img_w_lesion
+        img_w_lesion[abs(diff) > intensity_hu] =\
+            self.get_CT_number_phantom()[abs(diff) > intensity_hu]
+
+        img_w_lesion[lesion.mask] = lesion.image[lesion.mask]
+
+        self.lesions.append(lesion)
         self._phantom = img_w_lesion
-        self._lesion.append(lesion_image)
-        self._lesion_coords.append(lesion_coords)
-        self.lesion_intensity.append(float(intensity))
         return self
 
-    def apply_transform(self, transform: RandAffine | Affine, seed=None):
-        if not self._lesion:
-            if seed:
-                transform.set_random_state(seed=seed)
-            self._phantom = transform(self._phantom)
-            return
-        self._phantom, self._lesion[0] =\
-            transform_image_label_pair(transform,
-                                       self._phantom,
-                                       self.get_lesion_mask(),
-                                       seed=seed)
+    def apply_transform(self, transform: Union[RandAffine, Affine],
+                        seed: int = None):
+        """
+        Applies an affine transformation to the phantom and all its lesion masks.
 
-    def add_round_lesion(self,
-                         volume: int = 10,
-                         intensity: int = 50,
-                         material: str = 'white matter',
-                         eccentricity: float = 0.5,
-                         mass_effect: bool | float = 0.5,
-                         edema: bool | int = False,
-                         complexity: int = 3,
-                         overlap: float = 0.4,
-                         seed: int | None = None,
-                         **kwargs) -> tuple:
-        '''
-        adds round lesion to img in random location within mask of size radius
-        and intensity level intensity
+        This method applies the given transformation to the internal phantom data
+        and to each lesion mask, ensuring they remain aligned. The transformation
+        modifies the object's state in-place.
 
-        See parameter descriptions below for further modifications that can
-        be added:
+        Args:
+            transform (RandAffine | Affine): The transformation to apply.
+            seed (int, optional): A seed for the random number generator to ensure
+                                  reproducibility, especially for RandAffine.
+        """
+        if seed is not None:
+            transform.set_random_state(seed=seed)
 
-        :param volume: int or list of ints, volume of the sphere lesion in mL,
-            if provided a list it will make concentric lesions
-        :param intensity: int or list of ints, intensity of the sphere lesion
-            in HU, if provided a list it will make concentric lesions of
-            intensities
-        :param material: which material region to insert lesion into,
-            self.materials for options
-        :param eccentricity: between 0, 1 defines how elongated the lesions
-            are, with 0 being spherical, 1 being very oblong
-        :param mass_effect: bool or float between [0, 1], if 0 or False no
-            mass effect is applied, a mass effect > 0 but < 1 controls mass
-            effect strength where 1 is a large degree of mass effect warping
-            and 0.2 is a smaller amount of warping, see
-            `insert_with_mass_effect` for more details
-        :param edema: bool or int, referring to the number of pixels thick of
-            an edema layer to add around the lesion
-        :param complexity: int, number of ellipses to aid with
-            random jiggle, 1 gives a single ellipsoid, increasing to 2 or 3
-            yields overlapping ellipsoids with a more complex shape.
-        :param overlap: float, allowed overlap with the white matter mask
-        :param seed: optional, defaults to None, set seed for reproducible
-            lesion insertion
+        # 1. Transform the main phantom image. If the transform is random, its
+        # parameters are now fixed ("realized") for subsequent calls.
+        self._phantom = transform(self._phantom[None])[0]
 
-        :return: img_w_lesion, lesion_vol, (z, x, y)
-        '''
-        rng = np.random.default_rng(seed)
+        # 2. Apply the *same* realized transform to each lesion mask
+        for lesion in self.lesions:
+            # MONAI expects a channel dimension (C, H, W, D) and float type for interpolation
+            transformed_mask = transform(lesion.mask[None].astype(np.float32))[0]
 
-        voxel_size = np.power(self.dx*self.dy*self.dz, 1/3)
-        r = sphere_radius_from_volume(volume) / voxel_size
-        img = self.get_CT_number_phantom()
-        mask = self.get_material_mask(material).astype(int)
+            # Binarize the result after interpolation and update the lesion's mask
+            lesion.mask = transformed_mask > 0.5
 
-        lesion_vol = np.zeros_like(img)
-        valid_points = distance_transform_edt(mask) > (r * overlap)
-        r_int = np.ceil(r).astype(int)
-        valid_points[:r_int] = False  # ensures lesion is not at the boundary of the phantom
-        valid_points[-r_int:] = False
-        if not valid_points.any():
-            raise RuntimeError(f'Requested volume: {volume} mL too \
-large, try smaller volume')
-        # lower distance threshold `r` to allow overlap
-        z, x, y = np.argwhere(valid_points)[rng.integers(0,
-                                            valid_points.sum())]
-
-        lesion_vol = np.full(img.shape, fill_value=-1000)
-        transform = RandAffine(prob=1, translate_range=[r, r])
-        transform.set_random_state(seed)
-        if os.name == 'nt':
-            seed = False  # windows compatibility, monai transform crashes windows kernel
-            transform = lambda o: o  # return self
-
-        for _ in range(complexity):
-            axes = get_semi_major_axes(eccentricity, seed)
-            foci = r * axes
-            if complexity > 1:
-                correction = np.power(3/(4*np.pi*complexity), 1/3)+overlap
+            # 3. Update lesion metadata to reflect the transformation
+            if lesion.mask.any():
+                lesion.coords_voxel = tuple(map(int, center_of_mass(lesion.mask)))
+                lesion.volume_ml = np.sum(lesion.mask) * (self.dx * self.dy * self.dz) / 1000.0
             else:
-                correction = 1
-            foci = foci*correction
-            sphere = elliptical_lesion(img.shape, center=(z, x, y),
-                                       radius=foci,
-                                       random_rotate=seed)
-            sphere = transform(sphere).astype(bool)
-            lesion_vol[sphere] = intensity
-        lesion_mask = lesion_vol > -1000
+                # If the lesion is transformed out of the image, handle it gracefully
+                lesion.coords_voxel = (-1, -1, -1)
+                lesion.volume_ml = 0.0
 
-        if edema:
-            edema_pixels = 5
-            edema_HU = 10
-            edema = edema_pixels if edema is True else edema
-            edema_mask = binary_erosion(lesion_mask,
-                                        np.ones(3*[edema])) ^ lesion_mask
-            lesion_vol[edema_mask] = edema_HU
-            lesion_mask = lesion_vol > -1000
-        lesion_mask = lesion_mask & ~self.get_skull_map()
-        img_w_lesion = img.copy()
-        img_w_lesion[lesion_mask] = lesion_vol[lesion_mask]
+    def _apply_mass_effect(self, object_mask: np.ndarray,
+                           mass_effect: float = 0.2) -> np.ndarray:
+        """
+        Applies a true 3D mass effect warp, feathered at the boundaries to reduce artifacts.
+        """
+        # Ensure object mask only contains valid pixels within the phantom and
+        # respects inclusion/exclusion zones.
+        object_mask &= self.warp_inclusion_mask
+        object_mask &= ~self.warp_exclusion_mask
 
-        if mass_effect:
-            if mass_effect is True:
-                mass_effect = 0.5
-            warped = self.insert_with_mass_effect(img,
-                                                  lesion_mask,
-                                                  strength=mass_effect)
-            warped[lesion_mask] = img_w_lesion[lesion_mask]
-            img_w_lesion[lesion_mask.sum(axis=(1, 2)) > 0] =\
-                warped[lesion_mask.sum(axis=(1, 2)) > 0]
+        img = self.get_CT_number_phantom()
+        # --- 1. Calculate the base 3D displacement field ---
+        _, indices = distance_transform_edt(~object_mask, return_indices=True)
+        output_coords = np.indices(self.shape, dtype=float).transpose(1, 2, 3, 0)
+        nearest_object_coords = indices.transpose(1, 2, 3, 0)
+        displacement_vectors = output_coords - nearest_object_coords
 
-        return img_w_lesion, lesion_mask, (z, x, y)
+        # --- 2. Scale the displacement field ---
+        num_object_pixels = np.sum(object_mask)
+        if num_object_pixels > 0:
+            max_displacement = np.cbrt(num_object_pixels)
+        else:
+            return img  # No warp if object mask is empty.
 
-    def insert_with_mass_effect(self, img, lesion, strength=1):
-        if img.ndim == 2:
-            img = img[None]
-        assert img.ndim == 3
+        decay_factor = 40.0 * mass_effect
+        distances = np.linalg.norm(displacement_vectors, axis=-1) + 1e-6
+        scale_factors = max_displacement * np.exp(-distances / decay_factor)
 
-        warped = np.zeros_like(img)
-        exclusion_mask = self.get_warp_exclusion_mask()
-        inclusion_mask = self.get_warp_inclusion_mask()
-        for idx in range(lesion.shape[0]):
-            if not lesion[idx].any():
-                continue
-            src_coords, dst_coords = self.get_warp_coordinates(lesion, idx)
-            warped[idx] = warp_slice(axial_slice=img[idx],
-                                     exclusion_mask=exclusion_mask[idx],
-                                     inclusion_mask=inclusion_mask[idx],
-                                     src=src_coords, dst=dst_coords,
-                                     hematoma_type='IPH')
-        return warped
+        scaled_displacement = (
+            displacement_vectors / distances[..., np.newaxis] * scale_factors[..., np.newaxis]
+        )
 
-    def get_warp_coordinates(self, lesion, idx):
-        # get lesion coordinates
-        src, dst = get_transformation_src_dst(lesion[idx])
-        warp_dst = np.argwhere(dst)
-        warp_src = np.argwhere(src)
-        return warp_src, warp_dst
+        # --- 3. Create a feathered alpha mask to smooth the warp at the boundary ---
+        inclusion_mask = self.warp_inclusion_mask
+        if not np.any(inclusion_mask):
+            return img  # Nothing to warp
 
-    def _add_dural_lesion(self, volume, lesion_type, intensity,
-                          seed=None, mass_effect=True):
+        # Calculate distance from every point inside the inclusion mask to its nearest edge.
+        dist_to_edge = distance_transform_edt(inclusion_mask)
 
-        HU_volume = self.get_CT_number_phantom()
-        lesion_vol, HU_volume = insert_dural(
-            phantom=self,
-            desired_volume=volume,
-            hematoma_type=lesion_type,
-            mass_effect=mass_effect,
-            seed=seed)
-        if not isinstance(HU_volume, np.ndarray):
-            HU_volume = HU_volume.numpy()
+        # Feathering transition zone in pixels.
+        feather_width = 20.0
 
-        img_w_lesion = HU_volume.copy()
-        img_w_lesion[lesion_vol] = intensity
-        z, x, y = center_of_mass(lesion_vol)
-        return img_w_lesion, lesion_vol, (int(z), int(x), int(y))
+        # Create a smooth alpha map: 1.0 deep inside, 0.0 at the edge.
+        alpha = np.clip(dist_to_edge / feather_width, 0.0, 1.0)
+
+        # Apply the alpha mask to the displacement field.
+        feathered_displacement = scaled_displacement * alpha[..., np.newaxis]
+
+        # --- 4. Create the final blended "flow field" ---
+        # The "pull" location for a pixel is its original position minus the displacement.
+        # This is applied everywhere, but displacement is zero outside the inclusion zone.
+        src_coords = output_coords - feathered_displacement
+
+        # --- 5. Apply the transformation using the flow field ---
+        final_src_coords_reshaped = src_coords.transpose(3, 0, 1, 2)
+
+        warped_img = map_coordinates(
+            img,
+            final_src_coords_reshaped,
+            order=1,
+            prefilter=True,
+            cval=np.min(img)
+        )
+
+        return warped_img.astype(img.dtype)
