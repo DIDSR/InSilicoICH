@@ -549,7 +549,7 @@ from {phantom_dir}')
             sutures = self.get_sutures()
             phantom[sutures] = 0  # assume water HU
         if self.add_fractures:
-            fractures = self.get_fractures(phi_degree=5)
+            fractures = self.get_fractures()
             phantom[fractures] = 0  # assume water HU
         phantom[phantom < 0] = self.materials['air']
 

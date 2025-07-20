@@ -157,7 +157,7 @@ class SkullFractureProjector:
 
     def centroid_ray_casting_random_walk(self, skull_mask=None, length=100, 
                                    phi_degree=random.uniform(0, 60), theta_degree=random.uniform(0, 360),
-                                   step_size=0.5, centroid=None):
+                                   step_size=0.5, centroid=None, move_centroid=True):
         """
         Generate fractures using ray casting with polar random walk directions.
         
@@ -205,6 +205,11 @@ class SkullFractureProjector:
         continuity_factor = 0.8
         delta_shift_degree_phi *= continuity_factor
         delta_shift_degree_theta *= continuity_factor
+
+        phi_degree_centroid = phi_degree
+        theta_degree_centroid = theta_degree
+        delta_shift_degree_phi_centroid = 2
+        delta_shift_degree_theta_centroid = 2
         
         print("Casting rays with random walk...")
         
@@ -218,12 +223,25 @@ class SkullFractureProjector:
                 1, np.deg2rad(180 - phi_degree), np.deg2rad(theta_degree)
             )
             
-            # # Calculate surface point by extending from centroid
-            # max_radius = 100 #np.linalg.norm(np.array(skull_mask.shape))
-            # surface_point = centroid + direction * max_radius
+            if move_centroid:
+                # Move centroid around over a sphere
+                direction_centroid = pv.spherical_to_cartesian(
+                    1, np.deg2rad(180 - phi_degree_centroid), np.deg2rad(theta_degree_centroid)
+                )
+                centroid_virtual = centroid + np.multiply(direction_centroid, 20)
+                pointer_centroid = random.choice([2, 3])
+                if pointer_centroid == 2:
+                    phi_degree_centroid += delta_shift_degree_phi_centroid * random.choice([-1, 1])
+                    theta_degree_centroid += delta_shift_degree_theta_centroid
+                elif pointer_centroid == 3:
+                    phi_degree_centroid += delta_shift_degree_phi_centroid
+                    theta_degree_centroid += delta_shift_degree_theta_centroid * random.choice([-1, 1])
             
             # Cast ray and get voxels to mark as fracture
-            ray_points = self._cast_ray_through_skull(centroid, direction, skull_mask, step_size)
+            if move_centroid:
+                ray_points = self._cast_ray_through_skull(centroid_virtual, direction, skull_mask, step_size)
+            else:
+                ray_points = self._cast_ray_through_skull(centroid, direction, skull_mask, step_size)
             
             # Mark ray points as fracture
             for rp in ray_points:
