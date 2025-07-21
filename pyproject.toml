@@ -7,7 +7,7 @@ authors = [
 ]
 description = "CT Simulations of virtual pediatric intracranial hemorrhage for computer aided triage device evaluation"
 readme = "README.rst"
-requires-python = "<3.13"
+requires-python = ">=3.11, <3.13"
 dependencies = [
   "python-dotenv",
   "nibabel",
@@ -17,6 +17,7 @@ dependencies = [
   "SimpleITK",
   "pydicom",
   "requests",
+  "noise",
   "tomli-w"
   # "VITools @ git+https://github.com/DIDSR/VITools.git"
 ]
@@ -37,8 +38,8 @@ Homepage = "https://github.com/DIDSR/InSilicoICH"
 Issues = "https://github.com/DIDSR/InSilicoICH/issues"
 
 [project.scripts]
-generate = "insilicoICH.study:insilicoich_cli"
-recruit = "insilicoICH.study:recruitment_cli"
+generate = "insilicoICH.study:run_simulation_cli"
+recruit = "insilicoICH.study:recruit_patients_cli"
 
 [project.entry-points."VITools"] # Must match PROJECT_NAME
 head_phantoms = "insilicoICH.phantoms.head_phantoms"

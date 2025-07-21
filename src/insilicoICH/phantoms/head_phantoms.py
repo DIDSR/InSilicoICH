@@ -5,6 +5,8 @@ module for working with phantoms
 from pathlib import Path
 import os
 from functools import partial
+from warnings import warn
+from typing import List
 
 import numpy as np
 import nibabel as nib
@@ -12,22 +14,18 @@ import SimpleITK as sitk
 import pandas as pd
 import skimage as ski
 from dotenv import load_dotenv
-from warnings import warn
-
 from skimage.morphology import (binary_closing,
                                 remove_small_holes,
                                 binary_dilation,
                                 binary_erosion)
 from monai.transforms import ResizeWithPadOrCrop
-
 from scipy.ndimage import distance_transform_edt
-
-from .base_phantoms import LesionPhantom, resize, get_mean_age, get_transformation_src_dst
-from .utils import download_and_extract_archive
 from VITools.hooks import hookimpl
-from ..annotations.skull.NIHPD_Head_Phantom.skull_fracture import SkullFracture
-import random
-from ..annotations.skull.NIHPD_Head_Phantom.fracture_projector import SkullFractureProjector
+
+from .base_phantoms import (LesionPhantom, resize,
+                            get_mean_age)
+from ..lesion_definition import Lesion
+from .utils import download_and_extract_archive
 
 
 load_dotenv()
@@ -68,11 +66,7 @@ class HeadPhantom(LesionPhantom):
             'skull': 900
             }
         self.patientid = 0
-        self._lesion = []
-        self._lesion_coords = []
-        self.lesion_type = []
-        self.lesion_intensity = []  # HU
-        self.mass_effect = False
+        self.lesions: List[Lesion] = []
         phantom, spacings = self.load_phantom(Path(phantom_dir))
         super().__init__(phantom, spacings, **kwargs)
         if shape:
@@ -96,12 +90,14 @@ class HeadPhantom(LesionPhantom):
     def get_lesion_mask(self):
         return self._lesion[0]
 
-    def get_warp_exclusion_mask(self):
+    @property
+    def warp_exclusion_mask(self):
         return self.get_skull_map().astype(bool)
 
-    def get_warp_inclusion_mask(self):
+    @property
+    def warp_inclusion_mask(self):
         return self.get_CT_number_phantom() > -900
-    
+
     def save_volume_nifti(self, volume: np.ndarray, affine: np.ndarray, path_save: str):
         """
         Saves volume as nifti with the given geometry as an affine matrix
@@ -121,6 +117,7 @@ class HeadPhantom(LesionPhantom):
         origin = affine[:3, 3]  # origin (translation component)
 
         return shape, origin, spacing, affine, array
+
 
 class MIDA_Head(HeadPhantom):
     name = 'MIDA Head'
@@ -151,7 +148,8 @@ and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
         spacings = dz, dx, dy
         return phantom, spacings
 
-    def get_warp_exclusion_mask(self):
+    @property
+    def warp_exclusion_mask(self):
         skull = self.get_skull_map()
         mask = np.zeros_like(skull, dtype=bool)
         for idx in range(self.shape[0]):
@@ -161,46 +159,16 @@ and place in your `PHANTOM_DIRECTORY`, see `load_phantom` for more details
             mask[idx] = skull_slice
         return mask
 
-    def get_warp_inclusion_mask(self):
+    @property
+    def warp_inclusion_mask(self):
         return np.where(self.warp_exclusion_mask, False, True)
-
-    def get_warp_coordinates(self, lesion, idx, strength=1):
-        # get lesion coordinates
-        src, dst = get_transformation_src_dst(lesion[idx], strength=strength)
-        src = np.argwhere(src)
-        dst = np.argwhere(dst)
-        skull_slice = self.warp_exclusion_mask[idx]
-        # using the entire inner boundary of the skull mask seems to work great as anchor points
-        skull_boundary = ski.segmentation.find_boundaries(skull_slice, mode='inner', background=0)
-        skull_sample = np.argwhere(skull_boundary)
-
-        warp_src = warp_dst = skull_sample  # initialize warp_src and warp_dst with the skull boundary voxels
-
-        src_subset = src[np.round(np.linspace(0, len(src)-1, 5)).astype(int)] # subsample points from the src points
-        dst_subset = dst[np.round(np.linspace(0, len(dst)-1, 5)).astype(int)] # subsample points from the dst points
-
-        warp_src = np.insert(warp_src, 0, src_subset, axis=0) # insert src subset into main warp list
-        warp_dst = np.insert(warp_dst, 0, dst_subset, axis=0) # insert dst subset into main warp list
-
-        # insert the four corner coordinates for added warp stability
-        warp_src = np.insert(warp_src, 0, [[0, 0],
-                                           [0, lesion.shape[1]],
-                                           [lesion.shape[0], 0],
-                                           [lesion.shape[0], lesion.shape[1]]
-                                           ], axis=0)
-        warp_dst = np.insert(warp_dst, 0, [[0, 0],
-                                           [0, lesion.shape[1]],
-                                           [lesion.shape[0], 0],
-                                           [lesion.shape[0], lesion.shape[1]]
-                                           ], axis=0)
-        return warp_src, warp_dst
 
     def _load_material_LUT(self):
         return pd.read_csv(os.path.join(Path(__file__).parent.resolve(),
                                         'MIDA_v1.csv'))
 
     def get_CT_number_phantom(self):
-        if len(self._lesion_coords) > 0:
+        if len(self.lesions) > 0:
             return self._phantom
         phantom = self._phantom
         material_lut = self.material_lut
@@ -269,17 +237,14 @@ class NIHPD_Head(HeadPhantom):
                  skull_seg_method='otsu', add_sutures=False, add_fractures=True):
         phantom_dir = Path(phantom_dir)
         self.age = age
-        self.patient_name = f'{age} yr {NIHPD_Head.name}'
+        self.patient_name = f'{age} yr {self.name}'
         self.symmetric = symmetric
         self.skull_seg_method = skull_seg_method
         self.add_sutures = add_sutures
-        self.add_fractures = add_fractures
-        self.threshold_degree_phi = 100
-        self.frectures_seg = None
         if not phantom_dir.exists():
             print(f'''
 `PHANTOM_DIRECTORY` {phantom_dir} not found, now downloading NIHPD phantoms
-from {NIHPD_Head.url}
+from {self.url}
 
 If you have already downloaded NIHPD and MIDA head phantoms, please see
 `load_phantom` for details on how to add their locations.
@@ -303,6 +268,7 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
                 "skull_mesh.vtk",
             )
         }
+            # download_and_extract_archive(self.url, phantom_dir)
         super().__init__(phantom_dir, shape, age=age, patient_name=self.patient_name)
 
     def load_phantom(self, phantom_dir):
@@ -371,42 +337,21 @@ from {phantom_dir}')
         spacings = self.dz, self.dx, self.dy
         return self._phantom, spacings
 
-    def get_warp_coordinates(self, lesion, idx, strength=1):
-        # get lesion coordinates
-        src, dst = get_transformation_src_dst(lesion[idx], strength=strength)
-        src = np.argwhere(src)
-        dst = np.argwhere(dst)
-        # use brain mask to define anchor points
-        skull_boundary = self.warp_exclusion_mask[idx]
-        skull_sample = np.argwhere(skull_boundary)
-
-        warp_src = warp_dst = skull_sample  # initialize warp_src and warp_dst with the skull boundary voxels
-
-        src_subset = src[np.round(np.linspace(0, len(src)-1, 5)).astype(int)] # subsample points from the src points
-        dst_subset = dst[np.round(np.linspace(0, len(dst)-1, 5)).astype(int)] # subsample points from the dst points
-
-        warp_src = np.insert(warp_src, 0, src_subset, axis=0) # insert src subset into main warp list
-        warp_dst = np.insert(warp_dst, 0, dst_subset, axis=0) # insert dst subset into main warp list
-
-        # insert the four corner coordinates for added warp stability
-        warp_src = np.insert(warp_src, 0, [[0, 0],
-                                           [0, lesion.shape[1]],
-                                           [lesion.shape[0], 0],
-                                           [lesion.shape[0], lesion.shape[1]]
-                                           ], axis=0)
-        warp_dst = np.insert(warp_dst, 0, [[0, 0],
-                                           [0, lesion.shape[1]],
-                                           [lesion.shape[0], 0],
-                                           [lesion.shape[0], lesion.shape[1]]
-                                           ], axis=0)
-        return warp_src, warp_dst
-
-    def get_warp_exclusion_mask(self):
+    @property
+    def warp_exclusion_mask(self):
         '''
         approximates the skull as the outer boundary of the brain mask
         '''
-        return ski.segmentation.find_boundaries(self.mask.astype(bool),
-                                                mode='outer', background=0)
+        mask = self.get_skull_map() |\
+            ski.segmentation.find_boundaries(self.mask.astype(bool),
+                                             mode='outer', background=0)
+        mask = ski.morphology.binary_dilation(mask, np.ones(3*[3]))
+        mask |= ~self.warp_inclusion_mask
+        return mask
+
+    @property
+    def warp_inclusion_mask(self):
+        return self.mask.astype(bool)
 
     def resize(self, shape=None):
         original_shape = self.csf.shape
@@ -427,7 +372,8 @@ from {phantom_dir}')
         new_spacings = np.array(original_shape) / np.array(new_shape) *\
             [self.dz, self.dx, self.dy]
         self.dz, self.dx, self.dy = new_spacings
-        self.nz, self.nx, self.ny = shape
+        self.nz, self.nx, self.ny = new_shape
+        return self
 
     def get_sutures(self, thickness=2, thresh=30):
         """
@@ -463,72 +409,6 @@ from {phantom_dir}')
         sutures = ski.morphology.dilation(sutures, np.ones(3*[thickness]))
         return sutures
 
-    def fetch_fractures_seg(self, length=None, phi_degree=None, theta_degree=None, seed=None):
-        """
-        Fetch the skull fracture with given parameters.
-        """
-        if seed is not None:
-            random.seed(seed)
-
-        if length is None:
-            length = random.randint(50, 200)
-
-        if phi_degree is None:
-            phi_degree = random.uniform(0, 60)
-
-        if theta_degree is None:
-            theta_degree = random.uniform(0, 360)
-
-        assert phi_degree <= self.threshold_degree_phi and phi_degree > 0, "requirement 0 < phi_degree < 100 is not met"
-
-        print(phi_degree, theta_degree)
-        skull = self.get_skull_map()
-        
-        skull_int = skull.astype(np.int32).transpose(2, 1, 0)[:, ::-1, :]
-        projector = SkullFractureProjector(skull_mask=skull_int)
-
-        # Perform ray casting projection
-        # Note: centroid is considered as the center of the 3D array
-        fractures_proj = projector.centroid_ray_casting_random_walk(length=length, phi_degree=phi_degree, theta_degree=theta_degree)
-
-        skull_int = skull_int.transpose(2, 1, 0)[:, ::-1, :]
-        fractures_proj = fractures_proj.transpose(2, 1, 0)[:, ::-1, :]
-        self.fracture_seg = fractures_proj
-    
-        return fractures_proj
-    
-    def get_fractures(self, length=None, phi_degree=None, theta_degree=None, seed=None):
-        """
-        returns fracture mask to the self skull
-
-        :param thickness: thickness in pixels of the fracture
-        :param thresh: distance threshold for fracture mask, smaller values means closer to the skull surface
-        :returns: boolean fracture mask that can be used to set skull fracture
-            values
-        """
-        if length is None:
-            length = random.randint(50, 200)
-
-        if phi_degree is None:
-            phi_degree = random.uniform(0, 60)
-
-        if theta_degree is None:
-            theta_degree = random.uniform(0, 360)
-
-        fractures_proj = self.fetch_fractures_seg(length=length, phi_degree=phi_degree, theta_degree=theta_degree, seed=seed)
-        fractures = fractures_proj.astype(bool)
-
-        return fractures
-
-    def get_fracture_seg_slice_labels(self):
-        """
-        Returns the binary array with 1 where fracture present in slice, and 0 where not present.
-        """
-        assert self.fracture_seg is not None, "self.fracture_seg is not available, refer get_fractures()"
-        binary_mask = np.any(self.fracture_seg > 0, axis=(1, 2)).astype(np.uint8)
-
-        return binary_mask
-
     def assign_HUs(self, feature_range=(-100, 100)):
         phantom = self.csf*self.materials['CSF'] +\
                     self.gm*self.materials['gray matter'] +\
@@ -548,9 +428,6 @@ from {phantom_dir}')
         if self.add_sutures:
             sutures = self.get_sutures()
             phantom[sutures] = 0  # assume water HU
-        if self.add_fractures:
-            fractures = self.get_fractures()
-            phantom[fractures] = 0  # assume water HU
         phantom[phantom < 0] = self.materials['air']
 
         # # TODO: dura map currently overlaps with new skull methods, need fix
@@ -558,10 +435,9 @@ from {phantom_dir}')
         return phantom
 
     def get_CT_number_phantom(self):
-        if len(self._lesion_coords) > 0:
+        if len(self.lesions) > 0:
             return self._phantom
         phantom = self.assign_HUs()
-
         return phantom
 
     def get_material_mask(self, material):
@@ -629,22 +505,8 @@ class UNC_Head(NIHPD_Head):
     name = 'UNC Head'
     url = 'https://www.nitrc.org/frs/download.php/14897/UNCInfant012Atlases-2022-10-21.zip'
 
-    def __init__(self, phantom_dir, age: float, symmetric=False, shape=None,
-                 skull_seg_method='otsu'):
-        phantom_dir = Path(phantom_dir)
-        self.age = age
-        self.skull_seg_method = skull_seg_method
-        if not phantom_dir.exists():
-            print(f'''
-`PHANTOM_DIRECTORY` {phantom_dir} not found, now downloading UNC phantoms
-from {UNC_Head.url}
-
-If you have already downloaded NIHPD and MIDA head phantoms, please see
-`load_phantom` for details on how to add their locations.
-''')
-            download_and_extract_archive(UNC_Head.url, phantom_dir, remove_finished=True)
-        super().__init__(phantom_dir, shape=shape, age=age)
-        self.patient_name = f'{age} yr {UNC_Head.name}'
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         # define material HU; 0-2 yr old based on cases in
         # https://physionet.org/content/ct-ich/1.3.1/ and 
@@ -768,19 +630,13 @@ If you have already downloaded NIHPD and MIDA head phantoms, please see
         phantom[sinous] = self.materials['CSF']  # approximates blood
         if self.skull_seg_method == 'pseudoct':
             phantom[self.skull] = self.pseudoct[self.skull]
+        if self.add_sutures:
+            sutures = self.get_sutures()
+            phantom[sutures] = 0  # assume water HU
         phantom[phantom < 0] = self.materials['air']
 
         # # TODO: dura map currently overlaps with new skull methods, need fix
         # phantom[self.get_dura_map()] = 50  # HU same as MIDA
-        return phantom
-
-    def get_CT_number_phantom(self, add_sutures=False):
-        if len(self._lesion_coords) > 0:
-            return self._phantom
-        phantom = self.assign_HUs()
-        if add_sutures:
-            sutures = self.get_sutures()
-            phantom[sutures] = 0  # assume water HU
         return phantom
 
     def get_head_mask(self):

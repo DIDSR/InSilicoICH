@@ -1,13 +1,5 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from VITools import read_dicom
-from insilicoICH.phantoms.base_phantoms import get_transformation_src_dst
-from insilicoICH.lesion_definition import warp_slice
-
-from ipywidgets import interact, IntSlider
-
-import matplotlib.pyplot as plt
-import numpy as np
 from VITools import read_dicom, get_available_phantoms
 
 from ipywidgets import interact, IntSlider
@@ -26,55 +18,18 @@ def load_phantom(age, shape=None):
     if age == 38.0:
         return available_phantoms[f'{age} yr MIDA Head'](shape=shape)
 
-def make_and_display_lesion(phantom, lesion_type='round', volume=2,
-                            mass_effect=0.5, intensity=100, edema=0, seed=42,
-                            complexity=1, slice_idx=None, show_mask=True):
-    boundary = phantom.get_skull_map()
-    img = phantom.get_CT_number_phantom()
-    if lesion_type == 'round':
-        img_w_lesion, lesion_vol, (z, x, y) =\
-            phantom.add_round_lesion(volume=volume, intensity=intensity,
-                                     seed=seed, edema=edema,
-                                     complexity=complexity)
-    elif lesion_type.endswith('dural'):
-        img_w_lesion, lesion_vol, (z, x, y) =\
-            phantom._add_dural_lesion(lesion_type=lesion_type, volume=volume,
-                                      intensity=intensity, seed=seed)
-    src, dst = get_transformation_src_dst(lesion_vol[z], mass_effect)
-    dst_coords = np.argwhere(dst)
-    src_coords = np.argwhere(src)
-    if mass_effect > 0:
-        warped = warp_slice(img[z],
-                            boundary[z],
-                            src_coords, dst_coords,
-                            hematoma_type=lesion_type)
-        warped[lesion_vol[z]] = img_w_lesion[z][lesion_vol[z]].copy()
-    else:
-        warped = img_w_lesion[z].copy()
-    f, axs = plt.subplots(1, 2)
-    ctshow(img_w_lesion[z], 'brain', fig=f, ax=axs[0])
-    if show_mask:
-        axs[0].imshow(src, alpha=0.2, cmap='Reds')
-        axs[0].set_title('src')
-
-    ctshow(warped, 'brain', fig=f, ax=axs[1])
-    if show_mask:
-        axs[1].imshow(src, alpha=0.2, cmap='Reds')
-        axs[1].imshow(dst, alpha=0.2, cmap='Reds')
-    axs[1].set_title(f'dst, mass_effect: {mass_effect}')
-    f.show()
-
 
 def show_lesions(phantom, display='brain'):
     n_lesions = len(phantom._lesion_coords)
     f, axs = plt.subplots(2, n_lesions, dpi=150, tight_layout=True)
     if n_lesions < 2:
         axs = axs[:, None]
-    for idx, (lesion, coords) in enumerate(zip(phantom._lesion, phantom._lesion_coords)):
-        ctshow(phantom.get_CT_number_phantom()[coords[0]], display, ax=axs[0, idx], fig=f)
-        axs[0, idx].set_title(f'slice {coords[0]}')
-        ctshow(phantom.get_CT_number_phantom()[coords[0]], display, ax=axs[1, idx], fig=f)
-        axs[1, idx].imshow(lesion[coords[0]], cmap='Reds', alpha=0.3)
+    for idx, lesion in enumerate(phantom.lesions):
+        z = lesion.coords_voxel[0]
+        ctshow(phantom.get_CT_number_phantom()[z], display, ax=axs[0, idx], fig=f)
+        axs[0, idx].set_title(f'slice {z}')
+        ctshow(phantom.get_CT_number_phantom()[z], display, ax=axs[1, idx], fig=f)
+        axs[1, idx].imshow(lesion[z], cmap='Reds', alpha=0.3)
         axs[1, idx].set_title(f'{phantom.lesion_type[idx]}')
 
 
@@ -187,3 +142,22 @@ def study_viewer(metadata):
              name=metadata.name.unique(),
              display=display_settings.keys(),
              slice_idx=IntSlider(value=slices[len(slices)//2], min=min(slices), max=max(slices)))
+
+
+def generate_distinct_colors(num_colors, colormap_name='viridis'):
+    """
+    Generates a list of distinct colors from a Matplotlib colormap.
+
+    Args:
+        num_colors (int): The desired number of distinct colors.
+        colormap_name (str): The name of the Matplotlib colormap to use.
+                             Common options include 'viridis', 'plasma', 'inferno',
+                             'magma', 'cividis', 'tab10', 'Paired', etc.
+
+    Returns:
+        list: A list of RGBA tuples representing the distinct colors.
+    """
+    cmap = plt.colormaps[colormap_name]
+    # Sample the colormap evenly across its range
+    colors = [cmap(i) for i in np.linspace(0, 1, num_colors)]
+    return colors
