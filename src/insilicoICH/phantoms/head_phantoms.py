@@ -26,10 +26,6 @@ from .base_phantoms import (LesionPhantom, resize,
                             get_mean_age)
 from ..lesion_definition import Lesion
 from .utils import download_and_extract_archive
-from VITools.hooks import hookimpl
-from ..annotations.skull.NIHPD_Head_Phantom.skull_fracture import SkullFracture
-import random
-from ..annotations.skull.NIHPD_Head_Phantom.fracture_projector import SkullFractureProjector
 
 
 load_dotenv()
@@ -101,7 +97,7 @@ class HeadPhantom(LesionPhantom):
     @property
     def warp_inclusion_mask(self):
         return self.get_CT_number_phantom() > -900
-    
+
     def save_volume_nifti(self, volume: np.ndarray, affine: np.ndarray, path_save: str):
         """
         Saves volume as nifti with the given geometry as an affine matrix
@@ -121,6 +117,7 @@ class HeadPhantom(LesionPhantom):
         origin = affine[:3, 3]  # origin (translation component)
 
         return shape, origin, spacing, affine, array
+
 
 class MIDA_Head(HeadPhantom):
     name = 'MIDA Head'
@@ -244,9 +241,6 @@ class NIHPD_Head(HeadPhantom):
         self.symmetric = symmetric
         self.skull_seg_method = skull_seg_method
         self.add_sutures = add_sutures
-        self.add_fractures = add_fractures
-        self.threshold_degree_phi = 100
-        self.frectures_seg = None
         if not phantom_dir.exists():
             print(f'''
 `PHANTOM_DIRECTORY` {phantom_dir} not found, now downloading NIHPD phantoms
@@ -415,72 +409,6 @@ from {phantom_dir}')
         sutures = ski.morphology.dilation(sutures, np.ones(3*[thickness]))
         return sutures
 
-    def fetch_fractures_seg(self, length=None, phi_degree=None, theta_degree=None, seed=None):
-        """
-        Fetch the skull fracture with given parameters.
-        """
-        if seed is not None:
-            random.seed(seed)
-
-        if length is None:
-            length = random.randint(50, 200)
-
-        if phi_degree is None:
-            phi_degree = random.uniform(0, 60)
-
-        if theta_degree is None:
-            theta_degree = random.uniform(0, 360)
-
-        assert phi_degree <= self.threshold_degree_phi and phi_degree > 0, "requirement 0 < phi_degree < 100 is not met"
-
-        print(phi_degree, theta_degree)
-        skull = self.get_skull_map()
-        
-        skull_int = skull.astype(np.int32).transpose(2, 1, 0)[:, ::-1, :]
-        projector = SkullFractureProjector(skull_mask=skull_int)
-
-        # Perform ray casting projection
-        # Note: centroid is considered as the center of the 3D array
-        fractures_proj = projector.centroid_ray_casting_random_walk(length=length, phi_degree=phi_degree, theta_degree=theta_degree)
-
-        skull_int = skull_int.transpose(2, 1, 0)[:, ::-1, :]
-        fractures_proj = fractures_proj.transpose(2, 1, 0)[:, ::-1, :]
-        self.fracture_seg = fractures_proj
-    
-        return fractures_proj
-    
-    def get_fractures(self, length=None, phi_degree=None, theta_degree=None, seed=None):
-        """
-        returns fracture mask to the self skull
-
-        :param thickness: thickness in pixels of the fracture
-        :param thresh: distance threshold for fracture mask, smaller values means closer to the skull surface
-        :returns: boolean fracture mask that can be used to set skull fracture
-            values
-        """
-        if length is None:
-            length = random.randint(50, 200)
-
-        if phi_degree is None:
-            phi_degree = random.uniform(0, 60)
-
-        if theta_degree is None:
-            theta_degree = random.uniform(0, 360)
-
-        fractures_proj = self.fetch_fractures_seg(length=length, phi_degree=phi_degree, theta_degree=theta_degree, seed=seed)
-        fractures = fractures_proj.astype(bool)
-
-        return fractures
-
-    def get_fracture_seg_slice_labels(self):
-        """
-        Returns the binary array with 1 where fracture present in slice, and 0 where not present.
-        """
-        assert self.fracture_seg is not None, "self.fracture_seg is not available, refer get_fractures()"
-        binary_mask = np.any(self.fracture_seg > 0, axis=(1, 2)).astype(np.uint8)
-
-        return binary_mask
-
     def assign_HUs(self, feature_range=(-100, 100)):
         phantom = self.csf*self.materials['CSF'] +\
                     self.gm*self.materials['gray matter'] +\
@@ -500,9 +428,6 @@ from {phantom_dir}')
         if self.add_sutures:
             sutures = self.get_sutures()
             phantom[sutures] = 0  # assume water HU
-        if self.add_fractures:
-            fractures = self.get_fractures(phi_degree=5)
-            phantom[fractures] = 0  # assume water HU
         phantom[phantom < 0] = self.materials['air']
 
         # # TODO: dura map currently overlaps with new skull methods, need fix
