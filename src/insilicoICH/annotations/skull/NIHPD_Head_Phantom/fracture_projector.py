@@ -193,8 +193,9 @@ class SkullFractureProjector:
         
         # Random walk control parameters (from original code)
         list_switch = [2, 3]
-        switch_counter = 1
         list_reset_counter_wait = [10, 20, 30, 40, 50]
+
+        switch_counter = 1
         list_reset_counter_wait_index = 0
         pointer = list_switch[random.randint(0, len(list_switch) - 1)]
         
@@ -208,8 +209,12 @@ class SkullFractureProjector:
 
         phi_degree_centroid = phi_degree
         theta_degree_centroid = theta_degree
-        delta_shift_degree_phi_centroid = 2
-        delta_shift_degree_theta_centroid = 2
+        delta_shift_degree_phi_centroid = 1
+        delta_shift_degree_theta_centroid = 1
+
+        switch_counter_centroid = 1
+        list_reset_counter_wait_index_centroid = 0
+        pointer_centroid = list_switch[random.randint(0, len(list_switch) - 1)]
         
         print("Casting rays with random walk...")
         
@@ -228,14 +233,23 @@ class SkullFractureProjector:
                 direction_centroid = pv.spherical_to_cartesian(
                     1, np.deg2rad(180 - phi_degree_centroid), np.deg2rad(theta_degree_centroid)
                 )
-                centroid_virtual = centroid + np.multiply(direction_centroid, 20)
-                pointer_centroid = random.choice([2, 3])
-                if pointer_centroid == 2:
-                    phi_degree_centroid += delta_shift_degree_phi_centroid * random.choice([-1, 1])
-                    theta_degree_centroid += delta_shift_degree_theta_centroid
-                elif pointer_centroid == 3:
-                    phi_degree_centroid += delta_shift_degree_phi_centroid
-                    theta_degree_centroid += delta_shift_degree_theta_centroid * random.choice([-1, 1])
+                centroid_virtual = centroid + np.multiply(direction_centroid, 50)
+                centroid_virtual = np.round(centroid_virtual).astype(int)
+
+                if (switch_counter_centroid % list_reset_counter_wait[list_reset_counter_wait_index_centroid] == 0):
+                    list_reset_counter_wait_index_centroid = random.randint(0, len(list_reset_counter_wait) - 1)
+                    switch_counter_centroid = 1
+                    pointer_centroid = list_switch[random.randint(0, len(list_switch) - 1)]
+            
+                switch_counter_centroid += 1
+
+                if phi_degree_centroid < 100:
+                    if pointer_centroid == 2:
+                        phi_degree_centroid += delta_shift_degree_phi_centroid * random.choice([-1, 1])
+                        theta_degree_centroid += delta_shift_degree_theta_centroid
+                    elif pointer_centroid == 3:
+                        phi_degree_centroid += delta_shift_degree_phi_centroid
+                        theta_degree_centroid += delta_shift_degree_theta_centroid * random.choice([-1, 1])
             
             # Cast ray and get voxels to mark as fracture
             if move_centroid:
