@@ -32,67 +32,93 @@ LESION_TYPES = list(LesionPhantom.lesion_types)
 # =============================================================================
 
 
-def get_lesion_mask(scanner: Scanner,
-                    views=300) -> dict | None:
-    '''
-    Generates a binary mask of lesions in the CT image space.
+class MaskHandler:
+    """
+    Handles the generation and retrieval of lesion masks from CT images.
+    This class encapsulates the logic for creating lesion masks based on
+    the main phantom and its lesions.
+    """
 
-    This is done by:
-    1. Creating a temporary phantom containing only the lesion (lesion as 0 HU, background as -1000 HU).
-    2. Simulating a noiseless, artifact-free scan and reconstruction of this lesion-only phantom.
-    3. Thresholding the resulting lesion-only image to create a mask.
-    4. Optionally, combining this with a mask of the body from the main
-    reconstruction to ensure the lesion mask is within the body.
+    def __init__(self, scanner: Scanner):
+        self.scanner = scanner
 
-    Args:
-        scanner (Scanner): The Scanner object with the main phantom loaded.
-        views (int): Number of projection views for the scan simulation. More views leads to a higher quality mask.
+    def get_lesion_mask(self,
+                        views: int = 300) -> dict | None:
+        '''
+        Generates a binary mask of lesions in the CT image space.
 
-    Returns:
-        dict | None: A 3D boolean NumPy array representing the lesion mask in the
-                            dimensions of the main reconstruction. Returns None if the
-                            original phantom has no lesion defined or if reconstruction
-                            has not been performed.
-    '''
-    if not scanner.phantom.lesions:
-        return
+        This is done by:
+        1. Creating a temporary phantom containing only the lesion (lesion as 0 HU, background as -1000 HU).
+        2. Simulating a noiseless, artifact-free scan and reconstruction of this lesion-only phantom.
+        3. Thresholding the resulting lesion-only image to create a mask.
+        4. Optionally, combining this with a mask of the body from the main
+        reconstruction to ensure the lesion mask is within the body.
 
-    lesion_ids = []
-    recon = scanner.recon.copy()
-    for lesion in scanner.phantom.lesions:
-        startZ, endZ = scanner.scan_coverage
-        lesion_phantom = deepcopy(scanner.phantom)
-        lesion_phantom._phantom = np.where(lesion.mask, 0, -1000)
-        lesion_phantom.patient_name = 'lesion only'
-        lesion_dir = scanner.output_dir / 'lesion_mask'
-        lesion_only = Scanner(lesion_phantom,
-                              scanner_model=scanner.scanner_model,
-                              materials={
-                              'ICRU_lung_adult_healthy': -1000,
-                              'water': -100},
-                              output_dir=lesion_dir)
-        lesion_only.xcist.cfg.physics.energyCount = 2
-        lesion_only.xcist.cfg.physics.monochromatic = -1
-        lesion_only.xcist.cfg.physics.enableElectronicNoise = 0
-        lesion_only.xcist.cfg.physics.enableQuantumNoise = 0
+        Args:
+            scanner (Scanner): The Scanner object with the main phantom loaded.
+            views (int): Number of projection views for the scan simulation. More views leads to a higher quality mask.
 
-        lesion_only.run_scan(mA=500, views=views, startZ=startZ, endZ=endZ,
-                             pitch=scanner.pitch)
-        lesion_only.run_recon(slice_thickness=scanner.slice_thickness,
-                              slice_increment=scanner.slice_increment,
-                              fov=scanner.xcist.cfg.recon.fov)
-        if lesion.lesion_type == 'Fracture':
-            print('fracture')
-        if recon is not None:
-            mask = (lesion_only.recon > -950) & (recon > -300)
-        else:
-            mask = lesion_only.recon > -950
+        Returns:
+            dict | None: A 3D boolean NumPy array representing the lesion mask in the
+                                dimensions of the main reconstruction. Returns None if the
+                                original phantom has no lesion defined or if reconstruction
+                                has not been performed.
+        '''
+        scanner = self.scanner
+        if not scanner.phantom.lesions:
+            return
 
-        lesion_ids.append({'lesion': lesion.lesion_type,
-                           'mask': mask,
-                           'intensity_hu': lesion.intensity_hu})
-    rmtree(lesion_dir)
-    return lesion_ids
+        lesion_ids = []
+        recon = scanner.recon.copy()
+        for lesion in scanner.phantom.lesions:
+            startZ, endZ = scanner.scan_coverage
+            lesion_phantom = deepcopy(scanner.phantom)
+            lesion_phantom._phantom = np.where(lesion.mask, 0, -1000)
+            lesion_phantom.patient_name = 'lesion only'
+            lesion_dir = scanner.output_dir / 'lesion_mask'
+            lesion_only = Scanner(lesion_phantom,
+                                  scanner_model=scanner.scanner_model,
+                                  materials={
+                                  'ICRU_lung_adult_healthy': -1000,
+                                  'water': -100},
+                                  output_dir=lesion_dir)
+            lesion_only.xcist.cfg.physics.energyCount = 2
+            lesion_only.xcist.cfg.physics.monochromatic = -1
+            lesion_only.xcist.cfg.physics.enableElectronicNoise = 0
+            lesion_only.xcist.cfg.physics.enableQuantumNoise = 0
+
+            lesion_only.run_scan(mA=500, views=int(views), startZ=startZ, endZ=endZ,
+                                 pitch=scanner.pitch)
+            lesion_only.run_recon(slice_thickness=scanner.slice_thickness,
+                                  slice_increment=scanner.slice_increment,
+                                  fov=scanner.xcist.cfg.recon.fov)
+            if recon is not None:
+                mask = (lesion_only.recon > -950) & (recon > -300)
+            else:
+                mask = lesion_only.recon > -950
+
+            lesion_ids.append({'lesion': lesion.lesion_type,
+                               'mask': mask,
+                               'intensity_hu': lesion.intensity_hu})
+        rmtree(lesion_dir)
+        self.lesion_ids = lesion_ids
+        return self
+
+    def get_segmentation_mask(self) -> np.ndarray:
+        """
+        Generates a segmentation mask from the lesion IDs.
+
+        Returns:
+            np.ndarray: A 3D array where each voxel is labeled with the lesion ID.
+        """
+        if not hasattr(self, 'lesion_ids'):
+            raise ValueError("Lesion IDs not generated. Call get_lesion_mask() first.")
+
+        segmentation = np.zeros_like(self.scanner.recon)
+        for id, lesion in enumerate(self.lesion_ids):
+            mask = lesion['mask']
+            segmentation[mask > 0] = id + 1  # +1 to avoid zero for background
+        return segmentation.astype(int)
 
 
 class DistributionManager:
@@ -187,7 +213,8 @@ class ICHStudy(Study):
         lesion_rules = {
             'EDH': {'vol_limit': float('inf'), 'att_limit': 45},
             'SDH': {'vol_limit': float('inf'), 'att_limit': 45},
-            'IPH': {'vol_limit': 50, 'att_limit': 45}
+            'IPH': {'vol_limit': 50, 'att_limit': 45},
+            'Fracture': {'vol_limit': float('inf'), 'att_limit': -950}
         }
 
         study_params = []
@@ -270,6 +297,7 @@ class ICHStudy(Study):
                 irregularity=getattr(series, 'irregularity', 0.2),
                 eccentricity=getattr(series, 'eccentricity', 0.6),
                 edema=getattr(series, 'edema', 0),
+                fracture_length=getattr(series, 'fracture_length', 0),
                 # Pass other relevant params from series to generate...
             )
 
@@ -306,17 +334,24 @@ class ICHStudy(Study):
         series = self.metadata.iloc[patient_id]
 
         # Initialize default values
-        mask_path, lesion_coords, vol_by_slice_ml, slice_intensity = None, None, 0, 0
+        mask_path = None
+        lesion_coords = []
+        vol_by_slice_ml = []
+        intensities = []
+        volumes = []
+        types = []
 
         if pd.notna(series.subtype):
             # Generate and write lesion mask
-            mask_vol = get_lesion_mask(self.scanner)
+            handler = MaskHandler(self.scanner)
+            handler.get_lesion_mask(views=series.views)
+            segmentation_map = handler.get_segmentation_mask()
 
             # --- Create a temporary study object to write the mask ---
             # This avoids modifying the main scanner's recon attribute
             recon = self.scanner.recon.copy() if self.scanner.recon is not None else None
             mask_scanner = self.scanner
-            mask_scanner.recon = mask_vol
+            mask_scanner.recon = segmentation_map
             dicom_path = Path(series.output_directory) / 'lesion_masks'
             patient_name = self.scanner.phantom.patient_name
             mask_path = mask_scanner.write_to_dicom(dicom_path / f'{patient_name}_mask.dcm')
@@ -326,18 +361,35 @@ class ICHStudy(Study):
             spacings = [float(dcm.SliceThickness)] + list(map(float, dcm.PixelSpacing))
             voxel_vol_ml = np.prod(spacings) / 1000.0
 
-            vol_by_slice_ml = mask_vol.sum(axis=(1, 2)) * voxel_vol_ml
-
-            z, y, x = center_of_mass(mask_vol) # Note: order is z,y,x for numpy
-            lesion_coords = f"[{z:.1f}, {y:.1f}, {x:.1f}]"
-
-            slice_intensity = recon[mask_vol].mean() if recon is not None else 0
+        for idx, row in results.iterrows():
+            img = recon[idx]
+            coords = ""
+            lesion_type = ""
+            vol_by_slice_ml = 0
+            lesion_intensity = 0
+            for lesion in handler.lesion_ids:
+                mask_vol = lesion['mask'][idx]
+                vol_by_slice_ml += mask_vol.sum() * voxel_vol_ml
+                if mask_vol.sum() > 0:
+                    if lesion_type:
+                        lesion_type += ', '
+                    lesion_type += lesion['lesion']
+                y, x = center_of_mass(mask_vol)
+                z = idx
+                if coords:
+                    coords += ', '
+                coords = coords + f"[{z:.1f}, {y:.1f}, {x:.1f}]"
+                lesion_intensity += img[mask_vol > -1000].mean()
+            volumes.append(vol_by_slice_ml)
+            intensities.append(lesion_intensity)
+            lesion_coords.append(coords)
+            types.append(lesion_type)
 
         # Update results DataFrame
-        rows = results.case_id == f'case_{patient_id:04d}'
-        results.loc[rows, 'subtype'] = series.subtype
-        results.loc[rows, 'lesion_volume(mL)'] = vol_by_slice_ml
-        results.loc[rows, 'lesion_attenuation(HU)'] = slice_intensity
+        rows = results.case_id == f'case_{patient_id:04d}' # should be row by row specific
+        results.loc[rows, 'lesion'] = types
+        results.loc[rows, 'lesion_volume(mL)'] = volumes
+        results.loc[rows, 'lesion_attenuation(HU)'] = intensities
         results.loc[rows, 'mass_effect'] = series.mass_effect
         results.loc[rows, 'lesion_location(z,y,x)'] = lesion_coords
         results.loc[rows, 'mask_file_path'] = mask_path
