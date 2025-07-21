@@ -32,64 +32,64 @@ LESION_TYPES = list(LesionPhantom.lesion_types)
 # =============================================================================
 
 
-def get_lesion_mask(scanner: Scanner,
-                    views=300) -> dict | None:
-    '''
-    Generates a binary mask of lesions in the CT image space.
+# def get_lesion_mask(scanner: Scanner,
+#                     views=300) -> dict | None:
+#     '''
+#     Generates a binary mask of lesions in the CT image space.
 
-    This is done by:
-    1. Creating a temporary phantom containing only the lesion (lesion as 0 HU, background as -1000 HU).
-    2. Simulating a noiseless, artifact-free scan and reconstruction of this lesion-only phantom.
-    3. Thresholding the resulting lesion-only image to create a mask.
-    4. Optionally, combining this with a mask of the body from the main
-    reconstruction to ensure the lesion mask is within the body.
+#     This is done by:
+#     1. Creating a temporary phantom containing only the lesion (lesion as 0 HU, background as -1000 HU).
+#     2. Simulating a noiseless, artifact-free scan and reconstruction of this lesion-only phantom.
+#     3. Thresholding the resulting lesion-only image to create a mask.
+#     4. Optionally, combining this with a mask of the body from the main
+#     reconstruction to ensure the lesion mask is within the body.
 
-    Args:
-        scanner (Scanner): The Scanner object with the main phantom loaded.
-        views (int): Number of projection views for the scan simulation.
+#     Args:
+#         scanner (Scanner): The Scanner object with the main phantom loaded.
+#         views (int): Number of projection views for the scan simulation.
 
-    Returns:
-        dict | None: A 3D boolean NumPy array representing the lesion mask in the
-                            dimensions of the main reconstruction. Returns None if the
-                            original phantom has no lesion defined or if reconstruction
-                            has not been performed.
-    '''
-    if not scanner.phantom.lesions:
-        return
+#     Returns:
+#         dict | None: A 3D boolean NumPy array representing the lesion mask in the
+#                             dimensions of the main reconstruction. Returns None if the
+#                             original phantom has no lesion defined or if reconstruction
+#                             has not been performed.
+#     '''
+#     if not scanner.phantom.lesions:
+#         return
 
-    startZ, endZ = scanner.scan_coverage
-    lesion_phantom = deepcopy(scanner.phantom)
-    lesion_phantom.patient_name = 'lesion only'
-    lesion_dir = scanner.output_dir / 'lesion_mask'
-    lesion_only = Scanner(lesion_phantom,
-                          scanner_model=scanner.scanner_model,
-                          materials={
-                          'ICRU_lung_adult_healthy': -1000,
-                          'water': -100},
-                          output_dir=lesion_dir)
-    lesion_only.xcist.cfg.physics.energyCount = 2
-    lesion_only.xcist.cfg.physics.monochromatic = -1
-    lesion_only.xcist.cfg.physics.enableElectronicNoise = 0
-    lesion_only.xcist.cfg.physics.enableQuantumNoise = 0
+#     startZ, endZ = scanner.scan_coverage
+#     lesion_phantom = deepcopy(scanner.phantom)
+#     lesion_phantom.patient_name = 'lesion only'
+#     lesion_dir = scanner.output_dir / 'lesion_mask'
+#     lesion_only = Scanner(lesion_phantom,
+#                           scanner_model=scanner.scanner_model,
+#                           materials={
+#                           'ICRU_lung_adult_healthy': -1000,
+#                           'water': -100},
+#                           output_dir=lesion_dir)
+#     lesion_only.xcist.cfg.physics.energyCount = 2
+#     lesion_only.xcist.cfg.physics.monochromatic = -1
+#     lesion_only.xcist.cfg.physics.enableElectronicNoise = 0
+#     lesion_only.xcist.cfg.physics.enableQuantumNoise = 0
 
-    lesion_ids = []
-    for lesion in scanner.phantom.lesions:
-        ground_truth_lesion = np.where(lesion.mask, 0, -1000)
-        lesion_phantom._phantom = ground_truth_lesion
+#     lesion_ids = []
+#     for lesion in scanner.phantom.lesions:
+#         ground_truth_lesion = np.where(lesion.mask, 0, -1000)
+#         lesion_phantom._phantom = ground_truth_lesion
 
-        lesion_only.run_scan(mA=500, views=views, startZ=startZ, endZ=endZ,
-                             pitch=scanner.pitch)
-        lesion_only.run_recon(slice_thickness=scanner.slice_thickness,
-                              slice_increment=scanner.slice_increment)
+#         lesion_only.run_scan(mA=500, views=views, startZ=startZ, endZ=endZ,
+#                              pitch=scanner.pitch)
+#         lesion_only.run_recon(slice_thickness=scanner.slice_thickness,
+#                               slice_increment=scanner.slice_increment)
 
-        mask = (lesion_only.recon > -950)
-        if scanner.recon is not None:
-            mask = mask & (scanner.recon > -300)
-        lesion_ids.append({'lesion': lesion.lesion_type,
-                           'mask': mask,
-                           'intensity_hu': lesion.intensity_hu})
-    rmtree(lesion_dir)
-    return lesion_ids
+#         mask = (lesion_only.recon > -950)
+#         if scanner.recon is not None:
+#             mask = mask & (scanner.recon > -300)
+#         lesion_ids.append({'lesion': lesion.lesion_type,
+#                            'mask': mask,
+#                            'intensity_hu': lesion.intensity_hu})
+#     rmtree(lesion_dir)
+#     return lesion_ids
 
 
 class DistributionManager:

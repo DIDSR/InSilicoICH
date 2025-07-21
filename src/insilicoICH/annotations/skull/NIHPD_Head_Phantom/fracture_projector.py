@@ -2,7 +2,8 @@ import numpy as np
 import os
 import sys
 import skimage as ski
-import random  # suggest using numpy's rng for reproducibility
+from typing import Optional
+# import random  # suggest using numpy's rng for reproducibility
 import pyvista as pv
 
 main_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), *[".."] * 5))
@@ -14,11 +15,13 @@ class SkullFractureProjector:
     Complete skull fracture projection system using centroid-based ray casting.
     """
 
-    def __init__(self, skull_mask, fracture_annotations=None):
+    def __init__(self, skull_mask, fracture_annotations=None, seed: Optional[int] = None):
         self.skull_mask = skull_mask
         self.fracture_annotations = fracture_annotations
         self.projected_fractures = None
         self.threshold_degree_phi = 100
+        self.seed = seed if seed is not None else np.random.randint(0, 2**31 - 1)
+        self.random = np.random.default_rng(self.seed)
 
     def morph_closing(self, array: np.ndarray, kernel_size: int):
         array_closed = ski.morphology.closing(array, np.ones(3*[kernel_size]))
@@ -155,9 +158,9 @@ class SkullFractureProjector:
         # This should return appropriate delta values for phi and theta
         return .5, .5  # Default small angular steps
 
-    def centroid_ray_casting_random_walk(self, skull_mask=None, length=100, 
-                                   phi_degree=random.uniform(0, 60), theta_degree=random.uniform(0, 360),
-                                   step_size=0.5, centroid=None):
+    def centroid_ray_casting_random_walk(self, skull_mask=None, length=100,
+                                         phi_degree=None, theta_degree=None,
+                                         step_size=0.5, centroid=None):
         """
         Generate fractures using ray casting with polar random walk directions.
 
@@ -172,6 +175,9 @@ class SkullFractureProjector:
         Returns:
         projected_fractures: 3D array with fractures projected through skull thickness
         """
+        phi_degree = phi_degree or self.random.uniform(0, 60)
+        theta_degree = theta_degree or self.random.uniform(0, 360)
+
         if skull_mask is None:
             skull_mask = self.skull_mask
 
@@ -196,7 +202,7 @@ class SkullFractureProjector:
         switch_counter = 1
         list_reset_counter_wait = [10, 20, 30, 40, 50]
         list_reset_counter_wait_index = 0
-        pointer = list_switch[random.randint(0, len(list_switch) - 1)]
+        pointer = list_switch[self.random.integers(0, len(list_switch) - 1)]
 
         # Calculate angular spacing (you'll need to implement this based on your existing method)
         delta_shift_degree_phi, delta_shift_degree_theta = self._get_angular_spacing()
@@ -232,26 +238,26 @@ class SkullFractureProjector:
 
             # Random walk logic (from original code)
             if (switch_counter % list_reset_counter_wait[list_reset_counter_wait_index] == 0):
-                list_reset_counter_wait_index = random.randint(0, len(list_reset_counter_wait) - 1)
+                list_reset_counter_wait_index = self.random.integers(0, len(list_reset_counter_wait) - 1)
                 switch_counter = 1
-                pointer = list_switch[random.randint(0, len(list_switch) - 1)]
+                pointer = list_switch[self.random.integers(0, len(list_switch) - 1)]
 
             switch_counter += 1
 
             # Update angles based on pointer
             if pointer == 0:
-                phi_degree += delta_shift_degree_phi * random.choice([-1, 1])
+                phi_degree += delta_shift_degree_phi * self.random.choice([-1, 1])
             elif pointer == 1:
-                theta_degree += delta_shift_degree_theta * random.choice([-1, 1])
+                theta_degree += delta_shift_degree_theta * self.random.choice([-1, 1])
             elif pointer == 2:
-                phi_degree += delta_shift_degree_phi * random.choice([-1, 1])
+                phi_degree += delta_shift_degree_phi * self.random.choice([-1, 1])
                 theta_degree += delta_shift_degree_theta
             elif pointer == 3:
                 phi_degree += delta_shift_degree_phi
-                theta_degree += delta_shift_degree_theta * random.choice([-1, 1])
+                theta_degree += delta_shift_degree_theta * self.random.choice([-1, 1])
             elif pointer == 4:
-                phi_degree += delta_shift_degree_phi * random.choice([-1, 1])
-                theta_degree += delta_shift_degree_theta * random.choice([-1, 1])
+                phi_degree += delta_shift_degree_phi * self.random.choice([-1, 1])
+                theta_degree += delta_shift_degree_theta * self.random.choice([-1, 1])
 
         self.projected_fractures = projected_fractures
         print("Random walk ray casting complete!")

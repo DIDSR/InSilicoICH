@@ -497,8 +497,10 @@ class FractureLesion(Lesion):
         self.threshold_degree_phi = 100
         self.fracture_seg = None
 
-    def generate(self, length) -> "FractureLesion":
-        self.mask = self.get_fractures(length=length, phi_degree=5)
+    def generate(self, length, phi=None, theta=None) -> "FractureLesion":
+        self.phi_degree = phi
+        self.theta_degree = theta
+        self.mask = self.get_fractures(length=length)
         self.image = self.mask.astype(np.float32)
         self.coords_voxel = tuple(map(int, center_of_mass(self.mask)))
         self.volume_ml = np.sum(self.mask) * self.voxel_volume_ml
@@ -523,7 +525,8 @@ class FractureLesion(Lesion):
 
         print(phi_degree, theta_degree)       
         skull_int = self.skull.astype(np.int32).transpose(2, 1, 0)[:, ::-1, :]
-        projector = SkullFractureProjector(skull_mask=skull_int)
+        projector = SkullFractureProjector(skull_mask=skull_int,
+                                           seed=self.seed)
 
         # Perform ray casting projection
         # Note: centroid is considered as the center of the 3D array
@@ -535,7 +538,7 @@ class FractureLesion(Lesion):
 
         return fractures_proj
 
-    def get_fractures(self, length=None, phi_degree=None, theta_degree=None):
+    def get_fractures(self, length=None):
         """
         returns fracture mask to the self skull
 
@@ -547,13 +550,12 @@ class FractureLesion(Lesion):
         if length is None:
             length = self.rng.integers(50, 200)
 
-        if phi_degree is None:
-            phi_degree = self.rng.uniform(0, 60)
+        self.phi_degree = self.phi_degree or self.rng.uniform(0, 60)
+        self.theta_degree = self.theta_degree or self.rng.uniform(0, 360)
 
-        if theta_degree is None:
-            theta_degree = self.rng.uniform(0, 360) # repeated from fetch_fractures_seg
-
-        fractures_proj = self.fetch_fractures_seg(length=length, phi_degree=phi_degree, theta_degree=theta_degree)
+        fractures_proj = self.fetch_fractures_seg(length=length,
+                                                  phi_degree=self.phi_degree,
+                                                  theta_degree=self.theta_degree)
         fractures = fractures_proj.astype(bool)
 
         return fractures
