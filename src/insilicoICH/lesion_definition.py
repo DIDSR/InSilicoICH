@@ -497,10 +497,10 @@ class FractureLesion(Lesion):
         self.threshold_degree_phi = 100
         self.fracture_seg = None
 
-    def generate(self, length, phi=None, theta=None) -> "FractureLesion":
+    def generate(self, fracture_length, phi=None, theta=None, **kwargs) -> "FractureLesion":
         self.phi_degree = phi
         self.theta_degree = theta
-        self.mask = self.get_fractures(length=length)
+        self.mask = self.get_fractures(length=fracture_length)
         self.image = self.mask.astype(np.float32)
         self.coords_voxel = tuple(map(int, center_of_mass(self.mask)))
         self.volume_ml = np.sum(self.mask) * self.voxel_volume_ml

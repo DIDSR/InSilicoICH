@@ -200,7 +200,8 @@ class ICHStudy(Study):
         lesion_phantoms = [
             k for k, v in phantoms if
             isinstance(v, partial) and
-            issubclass(v.func, LesionPhantom)
+            issubclass(v.func, LesionPhantom) and
+            str(v.func) != "<class 'InSilicoLVO.phantoms.LVO_MIDA'>" # LVO MIDA not yet for recent lesion updates, fix soon
             ]
         base_df = super().generate_from_distributions(lesion_phantoms, study_count, **kwargs)
         rng = np.random.default_rng(base_df['global_seed'].iloc[0])
@@ -258,7 +259,7 @@ class ICHStudy(Study):
             params['age'] = age
             mass_effect = [0.4, 0.6] if mass_effect is True else mass_effect
             params['mass_effect'] = rng.uniform(low=min(mass_effect), high=max(mass_effect)) if mass_effect else False
-            params['fracture_length'] = rng.choice(range(*fracture_length)) if lesion_type in ['EDH', 'SDH'] else 0
+            params['fracture_length'] = rng.choice(range(*fracture_length)) if lesion_type in ['EDH', 'SDH', 'Fracture'] else 0
             params['add_augmentation'] = add_augmentation
             study_params.append(params)
 
@@ -277,6 +278,8 @@ class ICHStudy(Study):
                 boundary = phantom.get_dura_map()
             elif series.subtype == 'IPH':
                 boundary = phantom.get_material_mask('white matter')
+            elif series.subtype == 'Fracture':
+                boundary = phantom.get_skull_map()
             else:
                 boundary = None
 
@@ -310,7 +313,7 @@ class ICHStudy(Study):
                                                 spacings=phantom.spacings,
                                                 boundary=phantom.get_skull_map(),
                                                 seed=series.case_seed)
-                fracture.generate(length=series.fracture_length)
+                fracture.generate(fracture_length=series.fracture_length)
                 phantom.insert_lesion(fracture)
 
         # Check for augmentation flag, disable on Windows if needed
@@ -374,12 +377,12 @@ class ICHStudy(Study):
                     if lesion_type:
                         lesion_type += ', '
                     lesion_type += lesion['lesion']
-                y, x = center_of_mass(mask_vol)
-                z = idx
-                if coords:
-                    coords += ', '
-                coords = coords + f"[{z:.1f}, {y:.1f}, {x:.1f}]"
-                lesion_intensity += img[mask_vol > -1000].mean()
+                    y, x = center_of_mass(mask_vol)
+                    z = idx
+                    if coords:
+                        coords += ', '
+                    coords = coords + f"[{z:.1f}, {y:.1f}, {x:.1f}]"
+                    lesion_intensity += img[mask_vol > -1000].mean()
             volumes.append(vol_by_slice_ml)
             intensities.append(lesion_intensity)
             lesion_coords.append(coords)
