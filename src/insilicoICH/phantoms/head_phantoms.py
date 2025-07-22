@@ -384,8 +384,8 @@ from {phantom_dir}')
             values
         """
         src_dir = Path(__file__).parents[1]
-        fname = src_dir / 'annotations/suture/NIHPD_Head_Phantom/labelmap.nrrd'
-        data = sitk.GetArrayFromImage(sitk.ReadImage(fname)).transpose(2, 1, 0)[::-1, ::-1]
+        fname = src_dir / 'annotations/suture/NIHPD_Head_Phantom/skull_sutures.nii.gz'
+        data = sitk.GetArrayFromImage(sitk.ReadImage(fname))[::-1, ::-1, :]
         skull = self.get_skull_map()
         dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
         if (dx < 0) | (dy < 0) | (dz < 0):

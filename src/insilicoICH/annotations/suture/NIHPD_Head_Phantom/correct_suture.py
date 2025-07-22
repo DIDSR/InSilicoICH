@@ -78,6 +78,7 @@ def get_nifti_info(nifti_path):
 def nrrd_to_nifti(path_nrrd, path_save_nifti):
     # Load NRRD file
     nrrd_data, nrrd_header = nrrd.read(path_nrrd)
+    nrrd_data = adjust_array_roll_manual(nrrd_data, shift=1, axis=1)
 
     # Extract space directions and origin
     space_directions = nrrd_header.get("space directions")
@@ -123,9 +124,7 @@ def resample_to_target_sitk(source_path, target_path, output_path, interp="linea
     sitk.WriteImage(resampled, output_path)
 
 
-def adjust_array_roll_manual(data):
-    shift = 36
-    axis = 1
+def adjust_array_roll_manual(data, shift, axis):
     shifted = np.roll(data, shift=shift, axis=axis)
 
     # Optional: zero out the wrapped-around part
@@ -163,21 +162,7 @@ corrected_suture_nifti_path = os.path.join(
     "sutures.nii",
 )
 
-nrrd_to_nifti(
-    suture_nrrd_path,
-    os.path.join(
-        main_directory,
-        "src/insilicoICH/annotations/suture/NIHPD_Head_Phantom",
-        "labelmap.nii",
-    ),
-)
-
-array_corrected_suture, affine_corrected_suture = resize_to_target(
-    source_path=suture_nifti_path,
-    target_path=reference_nifti_path,
-)
-
-save_nifti(array_corrected_suture, affine_corrected_suture, corrected_suture_nifti_path)
+nrrd_to_nifti(suture_nrrd_path, suture_nifti_path)
 
 resample_to_target_sitk(
     suture_nifti_path, reference_nifti_path, corrected_suture_nifti_path
@@ -200,5 +185,5 @@ corrected_suture_nifti_path_adjuste_shifted = os.path.join(
 shape, origin, spacing, affine, array = get_nifti_info(
     corrected_suture_nifti_path_adjusted
 )
-array = adjust_array_roll_manual(array)
+array = adjust_array_roll_manual(array, shift=35, axis=1)
 save_nifti(array, affine, corrected_suture_nifti_path_adjuste_shifted)
