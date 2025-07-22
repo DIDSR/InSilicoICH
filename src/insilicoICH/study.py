@@ -361,7 +361,7 @@ class ICHStudy(Study):
             spacings = [float(dcm.SliceThickness)] + list(map(float, dcm.PixelSpacing))
             voxel_vol_ml = np.prod(spacings) / 1000.0
 
-        for idx, row in results.iterrows():
+        for idx in range(len(results)):
             img = recon[idx]
             coords = ""
             lesion_type = ""
