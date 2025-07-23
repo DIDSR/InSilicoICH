@@ -7,7 +7,7 @@ authors = [
 ]
 description = "CT Simulations of virtual pediatric intracranial hemorrhage for computer aided triage device evaluation"
 readme = "README.rst"
-requires-python = "<3.13"
+requires-python = ">=3.11, <3.13"
 dependencies = [
   "python-dotenv",
   "nibabel",
@@ -17,6 +17,7 @@ dependencies = [
   "SimpleITK",
   "pydicom",
   "requests",
+  "noise",
   "tomli-w"
   # "VITools @ git+https://github.com/DIDSR/VITools.git"
 ]
