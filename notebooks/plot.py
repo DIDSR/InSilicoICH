@@ -8,7 +8,6 @@ from matplotlib import patches
 from skimage.measure import regionprops
 from scipy.ndimage import find_objects
 from tqdm.auto import tqdm
-import pandas as pd
 
 
 def ct_windowed(image: np.ndarray, window: int = 80, level: int = 40) -> np.ndarray:

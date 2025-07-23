@@ -98,6 +98,26 @@ class HeadPhantom(LesionPhantom):
     def warp_inclusion_mask(self):
         return self.get_CT_number_phantom() > -900
 
+    def save_volume_nifti(self, volume: np.ndarray, affine: np.ndarray, path_save: str):
+        """
+        Saves volume as nifti with the given geometry as an affine matrix
+        """
+        nifti_img = nib.Nifti1Image(volume, affine)
+        nib.save(nifti_img, path_save)
+
+    def get_nifti_info(self, nifti_path):
+        """
+        Returns the nifti geometry.
+        """
+        img = nib.load(nifti_path)
+        array = img.get_fdata()
+        shape = img.shape  # (z, y, x) or (x, y, z), depending on orientation
+        affine = img.affine  # 4x4 affine transformation matrix
+        spacing = np.sqrt((affine[:3, :3] ** 2).sum(axis=0))  # voxel spacing
+        origin = affine[:3, 3]  # origin (translation component)
+
+        return shape, origin, spacing, affine, array
+
 
 class MIDA_Head(HeadPhantom):
     name = 'MIDA Head'
@@ -214,7 +234,7 @@ class NIHPD_Head(HeadPhantom):
     url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
 
     def __init__(self, phantom_dir, age: float, symmetric=False, shape=None,
-                 skull_seg_method='otsu', add_sutures=True):
+                 skull_seg_method='otsu', add_sutures=False, add_fractures=True):
         phantom_dir = Path(phantom_dir)
         self.age = age
         self.patient_name = f'{age} yr {self.name}'
@@ -229,7 +249,26 @@ from {self.url}
 If you have already downloaded NIHPD and MIDA head phantoms, please see
 `load_phantom` for details on how to add their locations.
 ''')
-            download_and_extract_archive(self.url, phantom_dir)
+            download_and_extract_archive(NIHPD_Head.url, phantom_dir)
+        self.dict_skull_paths = {
+            "path_mesh_brainmask": os.path.join(
+                Path(__file__).parents[1],
+                "annotations/skull/NIHPD_Head_Phantom/assets",
+                "mesh_brain.vtk",
+            ),
+            "path_mask_brain": phantom_dir / "nihpd_asym_04.5-08.5_mask.nii",
+            "path_file_config": os.path.join(
+                Path(__file__).parents[1],
+                "annotations/skull/NIHPD_Head_Phantom/assets",
+                "config.toml",
+            ),
+            "path_skull_mesh": os.path.join(
+                Path(__file__).parents[1],
+                "annotations/skull/NIHPD_Head_Phantom/assets",
+                "skull_mesh.vtk",
+            )
+        }
+            # download_and_extract_archive(self.url, phantom_dir)
         super().__init__(phantom_dir, shape, age=age, patient_name=self.patient_name)
 
     def load_phantom(self, phantom_dir):
@@ -345,8 +384,8 @@ from {phantom_dir}')
             values
         """
         src_dir = Path(__file__).parents[1]
-        fname = src_dir / 'annotations/suture/NIHPD_Head_Phantom/labelmap.nrrd'
-        data = sitk.GetArrayFromImage(sitk.ReadImage(fname)).transpose(2, 1, 0)[::-1, ::-1]
+        fname = src_dir / 'annotations/suture/NIHPD_Head_Phantom/skull_sutures.nii.gz'
+        data = sitk.GetArrayFromImage(sitk.ReadImage(fname))[::-1, ::-1, :]
         skull = self.get_skull_map()
         dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
         if (dx < 0) | (dy < 0) | (dz < 0):
