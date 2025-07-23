@@ -16,8 +16,8 @@ age=[0, 100]  # range in yrs [min, max]
 subtype=['IPH', 'SDH', 'EDH'] # add [false] for hemorrhage-absent cases
 mass_effect=true  # whether lesions displace brain tissue
 edema=[0, 15]  # edema width range [min, max] in pixels
-lesionVolume='src/insilicoICH/distributions/BHSD_volume_distributions.csv'  # str or list
-lesionAttenuation='src/insilicoICH/distributions/BHSD_HU_distributions.csv'  # str or list
+lesion_volume='src/insilicoICH/distributions/BHSD_volume_distributions.csv'  # str or list
+lesion_attenuation='src/insilicoICH/distributions/BHSD_HU_distributions.csv'  # str or list
 
 [acquisition]
 scanner_model=['GE_Lightspeed16','Scanner_Default']
