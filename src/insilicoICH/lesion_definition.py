@@ -536,6 +536,7 @@ class FractureLesion(Lesion):
         
         if thickness is not None:
             fractures_proj = ski.morphology.dilation(fractures_proj, np.ones(3*[thickness]))
+            fractures_proj = fractures_proj * skull_int
 
         skull_int = skull_int.transpose(2, 1, 0)[:, ::-1, :]
         fractures = fractures_proj.transpose(2, 1, 0)[:, ::-1, :].astype(bool)
