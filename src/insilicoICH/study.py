@@ -24,6 +24,7 @@ from .lesion_definition import LesionFactory
 
 # --- Constants and Configuration ---
 LESION_TYPES = list(LesionPhantom.lesion_types)
+src_dir = Path(__file__).parent
 
 # =============================================================================
 # MODULE 1: CONFIGURATION AND DATA MANAGEMENT
@@ -207,6 +208,10 @@ class ICHStudy(Study):
         rng = np.random.default_rng(base_df['global_seed'].iloc[0])
 
         # Use the DistributionManager for clean handling of inputs
+        if lesion_volume is None:
+            lesion_volume = src_dir / 'distributions' / 'BHSD_volume_distributions.csv'
+        if lesion_attenuation is None:
+            lesion_attenuation = src_dir / 'distributions' / 'BHSD_HU_distributions.csv'
         vol_manager = DistributionManager(lesion_volume)
         att_manager = DistributionManager(lesion_attenuation)
 
