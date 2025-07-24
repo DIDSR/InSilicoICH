@@ -505,38 +505,8 @@ class FractureLesion(Lesion):
         self.coords_voxel = tuple(map(int, center_of_mass(self.mask)))
         self.volume_ml = np.sum(self.mask) * self.voxel_volume_ml
         self.intensity_hu = 0
+
         return self
-
-    def fetch_fractures_seg(self, length=None, phi_degree=None, theta_degree=None):
-        """
-        Fetch the skull fracture with given parameters.
-        """
-
-        if length is None:
-            length = self.rng.integers(50, 200)
-
-        if phi_degree is None:
-            phi_degree = self.rng.uniform(0, 60)
-
-        if theta_degree is None:
-            theta_degree = self.rng.uniform(0, 360)
-
-        assert phi_degree <= self.threshold_degree_phi and phi_degree > 0, "requirement 0 < phi_degree < 100 is not met"
-
-        print(phi_degree, theta_degree)       
-        skull_int = self.skull.astype(np.int32).transpose(2, 1, 0)[:, ::-1, :]
-        projector = SkullFractureProjector(skull_mask=skull_int,
-                                           seed=self.seed)
-
-        # Perform ray casting projection
-        # Note: centroid is considered as the center of the 3D array
-        fractures_proj = projector.centroid_ray_casting_random_walk(length=length, phi_degree=phi_degree, theta_degree=theta_degree)
-
-        skull_int = skull_int.transpose(2, 1, 0)[:, ::-1, :]
-        fractures_proj = fractures_proj.transpose(2, 1, 0)[:, ::-1, :]
-        self.fracture_seg = fractures_proj
-
-        return fractures_proj
 
     def get_fractures(self, length=None):
         """
@@ -552,11 +522,21 @@ class FractureLesion(Lesion):
 
         self.phi_degree = self.phi_degree or self.rng.uniform(0, 60)
         self.theta_degree = self.theta_degree or self.rng.uniform(0, 360)
+        assert self.phi_degree <= self.threshold_degree_phi and self.phi_degree > 0, "requirement 0 < phi_degree < 100 is not met"
 
-        fractures_proj = self.fetch_fractures_seg(length=length,
-                                                  phi_degree=self.phi_degree,
-                                                  theta_degree=self.theta_degree)
-        fractures = fractures_proj.astype(bool)
+        skull_int = self.skull.astype(np.int32).transpose(2, 1, 0)[:, ::-1, :]
+        projector = SkullFractureProjector(skull_mask=skull_int,
+                                           seed=self.seed)
+
+        # Perform ray casting projection
+        # Note: centroid is considered as the center of the 3D array
+        fractures_proj = projector.centroid_ray_casting_random_walk(
+            length=length, phi_degree=self.phi_degree,
+            theta_degree=self.theta_degree)
+
+        skull_int = skull_int.transpose(2, 1, 0)[:, ::-1, :]
+        fractures = fractures_proj.transpose(2, 1, 0)[:, ::-1, :].astype(bool)
+        self.fracture_seg = fractures
 
         return fractures
 

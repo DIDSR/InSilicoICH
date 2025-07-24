@@ -3,6 +3,7 @@ import os
 import sys
 import skimage as ski
 from typing import Optional
+from scipy.ndimage import center_of_mass
 # import random  # suggest using numpy's rng for reproducibility
 import pyvista as pv
 
@@ -186,10 +187,7 @@ class SkullFractureProjector:
 
         if centroid is None:
             # Use center of the volume for simplicity
-            shape_skull_mask = skull_mask.shape
-            centroid = np.array([int(shape_skull_mask[0] / 2),
-                                int(shape_skull_mask[1] / 2),
-                                shape_skull_mask[2] - 82])     # Note: temprary fix
+            centroid = center_of_mass(skull_mask)
 
         print(f"Starting random walk fracture generation with {length} iterations")
         print(f"Skull centroid at: {centroid}")
@@ -243,19 +241,19 @@ class SkullFractureProjector:
                 centroid_virtual = np.round(centroid_virtual).astype(int)
 
                 if (switch_counter_centroid % list_reset_counter_wait[list_reset_counter_wait_index_centroid] == 0):
-                    list_reset_counter_wait_index_centroid = random.randint(0, len(list_reset_counter_wait) - 1)
+                    list_reset_counter_wait_index_centroid = self.random.integers(0, len(list_reset_counter_wait) - 1)
                     switch_counter_centroid = 1
-                    pointer_centroid = list_switch[random.randint(0, len(list_switch) - 1)]
+                    pointer_centroid = list_switch[self.random.integers(0, len(list_switch) - 1)]
 
                 switch_counter_centroid += 1
 
                 if phi_degree_centroid < 100:
                     if pointer_centroid == 2:
-                        phi_degree_centroid += delta_shift_degree_phi_centroid * random.choice([-1, 1])
+                        phi_degree_centroid += delta_shift_degree_phi_centroid * self.random.choice([-1, 1])
                         theta_degree_centroid += delta_shift_degree_theta_centroid
                     elif pointer_centroid == 3:
                         phi_degree_centroid += delta_shift_degree_phi_centroid
-                        theta_degree_centroid += delta_shift_degree_theta_centroid * random.choice([-1, 1])
+                        theta_degree_centroid += delta_shift_degree_theta_centroid * self.random.choice([-1, 1])
 
             # Cast ray and get voxels to mark as fracture
             if move_centroid:
