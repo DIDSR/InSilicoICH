@@ -497,10 +497,10 @@ class FractureLesion(Lesion):
         self.threshold_degree_phi = 100
         self.fracture_seg = None
 
-    def generate(self, fracture_length, phi=None, theta=None, **kwargs) -> "FractureLesion":
+    def generate(self, fracture_length, phi=None, theta=None, thickness=None, **kwargs) -> "FractureLesion":
         self.phi_degree = phi
         self.theta_degree = theta
-        self.mask = self.get_fractures(length=fracture_length)
+        self.mask = self.get_fractures(length=fracture_length, thickness=thickness)
         self.image = self.mask.astype(np.float32)
         self.coords_voxel = tuple(map(int, center_of_mass(self.mask)))
         self.volume_ml = np.sum(self.mask) * self.voxel_volume_ml
@@ -508,7 +508,7 @@ class FractureLesion(Lesion):
 
         return self
 
-    def get_fractures(self, length=None):
+    def get_fractures(self, length=None, thickness=None):
         """
         returns fracture mask to the self skull
 
@@ -533,6 +533,9 @@ class FractureLesion(Lesion):
         fractures_proj = projector.centroid_ray_casting_random_walk(
             length=length, phi_degree=self.phi_degree,
             theta_degree=self.theta_degree)
+        
+        if thickness is not None:
+            fractures_proj = ski.morphology.dilation(fractures_proj, np.ones(3*[thickness]))
 
         skull_int = skull_int.transpose(2, 1, 0)[:, ::-1, :]
         fractures = fractures_proj.transpose(2, 1, 0)[:, ::-1, :].astype(bool)
