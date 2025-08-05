@@ -100,7 +100,7 @@ class MaskHandler:
 
             lesion_ids.append({'lesion': lesion.lesion_type,
                                'mask': mask,
-                               'intensity_hu': lesion.intensity_hu})
+                               'intensity_hu': lesion.intensity_HU})
         rmtree(lesion_dir)
         self.lesion_ids = lesion_ids
         return self
