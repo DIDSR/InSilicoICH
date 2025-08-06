@@ -19,7 +19,7 @@ dependencies = [
   "requests",
   "noise",
   "tomli-w"
-  # "VITools @ git+https://github.com/DIDSR/VITools.git"
+  "VITools @ git+https://github.com/DIDSR/VITools.git"
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
