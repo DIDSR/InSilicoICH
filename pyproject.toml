@@ -18,7 +18,8 @@ dependencies = [
   "pydicom",
   "requests",
   "noise",
-  "tomli-w"
+  "tomli-w",
+  "pyvista",
   "VITools @ git+https://github.com/DIDSR/VITools.git"
 ]
 classifiers = [
