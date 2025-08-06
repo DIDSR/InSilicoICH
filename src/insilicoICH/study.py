@@ -174,6 +174,15 @@ class ICHStudy(Study):
     """
     Manages the generation and execution of in silico ICH virtual trials.
     """
+
+    # Define lesion-specific sampling rules in a config dictionary
+    lesion_rules = {
+        'EDH': {'vol_limit': float('inf'), 'att_limit': 45},
+        'SDH': {'vol_limit': float('inf'), 'att_limit': 45},
+        'IPH': {'vol_limit': 50, 'att_limit': 45},
+        'Fracture': {'vol_limit': float('inf'), 'att_limit': -950}
+    }
+
     @classmethod
     def generate_from_distributions(
         cls,
@@ -201,8 +210,7 @@ class ICHStudy(Study):
         lesion_phantoms = [
             k for k, v in phantoms if
             isinstance(v, partial) and
-            issubclass(v.func, LesionPhantom) and
-            str(v.func) != "<class 'InSilicoLVO.phantoms.LVO_MIDA'>" # LVO MIDA not yet for recent lesion updates, fix soon
+            issubclass(v.func, LesionPhantom)
             ]
         base_df = super().generate_from_distributions(lesion_phantoms, study_count, **kwargs)
         rng = np.random.default_rng(base_df['global_seed'].iloc[0])
@@ -214,14 +222,6 @@ class ICHStudy(Study):
             lesion_attenuation = src_dir / 'distributions' / 'BHSD_HU_distributions.csv'
         vol_manager = DistributionManager(lesion_volume)
         att_manager = DistributionManager(lesion_attenuation)
-
-        # Define lesion-specific sampling rules in a config dictionary
-        lesion_rules = {
-            'EDH': {'vol_limit': float('inf'), 'att_limit': 45},
-            'SDH': {'vol_limit': float('inf'), 'att_limit': 45},
-            'IPH': {'vol_limit': 50, 'att_limit': 45},
-            'Fracture': {'vol_limit': float('inf'), 'att_limit': -950}
-        }
 
         study_params = []
         for i in range(study_count):
@@ -238,10 +238,10 @@ class ICHStudy(Study):
             params['edema'] = 0
 
             if lesion_type:
-                rules = lesion_rules[lesion_type]
+                rules = cls.lesion_rules[lesion_type]
                 # Improved sampling loop to avoid potential infinite loops
                 vol, intensity = 0, 0
-                for _ in range(100): # Max 100 retries
+                for _ in range(100):  # Max 100 retries
                     vol = vol_manager.sample(lesion_type, rng)
                     if vol <= rules['vol_limit']: break
                 for _ in range(100):
@@ -271,55 +271,60 @@ class ICHStudy(Study):
         ich_df = pd.DataFrame(study_params)
         return base_df.join(ich_df)
 
+    def add_lesion(self, phantom, patient_id: int = 0):
+        # This part assumes Lesion objects from your other module are available
+        # and can be created via a factory.
+        series = self.metadata.iloc[patient_id]
+        if series.subtype in ['SDH', 'EDH']:
+            boundary = phantom.get_dura_map()
+        elif series.subtype == 'IPH':
+            boundary = phantom.get_material_mask('white matter')
+        elif series.subtype == 'Fracture':
+            boundary = phantom.get_skull_map()
+        else:
+            boundary = None
+
+        lesion_params = {
+            'spacings': phantom.spacings,
+            'seed': series.case_seed,
+            'boundary': boundary
+        }
+
+        lesion_obj = LesionFactory.create(series.subtype, **lesion_params)
+        lesion_obj.generate(
+            volume_ml=series.lesion_volume,
+            intensity_hu=series.lesion_attenuation,
+            texture_contrast=getattr(series, 'texture_contrast', 0),
+            texture_scale=getattr(series, 'texture_scale', 12),
+            complexity=getattr(series, 'complexity', 0),
+            smoothness=getattr(series, 'smoothness', 0.2),
+            irregularity=getattr(series, 'irregularity', 0.2),
+            eccentricity=getattr(series, 'eccentricity', 0.6),
+            edema=getattr(series, 'edema', 0),
+            fracture_length=getattr(series, 'fracture_length', 0),
+            # Pass other relevant params from series to generate...
+        )
+
+        # This assumes your phantom has an `insert_lesion` method
+        # that takes a generated lesion object.
+        phantom.insert_lesion(lesion_obj, mass_effect=series.mass_effect)
+        # Insert fracture if applicable
+        if series.subtype in ['EDH', 'SDH'] and series.fracture_length > 0:
+            fracture = LesionFactory.create('Fracture',
+                                            spacings=phantom.spacings,
+                                            boundary=phantom.get_skull_map(),
+                                            seed=series.case_seed)
+            fracture.generate(fracture_length=series.fracture_length)
+            phantom.insert_lesion(fracture)
+        return phantom
+
     def load_phantom(self, patient_id: int = 0):
         """Loads the base phantom and inserts a lesion based on study parameters."""
         phantom = super().load_phantom(patient_id)
         series = self.metadata.iloc[patient_id]
 
         if pd.notna(series.get('subtype')) and series.get('lesion_volume', 0) > 0:
-            # This part assumes Lesion objects from your other module are available
-            # and can be created via a factory.
-            if series.subtype in ['SDH', 'EDH']:
-                boundary = phantom.get_dura_map()
-            elif series.subtype == 'IPH':
-                boundary = phantom.get_material_mask('white matter')
-            elif series.subtype == 'Fracture':
-                boundary = phantom.get_skull_map()
-            else:
-                boundary = None
-
-            lesion_params = {
-                'spacings': phantom.spacings,
-                'seed': series.case_seed,
-                'boundary': boundary
-            }
-
-            lesion_obj = LesionFactory.create(series.subtype, **lesion_params)
-            lesion_obj.generate(
-                volume_ml=series.lesion_volume,
-                intensity_hu=series.lesion_attenuation,
-                texture_contrast=getattr(series, 'texture_contrast', 0),
-                texture_scale=getattr(series, 'texture_scale', 12),
-                complexity=getattr(series, 'complexity', 0),
-                smoothness=getattr(series, 'smoothness', 0.2),
-                irregularity=getattr(series, 'irregularity', 0.2),
-                eccentricity=getattr(series, 'eccentricity', 0.6),
-                edema=getattr(series, 'edema', 0),
-                fracture_length=getattr(series, 'fracture_length', 0),
-                # Pass other relevant params from series to generate...
-            )
-
-            # This assumes your phantom has an `insert_lesion` method
-            # that takes a generated lesion object.
-            phantom.insert_lesion(lesion_obj, mass_effect=series.mass_effect)
-            # Insert fracture if applicable
-            if series.subtype in ['EDH', 'SDH'] and series.fracture_length > 0:
-                fracture = LesionFactory.create('Fracture',
-                                                spacings=phantom.spacings,
-                                                boundary=phantom.get_skull_map(),
-                                                seed=series.case_seed)
-                fracture.generate(fracture_length=series.fracture_length)
-                phantom.insert_lesion(fracture)
+            phantom = self.add_lesion(phantom, patient_id)
 
         # Check for augmentation flag, disable on Windows if needed
         if series.add_augmentation and os.name != 'nt':
@@ -333,7 +338,6 @@ class ICHStudy(Study):
                     mode='nearest'
                 )
                 phantom.apply_transform(transform, seed=series.case_seed)
-
         return phantom
 
     def run_study(self, patient_id: int = 0):
@@ -445,7 +449,8 @@ def load_and_merge_configs(
         # Resolve relative paths for distributions
         for key in ['lesion_volume', 'lesion_attenuation']:
             if key in config:
-                config[key] = default_config_path.parent / config[key]
+                if isinstance(config[key], str):
+                    config[key] = default_config_path.parent / config[key]
 
     # 2. Override with user config file
     if user_config_path:
