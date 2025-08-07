@@ -137,8 +137,9 @@ class DistributionManager:
     def _load_from_csv(self, path: Path):
         """Loads distributions from a CSV file with value and weight columns."""
         df = pd.read_csv(path)
-        for lesion_type in LESION_TYPES:
-            val_col = f'{lesion_type}_volume' if 'IPH_volume' in df.columns else f'{lesion_type}_HU'
+        lesion_types = [o.split('_')[0] for o in df.columns if o.endswith('_weight')]
+        for lesion_type in lesion_types:
+            val_col = [o for o in df.columns if (not o.endswith('_weight') and o.startswith(lesion_type))][0]
             weight_col = f'{lesion_type}_weight'
             if val_col in df.columns and weight_col in df.columns:
                 subset_df = df[[val_col, weight_col]].dropna()
@@ -157,7 +158,7 @@ class DistributionManager:
                 'weights': np.full_like(values, 1/len(values))
             }
 
-    def sample(self, lesion_type: str, rng: np.random.Generator) -> float:
+    def sample(self, lesion_type: str, rng: np.random.Generator = np.random.default_rng()) -> float:
         """Samples a single value for a given lesion type."""
         dist = self.distributions.get(lesion_type)
         if dist is None:
@@ -515,6 +516,7 @@ def run_simulation_cli(arg_list: Optional[List[str]] = None):
     parser = ArgumentParser(description="Runs InSilicoICH simulations from a study plan.")
     parser.add_argument('input_csv', nargs='?', help="Path to study plan CSV file.")
     parser.add_argument('--parallel', '-p', action='store_true', help="Run simulations in parallel.")
+    parser.add_argument('--overwrite', '-o', action='store_true', help="Overwrites previous results")
     args = parser.parse_args(arg_list)
 
     input_csv_path = args.input_csv
@@ -525,7 +527,7 @@ def run_simulation_cli(arg_list: Optional[List[str]] = None):
         parser.error("An input CSV file is required either as an argument or via stdin.")
 
     print(f"Running study from: {input_csv_path}")
-    ICHStudy(input_csv_path).run_all(parallel=args.parallel)
+    ICHStudy(input_csv_path).run_all(parallel=args.parallel, overwrite=args.overwrite)
 
 
 if __name__ == '__main__':
