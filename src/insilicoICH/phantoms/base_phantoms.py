@@ -155,16 +155,18 @@ class LesionPhantom(Phantom):
             seed (int, optional): A seed for the random number generator to ensure
                                   reproducibility, especially for RandAffine.
         """
-        if seed is not None:
-            transform.set_random_state(seed=seed)
+        seed = seed or np.random.randint(1e6)
+        transform.set_random_state(seed=seed)
 
         # 1. Transform the main phantom image. If the transform is random, its
         # parameters are now fixed ("realized") for subsequent calls.
         self._phantom = transform(self._phantom[None])[0]
 
         # 2. Apply the *same* realized transform to each lesion mask
+        lesions = []
         for lesion in self.lesions:
             # MONAI expects a channel dimension (C, H, W, D) and float type for interpolation
+            transform.set_random_state(seed=seed)
             transformed_mask = transform(lesion.mask[None].astype(np.float32))[0]
 
             # Binarize the result after interpolation and update the lesion's mask
@@ -178,6 +180,7 @@ class LesionPhantom(Phantom):
                 # If the lesion is transformed out of the image, handle it gracefully
                 lesion.coords_voxel = (-1, -1, -1)
                 lesion.volume_ml = 0.0
+            lesions.append(lesion)
 
     def _apply_mass_effect(self, object_mask: np.ndarray,
                            mass_effect: float = 0.2) -> np.ndarray:
