@@ -82,6 +82,9 @@ Below are example outputs using the MIDA phantom, showing the simulated CT image
 * We recommend using a `conda` or `venv` virtual environment.
 
 ### 2. Install the Package
+
+**Install Directly**
+
 Install the package directly from GitHub using `pip`:
 
 ```bash
@@ -90,3 +93,17 @@ Install the package directly from GitHub using `pip`:
 # conda activate insilico-env
 
 pip install git+https://github.com/DIDSR/InSilicoICH.git
+```
+
+**Install from GitHub Clone**
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/DIDSR/InSilicoICH.git
+    cd InSilicoICH
+    ```
+
+2.  **Install dependencies:**
+    ```bash
+    pip install .
+    ```
