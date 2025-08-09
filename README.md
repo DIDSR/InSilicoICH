@@ -89,4 +89,4 @@ Install the package directly from GitHub using `pip`:
 # conda create -n "insilico-env" python=3.11
 # conda activate insilico-env
 
-pip install git+[https://github.com/DIDSR/InSilicoICH.git](https://github.com/DIDSR/InSilicoICH.git)
+pip install git+https://github.com/DIDSR/InSilicoICH.git
