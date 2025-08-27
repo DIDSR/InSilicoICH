@@ -341,40 +341,31 @@ class ICHStudy(Study):
                 phantom.apply_transform(transform, seed=series.case_seed)
         return phantom
 
-    def run_study(self, patient_id: int = 0):
-        """Runs the CT simulation and generates post-simulation metadata and masks."""
-        results = super().run_study(patient_id)
+    def _collect_lesion_stats(self, patient_id):
         series = self.metadata.iloc[patient_id]
-
-        # Initialize default values
-        mask_path = None
         lesion_coords = []
         vol_by_slice_ml = []
         intensities = []
         volumes = []
         types = []
 
-        if pd.notna(series.subtype):
-            # Generate and write lesion mask
-            handler = MaskHandler(self.scanner)
-            handler.get_lesion_mask(views=series.views)
-            segmentation_map = handler.get_segmentation_mask()
+        handler = MaskHandler(self.scanner)
+        handler.get_lesion_mask(views=series.views)
+        segmentation_map = handler.get_segmentation_mask()
 
-            # --- Create a temporary study object to write the mask ---
-            # This avoids modifying the main scanner's recon attribute
-            recon = self.scanner.recon.copy() if self.scanner.recon is not None else None
-            mask_scanner = self.scanner
-            mask_scanner.recon = segmentation_map
-            dicom_path = Path(series.output_directory) / 'lesion_masks'
-            patient_name = self.scanner.phantom.patient_name
-            mask_path = mask_scanner.write_to_dicom(dicom_path / f'{patient_name}_mask.dcm')
+        recon = self.scanner.recon.copy() if self.scanner.recon is not None else None
+        mask_scanner = self.scanner
+        mask_scanner.recon = segmentation_map
+        dicom_path = Path(series.output_directory) / 'lesion_masks'
+        patient_name = self.scanner.phantom.patient_name
+        mask_path = mask_scanner.write_to_dicom(dicom_path / f'{patient_name}_mask.dcm')
 
-            # Calculate metrics from the mask
-            dcm = pydicom.dcmread(mask_path[0])
-            spacings = [float(dcm.SliceThickness)] + list(map(float, dcm.PixelSpacing))
-            voxel_vol_ml = np.prod(spacings) / 1000.0
+        # Calculate metrics from the mask
+        dcm = pydicom.dcmread(mask_path[0])
+        spacings = [float(dcm.SliceThickness)] + list(map(float, dcm.PixelSpacing))
+        voxel_vol_ml = np.prod(spacings) / 1000.0
 
-        for idx in range(len(results)):
+        for idx in range(len(recon)):
             img = recon[idx]
             coords = ""
             lesion_type = ""
@@ -397,6 +388,16 @@ class ICHStudy(Study):
             intensities.append(lesion_intensity)
             lesion_coords.append(coords)
             types.append(lesion_type)
+        return volumes, intensities, lesion_coords, types, mask_path
+
+    def run_study(self, patient_id: int = 0):
+        """Runs the CT simulation and generates post-simulation metadata and masks."""
+        results = super().run_study(patient_id)
+        series = self.metadata.iloc[patient_id]
+        
+        volumes = intensities = lesion_coords = types = mask_path = None
+        if pd.notna(series.subtype):
+            volumes, intensities, lesion_coords, types, mask_path = self._collect_lesion_stats(patient_id)
 
         # Update results DataFrame
         rows = results.case_id == f'case_{patient_id:04d}' # should be row by row specific
