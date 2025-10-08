@@ -270,6 +270,7 @@ class ICHStudy(Study):
             study_params.append(params)
 
         ich_df = pd.DataFrame(study_params)
+        ich_df.loc[ich_df.lesion_volume == 0, 'subtype'] = None # set 0 volume subtypes to None
         return base_df.join(ich_df)
 
     def add_lesion(self, phantom, patient_id: int = 0):
