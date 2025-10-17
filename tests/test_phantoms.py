@@ -1,67 +1,90 @@
 '''
 test low level insilicoich phantom generation functionality
 '''
-from pathlib import Path
-import os
-from dotenv import load_dotenv
+from functools import partial
+
 from monai.transforms import RandAffine
 import numpy as np
+from VITools import get_available_phantoms
 
-from insilicoICH.ground_truth_definition.utils import download_and_extract_archive
-from insilicoICH.ground_truth_definition.phantoms import load_phantom
+from insilicoICH.phantoms.head_phantoms import MIDA_Head
+from insilicoICH.lesion_definition import LesionFactory
 
-nihpd_ages = [6.5, 9.0, 10.5, 11.5, 12.0, 15.75]
 
-load_dotenv()
-if 'PHANTOM_DIRECTORY' in os.environ:
-    phantom_dir = Path(os.environ['PHANTOM_DIRECTORY'])
-else:
-    print('''
-Please `export PHANTOM_DIRECTORY=/path/to/phantoms` or add your `.env`
-file with PHANTOM_DIRECTORY=/path/to/phantoms
-''')
-    phantom_dir = Path(__file__).parent.absolute()
+available_phantoms = get_available_phantoms()
 
-nihpd_dir = phantom_dir / 'NIHPD_Head_Phantom'
-mida_dir = phantom_dir / 'MIDA_Head_Phantom'
-
-if not nihpd_dir.exists():
-    url = 'https://www.bic.mni.mcgill.ca/~vfonov/nihpd/obj1_analyze.zip'
-    download_and_extract_archive(url, nihpd_dir)
 
 shape = 3*[128]
 seed = 41
 
 
+def load_phantom(age, shape=None):
+    '''
+    load a phantom for testing
+    '''
+    if age < 6.5:
+        return available_phantoms[f'{age} yr UNC Head'](shape=shape)
+    if age < 19.0:
+        return available_phantoms[f'{age} yr NIHPD Head'](shape=shape)
+    if age == 38.0:
+        return available_phantoms[f'{age} yr MIDA Head'](shape=shape)
+
+
 def rmse(x, y): return np.sqrt(np.mean((x-y)**2))
+
+
+def test_resize():
+    age = 9.0
+    phantom = load_phantom(age, shape=shape)
+    assert max(phantom.shape) == max(shape)
 
 
 def test_big_epidural_lesion():
     intensity = 100
-    age = 9
+    age = 9.0
     mass_effect = True
-    desired_volume = 100
+    desired_volume = 60
     phantom = load_phantom(age, shape=shape)
-    phantom.insert_lesion('EDH', volume=desired_volume,
-                          intensity=intensity,
-                          mass_effect=mass_effect,
-                          seed=seed)
+    lesion = LesionFactory.create('EDH', spacings=phantom.spacings,
+                                  boundary=phantom.get_dura_map(),
+                                  seed=seed)
+    lesion.generate(volume_ml=desired_volume, intensity_hu=intensity)
+
+    phantom.insert_lesion(lesion, mass_effect=mass_effect)
     measured_volume = phantom.get_lesion_volume()
-    assert rmse(desired_volume, measured_volume) < 21
+    assert rmse(desired_volume, measured_volume) < 10  # see if I can get this down
 
 
 def test_big_subdural_lesion():
     intensity = 100
-    age = 9
-    desired_volume = 80
+    age = 9.0
+    desired_volume = 60
+    mass_effect = 0.2
+    phantom = load_phantom(age, shape=shape)
+    lesion = LesionFactory.create('SDH', spacings=phantom.spacings,
+                                  boundary=phantom.get_dura_map(),
+                                  seed=seed)
+    lesion.generate(volume_ml=desired_volume, intensity_hu=intensity)
+    phantom.insert_lesion(lesion,
+                          mass_effect=mass_effect)
+    measured_volume = phantom.get_lesion_volume()
+    assert rmse(desired_volume, measured_volume) < 1.5
+
+
+def test_big_intraparenchymal_lesion():
+    intensity = 100
+    age = 9.0
+    desired_volume = 60
     mass_effect = True
     phantom = load_phantom(age, shape=shape)
-    phantom.insert_lesion('SDH', volume=desired_volume,
-                          intensity=intensity,
-                          mass_effect=mass_effect,
-                          seed=seed)
+    lesion = LesionFactory.create('IPH', spacings=phantom.spacings,
+                                  boundary=phantom.get_material_mask('white matter'),
+                                  seed=seed)
+    lesion.generate(volume_ml=desired_volume, intensity_hu=intensity)
+    phantom.insert_lesion(lesion,
+                          mass_effect=mass_effect)
     measured_volume = phantom.get_lesion_volume()
-    assert rmse(desired_volume, measured_volume) < 56
+    assert rmse(desired_volume, measured_volume) < 1
 
 
 def test_transforms(threshold=-685):
@@ -82,7 +105,12 @@ def check_volumes(inputs=list(range(1, 10)), **kwargs):
     outs = []
     for input_vol in inputs:
         phantom = load_phantom(15.75)
-        phantom.insert_lesion(lesion_type='IPH', volume=input_vol, **kwargs)
+        lesion = LesionFactory.create('IPH', spacings=phantom.spacings,
+                                      boundary=phantom.get_material_mask('white matter'),
+                                      seed=kwargs.get('seed', seed))
+        lesion.generate(volume_ml=input_vol, intensity_hu=100,
+                        complexity=kwargs.get('complexity', 1))
+        phantom.insert_lesion(lesion)
         outs.append(phantom.get_lesion_volume())
     return outs
 
@@ -96,6 +124,56 @@ def test_IPH_volume_accuracy():
     inputs = np.linspace(1, 70, 3)
     for overlap in [0.2, 0.4]:
         for complexity in range(1, 4):
-            corrected = check_volumes(inputs=inputs, complexity=complexity,
-                                      overlap=overlap, seed=seed)
-            assert rmse(inputs, corrected) < 20
+            corrected = check_volumes(inputs=inputs,
+                                      complexity=complexity,
+                                      overlap=overlap,
+                                      seed=seed)
+            assert rmse(inputs, corrected) < 0.5
+
+
+def test_load_phantoms():
+    '''
+    tests that all phantoms load successfully
+    '''
+    for name, phantom_class in available_phantoms.items():
+        if isinstance(phantom_class, partial) and issubclass(phantom_class.func,
+                                                             MIDA_Head):
+            continue
+        phantom = phantom_class()
+        print(f'{name} {phantom}')
+
+
+def test_mass_effect():
+    '''
+    tests that mass effect is applied correctly
+    '''
+    age = 6.5
+    vol = 20
+    seed = 42
+    phantom = load_phantom(age)
+    lesion = LesionFactory.create('EDH', spacings=phantom.spacings,
+                                  boundary=phantom.get_dura_map(),
+                                  seed=seed)
+    lesion.generate(volume_ml=vol, intensity_hu=100)
+    phantom.insert_lesion(lesion, mass_effect=False)
+    phantom_no_me_image = phantom.get_CT_number_phantom()[
+        phantom.lesions[0].coords_voxel[0]
+        ]
+
+    phantom_me = load_phantom(age)
+    phantom_me.insert_lesion(lesion, mass_effect=0.5)
+    phantom_me_image = phantom_me.get_CT_number_phantom()[
+        phantom.lesions[0].coords_voxel[0]
+        ]
+
+    me_05 = phantom_me_image - phantom_no_me_image
+    assert (np.linalg.norm(me_05) > 500) & (np.linalg.norm(me_05) < 1100)
+
+    phantom_me = load_phantom(age)
+    phantom_me.insert_lesion(lesion, mass_effect=1.0)
+    phantom_me_image = phantom_me.get_CT_number_phantom()[
+        phantom_me.lesions[0].coords_voxel[0]
+        ]
+
+    me_10 = phantom_me_image - phantom_no_me_image
+    assert np.linalg.norm(me_10) > np.linalg.norm(me_05)

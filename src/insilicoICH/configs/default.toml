@@ -4,27 +4,28 @@
 # uncommented parameters here will override defaults
 [general]
 output_directory="test"
-zspan=[0, 10]  # scan range in mm, min max, comment out to scan whole range
-desired_cases=1  # desired dataset size
-keep_raw=false  # keep projection data
+scan_coverage=[0, 10]  # scan range in mm, min max, comment out to scan whole range
+study_count=1  # desired dataset size
+remove_raw=false  # keep projection data
 seed=false  # seed to reproduce dataset, set to false or integer
 
 [patient]
 age=[0, 30]  # range in yrs [min, max]
 
 [lesion]
-subtypes=['IPH', 'SDH', 'EDH'] # add [false] for hemorrhage-absent cases
+subtype=['IPH', 'SDH', 'EDH'] # add [false] for hemorrhage-absent cases
 mass_effect=true  # whether lesions displace brain tissue
 edema=[0, 15]  # edema width range [min, max] in pixels
-volume='distributions/BHSD_volume_distributions.csv'  # str or list
-attenuation='distributions/BHSD_HU_distributions.csv'  # str or list
+lesion_volume='distributions/BHSD_volume_distributions.csv'  # str or list
+lesion_attenuation='distributions/BHSD_HU_distributions.csv'  # str or list
 
 [acquisition]
-scanner=['Scanner_Default']
+scanner_model=['Scanner_Default']
 views=[100]
 kVp=[120]
 mA=[200]
 
 [recon]
-kernel=['standard']
-slice_thickness=[1]
+recon_kernel=['standard']
+slice_thickness=[1]  # Nominal width of reconstructed image along the z axis 
+slice_increment=[1]  # Distance between adjacent slices in the z axis, should be equal to or greater than slice thickness

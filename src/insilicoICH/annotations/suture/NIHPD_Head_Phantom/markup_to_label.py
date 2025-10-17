@@ -103,18 +103,17 @@ def convert_multiple_markups_to_segmentation_label(
 
 if __name__ == "__main__":
     # load_dotenv()
-    phantom_dir = '/gpfs_projects/brandon.nelson/pedsilicoICH/phantoms'
     reference_nifti_path = os.path.join(
-        main_directory, phantom_dir, "NIHPD_Head_Phantom", "nihpd_asym_04.5-08.5_mask.nii"
+        main_directory, "src/NIHPD_Head_Phantom", "nihpd_asym_04.5-08.5_mask.nii"
     )
     output_nifti_path = os.path.join(
         main_directory,
-        "src/pedsilicoICH/annotations/suture/NIHPD_Head_Phantom",
+        "src/insilicoICH/annotations/suture/NIHPD_Head_Phantom",
         "labelmap.nrrd",
     )
 
     markup_dir = os.path.join(
-        main_directory, "src/pedsilicoICH/annotations/suture/NIHPD_Head_Phantom/markups"
+        main_directory, "src/insilicoICH/annotations/suture/NIHPD_Head_Phantom/markups"
     )
 
     convert_multiple_markups_to_segmentation_label(

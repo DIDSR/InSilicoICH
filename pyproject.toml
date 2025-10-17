@@ -1,26 +1,27 @@
 [project]
 name = "InSilicoICH"
-version = "0.1.0"
+version = "0.5.4"
 authors = [
   {name="Brandon Nelson", email="brandon.nelson@fda.hhs.gov"},
-  {name="Jayse M. Weaver", email="jayse.weaver@fda.hhs.gov"}
+  {name="Jayse M. Weaver", email="jayse.weaver@fda.hhs.gov"},
+  {name="Dhaval Kadia", email="dhaval.kadia@fda.hhs.gov"}
 ]
 description = "CT Simulations of virtual pediatric intracranial hemorrhage for computer aided triage device evaluation"
 readme = "README.rst"
-requires-python = "<3.13"
+requires-python = ">=3.11, <3.13"
 dependencies = [
   "python-dotenv",
   "nibabel",
   "scikit-image",
   "scipy",
   "monai==1.3.2",
-  "pandas",
-  "numpy",
-  "pynrrd",
+  "SimpleITK",
   "pydicom",
-  "pytest",
   "requests",
-  "gecatsim @ git+https://github.com/xcist/main.git"
+  "noise",
+  "tomli-w",
+  "pyvista",
+  "VITools @ git+https://github.com/DIDSR/VITools.git"
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -31,7 +32,6 @@ classifiers = [
 [tool.setuptools]
 include-package-data = true
 
-
 [tool.setuptools.packages.find]
 where = ["src"]
 
@@ -40,6 +40,8 @@ Homepage = "https://github.com/DIDSR/InSilicoICH"
 Issues = "https://github.com/DIDSR/InSilicoICH/issues"
 
 [project.scripts]
-generate = "insilicoICH.pipeline:insilicoich_cli"
-insilicoich = "insilicoICH.pipeline:insilicoich_cli" # keeping for now for backwards compatibility
-recruit = "insilicoICH.recruit_study:recruitment_cli"
+generate = "insilicoICH.study:run_simulation_cli"
+recruit = "insilicoICH.study:recruit_patients_cli"
+
+[project.entry-points."VITools"] # Must match PROJECT_NAME
+head_phantoms = "insilicoICH.phantoms.head_phantoms"
