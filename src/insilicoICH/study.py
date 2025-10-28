@@ -397,6 +397,8 @@ class ICHStudy(Study):
         series = self.metadata.iloc[patient_id]
         
         volumes = intensities = lesion_coords = types = mask_path = None
+        self.scanner.slice_thickness = series.slice_thickness
+        self.scanner.slice_increment = series.slice_increment
         if pd.notna(series.subtype):
             volumes, intensities, lesion_coords, types, mask_path = self._collect_lesion_stats(patient_id)
 
