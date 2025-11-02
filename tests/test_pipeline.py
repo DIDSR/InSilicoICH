@@ -134,6 +134,24 @@ def test_lesion_characteristics(age=15.75, views=100,
     plot_montage(phantoms, params, name.parent / 'phantoms.png')
 
 
+def rmse(y_true, y_pred):
+   return np.sqrt(np.mean((y_true - y_pred) ** 2))
+
+
+def test_phantom_initialization():
+    '''
+    this test checks for a previous bug where in initializing the phantom before scanning the z-axis was shuffled
+    so this test ensures the integrity of the phantom just before generating projection data
+
+    A large rmse that breaks the assertion signifies a corruption of the phantom prior to generating projection data
+    '''
+    phantom = load_phantom(6.5)
+    scanner = Scanner(phantom)
+    raw_hu_phantom =  np.fromfile(next(scanner.output_dir.rglob('0_HU_data_197x233x189.raw')), dtype='float32').reshape((189, 233, 197))
+
+    assert rmse(raw_hu_phantom, phantom.get_CT_number_phantom()) < 0.4
+
+
 if __name__ == "__main__":
     parser = ArgumentParser(
         description='Generates test report figure')

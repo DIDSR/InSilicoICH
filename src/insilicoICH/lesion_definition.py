@@ -370,7 +370,7 @@ class RoundLesion(Lesion):
     def generate(self, volume_ml: float, intensity_hu: float, eccentricity: float = 0.5,
                  irregularity: float = 0.5, smoothness: float = 0.5, complexity: int = 3,
                  edema_hu: float = 0, edema_thickness: int = 5, texture_contrast: float = 0,
-                 texture_scale: float = 10.0, **kwargs) -> "RoundLesion":
+                 texture_scale: float = 10.0, overlap: float = 0.4, **kwargs) -> "RoundLesion":
         """
         Generates the 3D mask and textured image for an intraparenchymal hemorrhage.
 
@@ -428,7 +428,7 @@ class RoundLesion(Lesion):
 
         # 1. Find valid center point
         base_radius_vox = np.cbrt(target_voxel_count * 0.75 / np.pi)
-        valid_indices = np.argwhere(distance_transform_edt(self.boundary_mask) > base_radius_vox * 0.4)
+        valid_indices = np.argwhere(distance_transform_edt(self.boundary_mask) > base_radius_vox * overlap)
         if len(valid_indices) == 0:
             raise RuntimeError(f'Requested volume {volume_ml}mL is too large for the available space.')
         center_coords = tuple(valid_indices[self.rng.integers(len(valid_indices))])
@@ -481,7 +481,8 @@ class RoundLesion(Lesion):
             lesion_core_mask &= ~edema_mask  # Core is only the high-intensity part
 
         texture = self._get_noise_texture(self.mask.shape, intensity_hu, texture_contrast, scale=texture_scale)
-        self.image[lesion_core_mask] = texture[lesion_core_mask]  # Apply texture only to the core
+        self.image[lesion_core_mask] = texture[lesion_core_mask] # Apply texture only to the core
+        self.intensity_hu = intensity_hu
 
         self.volume_ml = np.sum(self.mask) * self.voxel_volume_ml
         self.coords_voxel = tuple(map(int, center_of_mass(self.mask)))
