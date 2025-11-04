@@ -276,7 +276,7 @@ class ICHStudy(Study):
     def add_lesion(self, phantom, patient_id: int = 0):
         # This part assumes Lesion objects from your other module are available
         # and can be created via a factory.
-        series = self.metadata.iloc[patient_id]
+        series = self.metadata[self.metadata.case_id  == f'case_{patientid:04d}'].iloc[0]
         if series.subtype in ['SDH', 'EDH']:
             boundary = phantom.get_dura_map()
         elif series.subtype == 'IPH':
@@ -323,7 +323,7 @@ class ICHStudy(Study):
     def load_phantom(self, patient_id: int = 0):
         """Loads the base phantom and inserts a lesion based on study parameters."""
         phantom = super().load_phantom(patient_id)
-        series = self.metadata.iloc[patient_id]
+        series = self.metadata[self.metadata.case_id  == f'case_{patientid:04d}'].iloc[0]
 
         if pd.notna(series.get('subtype')) and series.get('lesion_volume', 0) > 0:
             phantom = self.add_lesion(phantom, patient_id)
@@ -343,7 +343,7 @@ class ICHStudy(Study):
         return phantom
 
     def _collect_lesion_stats(self, patient_id):
-        series = self.metadata.iloc[patient_id]
+        series = self.metadata[self.metadata.case_id  == f'case_{patientid:04d}'].iloc[0]
         lesion_coords = []
         vol_by_slice_ml = []
         intensities = []
@@ -394,7 +394,7 @@ class ICHStudy(Study):
     def run_study(self, patient_id: int = 0):
         """Runs the CT simulation and generates post-simulation metadata and masks."""
         results = super().run_study(patient_id)
-        series = self.metadata.iloc[patient_id]
+        series = self.metadata[self.metadata.case_id  == f'case_{patientid:04d}'].iloc[0]
         
         volumes = intensities = lesion_coords = types = mask_path = None
         self.scanner.slice_thickness = series.slice_thickness
