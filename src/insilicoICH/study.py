@@ -273,10 +273,10 @@ class ICHStudy(Study):
         ich_df.loc[ich_df.lesion_volume == 0, 'subtype'] = None # set 0 volume subtypes to None
         return base_df.join(ich_df)
 
-    def add_lesion(self, phantom, patient_id: int = 0):
+    def add_lesion(self, phantom, patientid: int = 0):
         # This part assumes Lesion objects from your other module are available
         # and can be created via a factory.
-        series = self.metadata.iloc[patient_id]
+        series = self.metadata[self.metadata.case_id  == f'case_{patientid:04d}'].iloc[0]
         if series.subtype in ['SDH', 'EDH']:
             boundary = phantom.get_dura_map()
         elif series.subtype == 'IPH':
@@ -320,13 +320,13 @@ class ICHStudy(Study):
             phantom.insert_lesion(fracture)
         return phantom
 
-    def load_phantom(self, patient_id: int = 0):
+    def load_phantom(self, patientid: int = 0):
         """Loads the base phantom and inserts a lesion based on study parameters."""
-        phantom = super().load_phantom(patient_id)
-        series = self.metadata.iloc[patient_id]
+        phantom = super().load_phantom(patientid)
+        series = self.metadata[self.metadata.case_id  == f'case_{patientid:04d}'].iloc[0]
 
         if pd.notna(series.get('subtype')) and series.get('lesion_volume', 0) > 0:
-            phantom = self.add_lesion(phantom, patient_id)
+            phantom = self.add_lesion(phantom, patientid)
 
         # Check for augmentation flag, disable on Windows if needed
         if series.add_augmentation and os.name != 'nt':
@@ -342,8 +342,8 @@ class ICHStudy(Study):
                 phantom.apply_transform(transform, seed=series.case_seed)
         return phantom
 
-    def _collect_lesion_stats(self, patient_id):
-        series = self.metadata.iloc[patient_id]
+    def _collect_lesion_stats(self, patientid):
+        series = self.metadata[self.metadata.case_id  == f'case_{patientid:04d}'].iloc[0]
         lesion_coords = []
         vol_by_slice_ml = []
         intensities = []
@@ -391,19 +391,19 @@ class ICHStudy(Study):
             types.append(lesion_type)
         return volumes, intensities, lesion_coords, types, mask_path
 
-    def run_study(self, patient_id: int = 0):
+    def run_study(self, patientid: int = 0):
         """Runs the CT simulation and generates post-simulation metadata and masks."""
-        results = super().run_study(patient_id)
-        series = self.metadata.iloc[patient_id]
+        results = super().run_study(patientid)
+        series = self.metadata[self.metadata.case_id  == f'case_{patientid:04d}'].iloc[0]
         
         volumes = intensities = lesion_coords = types = mask_path = None
         self.scanner.slice_thickness = series.slice_thickness
         self.scanner.slice_increment = series.slice_increment
         if pd.notna(series.subtype):
-            volumes, intensities, lesion_coords, types, mask_path = self._collect_lesion_stats(patient_id)
+            volumes, intensities, lesion_coords, types, mask_path = self._collect_lesion_stats(patientid)
 
         # Update results DataFrame
-        rows = results.case_id == f'case_{patient_id:04d}' # should be row by row specific
+        rows = results.case_id == f'case_{patientid:04d}' # should be row by row specific
         results.loc[rows, 'lesion'] = types
         results.loc[rows, 'lesion_volume(mL)'] = volumes
         results.loc[rows, 'lesion_attenuation(HU)'] = intensities
