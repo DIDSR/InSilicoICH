@@ -2,4 +2,5 @@ include src/insilicoICH/defaults/*
 include src/insilicoICH/phantoms/MIDA_v1.csv
 include src/insilicoICH/distributions/*
 include src/insilicoICH/configs/default.toml
-include src/insilicoICH/annotations/suture/NIHPD_Head_Phantom/labelmap.nrrd
+include src/insilicoICH/annotations/suture/NIHPD_Head_Phantom/assets/labelmap.nrrd
+include src/insilicoICH/annotations/suture/NIHPD_Head_Phantom/assets/skull_sutures.nii.gz
