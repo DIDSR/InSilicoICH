@@ -38,3 +38,6 @@ lesions.png
 *.8*
 *.9*
 *.nii
+!src/insilicoICH/annotations/suture/NIHPD_Head_Phantom/assets
+!src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets/mesh_brain.vtk
+!src/insilicoICH/annotations/skull/NIHPD_Head_Phantom/assets/skull_mesh.vtk
