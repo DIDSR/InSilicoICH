@@ -15,8 +15,7 @@ from scipy.ndimage import (
 )
 import noise
 
-# from .annotations.skull.NIHPD_Head_Phantom.fracture_projector import SkullFractureProjector
-# from insilicoskull.fracture import FractureLesion
+from insilicoskull.fracture import FractureLesion
 
 # --- Type Aliases for Clarity ---
 Shape3D = Tuple[int, int, int]
@@ -562,7 +561,6 @@ class RoundLesion(Lesion):
 
 
 class LesionFactory:
-    from insilicoskull.fracture import FractureLesion
     
     """Creates lesion objects based on the specified type."""
 
