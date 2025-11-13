@@ -15,7 +15,8 @@ from scipy.ndimage import (
 )
 import noise
 
-from .annotations.skull.NIHPD_Head_Phantom.fracture_projector import SkullFractureProjector
+# from .annotations.skull.NIHPD_Head_Phantom.fracture_projector import SkullFractureProjector
+# from insilicoskull.fracture import FractureLesion
 
 # --- Type Aliases for Clarity ---
 Shape3D = Tuple[int, int, int]
@@ -490,69 +491,69 @@ class RoundLesion(Lesion):
         return self
 
 
-class FractureLesion(Lesion):
-    """Placeholder for future fracture lesion implementation."""
-    def __init__(self, lesion_type: str, boundary, spacings, **kwargs):
-        super().__init__(lesion_type, spacings,  **kwargs)
-        self.skull = boundary
-        self.threshold_degree_phi = 100
-        self.fracture_seg = None
+# class FractureLesion(Lesion):
+#     """Placeholder for future fracture lesion implementation."""
+#     def __init__(self, lesion_type: str, boundary, spacings, **kwargs):
+#         super().__init__(lesion_type, spacings,  **kwargs)
+#         self.skull = boundary
+#         self.threshold_degree_phi = 100
+#         self.fracture_seg = None
 
-    def generate(self, fracture_length, phi=None, theta=None, thickness=None, **kwargs) -> "FractureLesion":
-        self.phi_degree = phi
-        self.theta_degree = theta
-        self.mask = self.get_fractures(length=fracture_length, thickness=thickness)
-        self.image = self.mask.astype(np.float32)
-        self.coords_voxel = tuple(map(int, center_of_mass(self.mask)))
-        self.volume_ml = np.sum(self.mask) * self.voxel_volume_ml
-        self.intensity_hu = 0
+#     def generate(self, fracture_length, phi=None, theta=None, thickness=None, **kwargs) -> "FractureLesion":
+#         self.phi_degree = phi
+#         self.theta_degree = theta
+#         self.mask = self.get_fractures(length=fracture_length, thickness=thickness)
+#         self.image = self.mask.astype(np.float32)
+#         self.coords_voxel = tuple(map(int, center_of_mass(self.mask)))
+#         self.volume_ml = np.sum(self.mask) * self.voxel_volume_ml
+#         self.intensity_hu = 0
 
-        return self
+#         return self
 
-    def get_fractures(self, length=None, thickness=None):
-        """
-        returns fracture mask to the self skull
+#     def get_fractures(self, length=None, thickness=None):
+#         """
+#         returns fracture mask to the self skull
 
-        :param thickness: thickness in pixels of the fracture
-        :param thresh: distance threshold for fracture mask, smaller values means closer to the skull surface
-        :returns: boolean fracture mask that can be used to set skull fracture
-            values
-        """
-        if length is None:
-            length = self.rng.integers(50, 200)
+#         :param thickness: thickness in pixels of the fracture
+#         :param thresh: distance threshold for fracture mask, smaller values means closer to the skull surface
+#         :returns: boolean fracture mask that can be used to set skull fracture
+#             values
+#         """
+#         if length is None:
+#             length = self.rng.integers(50, 200)
 
-        self.phi_degree = self.phi_degree or self.rng.uniform(0, 60)
-        self.theta_degree = self.theta_degree or self.rng.uniform(0, 360)
-        assert self.phi_degree <= self.threshold_degree_phi and self.phi_degree > 0, "requirement 0 < phi_degree < 100 is not met"
+#         self.phi_degree = self.phi_degree or self.rng.uniform(0, 60)
+#         self.theta_degree = self.theta_degree or self.rng.uniform(0, 360)
+#         assert self.phi_degree <= self.threshold_degree_phi and self.phi_degree > 0, "requirement 0 < phi_degree < 100 is not met"
 
-        skull_int = self.skull.astype(np.int32).transpose(2, 1, 0)[:, ::-1, :]
-        projector = SkullFractureProjector(skull_mask=skull_int,
-                                           seed=self.seed)
+#         skull_int = self.skull.astype(np.int32).transpose(2, 1, 0)[:, ::-1, :]
+#         projector = SkullFractureProjector(skull_mask=skull_int,
+#                                            seed=self.seed)
 
-        # Perform ray casting projection
-        # Note: centroid is considered as the center of the 3D array
-        fractures_proj = projector.centroid_ray_casting_random_walk(
-            length=length, phi_degree=self.phi_degree,
-            theta_degree=self.theta_degree)
+#         # Perform ray casting projection
+#         # Note: centroid is considered as the center of the 3D array
+#         fractures_proj = projector.centroid_ray_casting_random_walk(
+#             length=length, phi_degree=self.phi_degree,
+#             theta_degree=self.theta_degree)
         
-        if thickness is not None:
-            fractures_proj = ski.morphology.dilation(fractures_proj, np.ones(3*[thickness]))
-            fractures_proj = fractures_proj * skull_int
+#         if thickness is not None:
+#             fractures_proj = ski.morphology.dilation(fractures_proj, np.ones(3*[thickness]))
+#             fractures_proj = fractures_proj * skull_int
 
-        skull_int = skull_int.transpose(2, 1, 0)[:, ::-1, :]
-        fractures = fractures_proj.transpose(2, 1, 0)[:, ::-1, :].astype(bool)
-        self.fracture_seg = fractures
+#         skull_int = skull_int.transpose(2, 1, 0)[:, ::-1, :]
+#         fractures = fractures_proj.transpose(2, 1, 0)[:, ::-1, :].astype(bool)
+#         self.fracture_seg = fractures
 
-        return fractures
+#         return fractures
 
-    def get_fracture_seg_slice_labels(self):
-        """
-        Returns the binary array with 1 where fracture present in slice, and 0 where not present.
-        """
-        assert self.fracture_seg is not None, "self.fracture_seg is not available, refer get_fractures()"
-        binary_mask = np.any(self.fracture_seg > 0, axis=(1, 2)).astype(np.uint8)
+#     def get_fracture_seg_slice_labels(self):
+#         """
+#         Returns the binary array with 1 where fracture present in slice, and 0 where not present.
+#         """
+#         assert self.fracture_seg is not None, "self.fracture_seg is not available, refer get_fractures()"
+#         binary_mask = np.any(self.fracture_seg > 0, axis=(1, 2)).astype(np.uint8)
 
-        return binary_mask
+#         return binary_mask
 
 # =============================================================================
 # 4. LESION FACTORY
@@ -561,6 +562,8 @@ class FractureLesion(Lesion):
 
 
 class LesionFactory:
+    from insilicoskull.fracture import FractureLesion
+    
     """Creates lesion objects based on the specified type."""
 
     _lesion_map: Dict[str, Type[Lesion]] = {
