@@ -309,6 +309,7 @@ class ICHStudy(Study):
 
         # This assumes your phantom has an `insert_lesion` method
         # that takes a generated lesion object.
+        print(f'adding lesion to phantom: {lesion_obj}')
         phantom.insert_lesion(lesion_obj, mass_effect=series.mass_effect)
         # Insert fracture if applicable
         if series.subtype in ['EDH', 'SDH'] and series.fracture_length > 0:
@@ -317,6 +318,7 @@ class ICHStudy(Study):
                                             boundary=phantom.get_skull_map(),
                                             seed=series.case_seed)
             fracture.generate(fracture_length=series.fracture_length)
+            print(f'adding fracture to phantom: {fracture}')
             phantom.insert_lesion(fracture)
         return phantom
 
@@ -339,6 +341,7 @@ class ICHStudy(Study):
                     padding_mode="border",
                     mode='nearest'
                 )
+                print(f'applying augmentations to phantom: {transform}')
                 phantom.apply_transform(transform, seed=series.case_seed)
         return phantom
 
