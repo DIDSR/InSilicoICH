@@ -317,7 +317,7 @@ class ICHStudy(Study):
         print(f'adding lesion to phantom: {lesion_obj}')
         phantom.insert_lesion(lesion_obj, mass_effect=series.mass_effect)
         # Insert fracture if applicable
-        if series.subtype in ['EDH', 'SDH'] and series.fracture_length > 0:
+        if (series.subtype in ['EDH', 'SDH']) and (series.fracture_length > 0):
             fracture = LesionFactory.create('Fracture',
                                             spacings=phantom.spacings,
                                             boundary=phantom.get_skull_map(),
