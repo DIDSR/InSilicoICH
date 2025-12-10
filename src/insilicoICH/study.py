@@ -544,7 +544,7 @@ def run_simulation_cli(arg_list: Optional[List[str]] = None):
 
 if __name__ == '__main__':
     # A simple router to decide which CLI to run
-    if len(sys.argv) > 1 and sys.argv[1] == 'recruit':
+    if (len(sys.argv) > 1) and (sys.argv[1] == 'recruit'):
         recruit_patients_cli(sys.argv[2:])
     else:
         run_simulation_cli()
