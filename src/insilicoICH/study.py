@@ -271,7 +271,12 @@ class ICHStudy(Study):
 
         ich_df = pd.DataFrame(study_params)
         ich_df.loc[ich_df.lesion_volume == 0, 'subtype'] = None # set 0 volume subtypes to None
-        return base_df.join(ich_df)
+        study_list = base_df.join(ich_df)
+        study_list.loc[study_list['lesion_volume'] == 0, 'subtype'] = None
+        study_list.loc[study_list['subtype'].isnull(), 'lesion_volume'] = 0
+        study_list.loc[study_list['subtype'].isnull(), 'lesion_attenuation'] = 0
+        study_list.loc[study_list['subtype'].isnull(), 'mass_effect'] = 0
+        return study_list
 
     def add_lesion(self, phantom, patientid: int = 0):
         # This part assumes Lesion objects from your other module are available
@@ -327,7 +332,7 @@ class ICHStudy(Study):
         phantom = super().load_phantom(patientid)
         series = self.metadata[self.metadata.case_id  == f'case_{patientid:04d}'].iloc[0]
 
-        if pd.notna(series.get('subtype')) and series.get('lesion_volume', 0) > 0:
+        if pd.notna(series.get('subtype')):
             phantom = self.add_lesion(phantom, patientid)
 
         # Check for augmentation flag, disable on Windows if needed

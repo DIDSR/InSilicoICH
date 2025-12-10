@@ -5,15 +5,15 @@
 [general]
 output_directory="default_study"
 scan_coverage=[0, 10]  # scan range in mm, min max, comment out to scan whole range
-study_count=3  # desired dataset size
+study_count=100  # desired dataset size
 remove_raw=true  # keep projection data
-seed=false  # seed to reproduce dataset, set to false or integer
+seed=42  # seed to reproduce dataset, set to false or integer
 
 [patient]
 age=[0, 100]  # range in yrs [min, max]
 
 [lesion]
-subtype=['IPH', 'SDH', 'EDH'] # add [false] for hemorrhage-absent cases
+subtype=[false, 'IPH', 'SDH', 'EDH'] # add [false] for hemorrhage-absent cases
 mass_effect=true  # whether lesions displace brain tissue
 edema=[0, 15]  # edema width range [min, max] in pixels
 lesion_volume='src/insilicoICH/distributions/BHSD_volume_distributions.csv'  # str or list
