@@ -5,7 +5,7 @@ a common problem in pediatric imaging
 from copy import deepcopy
 import numpy as np
 
-from monai.transforms import RandAffine, Affine
+from .transforms import RandAffine, Affine
 
 
 def transform_image_label_pair(transform: RandAffine | Affine,
@@ -22,5 +22,5 @@ def transform_image_label_pair(transform: RandAffine | Affine,
         label_transform.set_random_state(seed=seed)
 
     if isinstance(transform, RandAffine):
-        return transform(image).numpy(), label_transform(label).numpy()
-    return transform(image)[0], label_transform(label)[0]
+        return transform(image), label_transform(label)
+    return transform(image), label_transform(label)
