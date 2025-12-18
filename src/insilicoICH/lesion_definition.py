@@ -15,7 +15,7 @@ from scipy.ndimage import (
 )
 import noise
 
-from .annotations.skull.NIHPD_Head_Phantom.fracture_projector import SkullFractureProjector
+
 
 # --- Type Aliases for Clarity ---
 Shape3D = Tuple[int, int, int]
@@ -130,6 +130,7 @@ def generate_3d_perlin_texture(depth=32, height=128, width=128, scale=50.0,
 # 2. ABSTRACT BASE CLASS FOR LESIONS
 # Defines the common interface and shared functionality for all lesion types.
 # =============================================================================
+
 
 
 class Lesion(abc.ABC):
@@ -491,68 +492,127 @@ class RoundLesion(Lesion):
 
 
 class FractureLesion(Lesion):
-    """Placeholder for future fracture lesion implementation."""
-    def __init__(self, lesion_type: str, boundary, spacings, **kwargs):
-        super().__init__(lesion_type, spacings,  **kwargs)
+    """Generates skull fractures using a random walk ray casting algorithm."""
+
+    def __init__(self, lesion_type: str, boundary: np.ndarray, **kwargs):
+        # Pass spacings to parent if available, else default to 1mm
+        spacings = kwargs.pop('spacings', (1, 1, 1))
+        super().__init__(lesion_type=lesion_type, spacings=spacings, **kwargs)
         self.skull = boundary
-        self.threshold_degree_phi = 100
-        self.fracture_seg = None
+        self.dx, self.dy, self.dz = spacings
 
-    def generate(self, fracture_length, phi=None, theta=None, thickness=None, **kwargs) -> "FractureLesion":
-        self.phi_degree = phi
-        self.theta_degree = theta
-        self.mask = self.get_fractures(length=fracture_length, thickness=thickness)
+    def generate(self, fracture_length: int = 100, phi_degree: float = None,
+                 theta_degree: float = None, thickness: int = 1, **kwargs) -> "FractureLesion":
+        """
+        Generates a random walk fracture on the skull.
+
+        Args:
+            fracture_length (int): Number of steps in the random walk.
+            phi_degree (float): Starting polar angle (degrees).
+            theta_degree (float): Starting azimuthal angle (degrees).
+            thickness (int): Thickness of the fracture line.
+        """
+        # Set defaults if not provided
+        if phi_degree is None:
+            phi_degree = self.rng.uniform(0, 60)
+        if theta_degree is None:
+            theta_degree = self.rng.uniform(0, 360)
+
+        # Generate fracture mask
+        fracture_mask = self._random_walk_ray_casting(fracture_length, phi_degree, theta_degree)
+
+        # Apply thickness
+        if thickness > 1:
+            # optimize: only dilate if needed, using a smaller footprint for speed
+            fracture_mask = ski.morphology.dilation(fracture_mask, ski.morphology.ball(thickness // 2))
+
+        # Constrain to skull volume
+        self.mask = fracture_mask & (self.skull > 0)
+        
+        # Compute properties
         self.image = self.mask.astype(np.float32)
-        self.coords_voxel = tuple(map(int, center_of_mass(self.mask)))
         self.volume_ml = np.sum(self.mask) * self.voxel_volume_ml
-        self.intensity_hu = 0
-
+        
+        if self.mask.any():
+            self.coords_voxel = tuple(map(int, center_of_mass(self.mask)))
+        else:
+            self.coords_voxel = (0, 0, 0)
+            
+        self.intensity_hu = -1000 # Air-like intensity for fracture void? Or just 0? Original was 0.
+        
         return self
 
-    def get_fractures(self, length=None, thickness=None):
-        """
-        returns fracture mask to the self skull
-
-        :param thickness: thickness in pixels of the fracture
-        :param thresh: distance threshold for fracture mask, smaller values means closer to the skull surface
-        :returns: boolean fracture mask that can be used to set skull fracture
-            values
-        """
-        if length is None:
-            length = self.rng.integers(50, 200)
-
-        self.phi_degree = self.phi_degree or self.rng.uniform(0, 60)
-        self.theta_degree = self.theta_degree or self.rng.uniform(0, 360)
-        assert self.phi_degree <= self.threshold_degree_phi and self.phi_degree > 0, "requirement 0 < phi_degree < 100 is not met"
-
-        skull_int = self.skull.astype(np.int32).transpose(2, 1, 0)[:, ::-1, :]
-        projector = SkullFractureProjector(skull_mask=skull_int,
-                                           seed=self.seed)
-
-        # Perform ray casting projection
-        # Note: centroid is considered as the center of the 3D array
-        fractures_proj = projector.centroid_ray_casting_random_walk(
-            length=length, phi_degree=self.phi_degree,
-            theta_degree=self.theta_degree)
+    def _spherical_to_cartesian(self, r, phi_deg, theta_deg):
+        """Convert spherical coordinates to Cartesian (z, y, x)."""
+        phi_rad = np.deg2rad(phi_deg)
+        theta_rad = np.deg2rad(theta_deg)
         
-        if thickness is not None:
-            fractures_proj = ski.morphology.dilation(fractures_proj, np.ones(3*[thickness]))
-            fractures_proj = fractures_proj * skull_int
+        # Convention: Z is polar axis
+        z = r * np.cos(phi_rad)
+        radius_xy = r * np.sin(phi_rad)
+        x = radius_xy * np.cos(theta_rad)
+        y = radius_xy * np.sin(theta_rad)
+        
+        return np.array([z, y, x])
 
-        skull_int = skull_int.transpose(2, 1, 0)[:, ::-1, :]
-        fractures = fractures_proj.transpose(2, 1, 0)[:, ::-1, :].astype(bool)
-        self.fracture_seg = fractures
+    def _cast_ray(self, center, direction, max_dist):
+        """Casts a ray from center in direction to find skull intersection."""
+        # Vectorized ray casting
+        # P = C + t * D
+        # We need t such that P is in array bounds.
+        
+        # Estimate needed steps. Since we want all skull voxels on the line,
+        # we step by roughly 0.5 voxel size.
+        step_acc = 0.5
+        t_values = np.arange(0, max_dist, step_acc)
+        
+        points = center + np.outer(t_values, direction)
+        points_int = np.rint(points).astype(int)
+        
+        # Filter out-of-bounds
+        in_bounds = (
+            (points_int[:, 0] >= 0) & (points_int[:, 0] < self.skull.shape[0]) &
+            (points_int[:, 1] >= 0) & (points_int[:, 1] < self.skull.shape[1]) &
+            (points_int[:, 2] >= 0) & (points_int[:, 2] < self.skull.shape[2])
+        )
+        points_int = points_int[in_bounds]
+        
+        if len(points_int) == 0:
+            return np.array([])
 
-        return fractures
+        # Filter for skull
+        skull_indices = self.skull[points_int[:, 0], points_int[:, 1], points_int[:, 2]] > 0
+        return points_int[skull_indices]
 
-    def get_fracture_seg_slice_labels(self):
-        """
-        Returns the binary array with 1 where fracture present in slice, and 0 where not present.
-        """
-        assert self.fracture_seg is not None, "self.fracture_seg is not available, refer get_fractures()"
-        binary_mask = np.any(self.fracture_seg > 0, axis=(1, 2)).astype(np.uint8)
+    def _random_walk_ray_casting(self, length, start_phi, start_theta):
+        mask = np.zeros_like(self.skull, dtype=bool)
+        center_idx = np.array(self.skull.shape) / 2.0
+        # rough max dimension for ray length
+        max_dist = np.linalg.norm(self.skull.shape)
 
-        return binary_mask
+        phi, theta = start_phi, start_theta
+        step_size_deg = 1.0 # Angular step size
+        
+        # pre-calculate directions to avoid repeated Trig? 
+        # For random walk, strictly sequential is inevitable.
+        
+        for _ in range(length):
+            # 1. Cast ray
+            direction = self._spherical_to_cartesian(1.0, phi, theta)
+            hits = self._cast_ray(center_idx, direction, max_dist)
+            
+            if len(hits) > 0:
+                 mask[hits[:, 0], hits[:, 1], hits[:, 2]] = True
+            
+            # 2. Random walk step
+            # Bias slightly to continue in same direction (momentum)?
+            # Simplified: just uniform random walk
+            if self.rng.random() < 0.5:
+                phi += step_size_deg * self.rng.choice([-1, 1])
+            else:
+                theta += step_size_deg * self.rng.choice([-1, 1])
+                
+        return mask
 
 # =============================================================================
 # 4. LESION FACTORY
