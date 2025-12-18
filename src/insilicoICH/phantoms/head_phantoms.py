@@ -18,10 +18,10 @@ from skimage.morphology import (binary_closing,
                                 remove_small_holes,
                                 binary_dilation,
                                 binary_erosion)
-from monai.transforms import ResizeWithPadOrCrop
 from scipy.ndimage import distance_transform_edt
 from VITools.hooks import hookimpl
 
+from ..transforms import ResizeWithPadOrCrop
 from .base_phantoms import (LesionPhantom, resize,
                             get_mean_age)
 from ..lesion_definition import Lesion
@@ -390,7 +390,7 @@ from {phantom_dir}')
         dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
         if (dx < 0) | (dy < 0) | (dz < 0):
             resizewithcrop = ResizeWithPadOrCrop(spatial_size=skull.shape)
-            data = resizewithcrop(data[None])[0].numpy()
+            data = resizewithcrop(data[None])[0]
             dx, dy, dz = np.array(skull.shape) - np.array(data.shape)
 
         dx1 = dx2 = dx//2

@@ -15,10 +15,10 @@ import numpy as np
 import pandas as pd
 import pydicom
 import tomllib
-from monai.transforms import RandAffine
 from scipy.ndimage import center_of_mass
 
 from VITools import Study, get_available_phantoms, load_vol, Scanner
+from .transforms import RandAffine
 from .phantoms.head_phantoms import LesionPhantom
 from .lesion_definition import LesionFactory
 
