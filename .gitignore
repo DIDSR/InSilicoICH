@@ -1,6 +1,4 @@
-notebooks/.ipynb_checkpoints
 .ipynb_checkpoints
-notebooks/__pycache__
 .vscode
 .InSilicoICH
 .pytest_cache
@@ -38,3 +36,5 @@ lesions.png
 *.8*
 *.9*
 *.nii
+*.nii.gz
+src/UNC_Head_phantom

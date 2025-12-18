@@ -5,7 +5,7 @@ import skimage as ski
 from typing import Optional
 from scipy.ndimage import center_of_mass
 # import random  # suggest using numpy's rng for reproducibility
-import pyvista as pv
+# import pyvista as pv eliminated in favor of numpy implementation
 
 main_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), *[".."] * 5))
 sys.path.append(main_directory)
@@ -15,6 +15,12 @@ class SkullFractureProjector:
     """
     Complete skull fracture projection system using centroid-based ray casting.
     """
+
+    def _spherical_to_cartesian(self, r, phi_rad, theta_rad):
+        x = r * np.sin(phi_rad) * np.cos(theta_rad)
+        y = r * np.sin(phi_rad) * np.sin(theta_rad)
+        z = r * np.cos(phi_rad)
+        return np.array([x, y, z])
 
     def __init__(self, skull_mask, fracture_annotations=None, seed: Optional[int] = None):
         self.skull_mask = skull_mask
@@ -228,13 +234,13 @@ class SkullFractureProjector:
 
             # Note: temporary fix with 180 - phi_degree    
             # Convert polar coordinates to direction vector
-            direction = pv.spherical_to_cartesian(
+            direction = self._spherical_to_cartesian(
                 1, np.deg2rad(180 - phi_degree), np.deg2rad(theta_degree)
             )
 
             if move_centroid:
                 # Move centroid around over a sphere
-                direction_centroid = pv.spherical_to_cartesian(
+                direction_centroid = self._spherical_to_cartesian(
                     1, np.deg2rad(180 - phi_degree_centroid), np.deg2rad(theta_degree_centroid)
                 )
                 centroid_virtual = centroid + np.multiply(direction_centroid, 50)

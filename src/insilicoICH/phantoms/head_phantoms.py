@@ -249,26 +249,7 @@ from {self.url}
 If you have already downloaded NIHPD and MIDA head phantoms, please see
 `load_phantom` for details on how to add their locations.
 ''')
-            download_and_extract_archive(NIHPD_Head.url, phantom_dir)
-        self.dict_skull_paths = {
-            "path_mesh_brainmask": os.path.join(
-                Path(__file__).parents[1],
-                "annotations/skull/NIHPD_Head_Phantom/assets",
-                "mesh_brain.vtk",
-            ),
-            "path_mask_brain": phantom_dir / "nihpd_asym_04.5-08.5_mask.nii",
-            "path_file_config": os.path.join(
-                Path(__file__).parents[1],
-                "annotations/skull/NIHPD_Head_Phantom/assets",
-                "config.toml",
-            ),
-            "path_skull_mesh": os.path.join(
-                Path(__file__).parents[1],
-                "annotations/skull/NIHPD_Head_Phantom/assets",
-                "skull_mesh.vtk",
-            )
-        }
-            # download_and_extract_archive(self.url, phantom_dir)
+            download_and_extract_archive(self.url, phantom_dir)
         super().__init__(phantom_dir, shape, age=age, patient_name=self.patient_name)
 
     def load_phantom(self, phantom_dir):
@@ -357,16 +338,16 @@ from {phantom_dir}')
         original_shape = self.csf.shape
 
         # resize original images
-        self.csf = resize(self.csf, shape).numpy()
-        self.gm = resize(self.gm, shape).numpy()
-        self.wm = resize(self.wm, shape).numpy()
-        self.mask = resize(self.mask, shape).numpy()
-        self.pdw = resize(self.pdw, shape).numpy()
-        self.t1w = resize(self.t1w, shape).numpy()
+        self.csf = resize(self.csf, shape)
+        self.gm = resize(self.gm, shape)
+        self.wm = resize(self.wm, shape)
+        self.mask = resize(self.mask, shape)
+        self.pdw = resize(self.pdw, shape)
+        self.t1w = resize(self.t1w, shape)
 
         # resize additional
-        self.head_mask = resize(self.head_mask, shape).numpy().astype(bool)
-        self.skull = resize(self.skull, shape).numpy()
+        self.head_mask = resize(self.head_mask, shape).astype(bool)
+        self.skull = resize(self.skull, shape)
         new_shape = self.csf.shape
 
         new_spacings = np.array(original_shape) / np.array(new_shape) *\
@@ -597,15 +578,15 @@ class UNC_Head(NIHPD_Head):
         original_shape = self.csf.shape
 
         # resize original images
-        self.csf = resize(self.csf, shape).numpy()
-        self.gm = resize(self.gm, shape).numpy()
-        self.wm = resize(self.wm, shape).numpy()
-        self.mask = resize(self.mask, shape).numpy()
-        self.intensity = resize(self.t1w, shape).numpy()
+        self.csf = resize(self.csf, shape)
+        self.gm = resize(self.gm, shape)
+        self.wm = resize(self.wm, shape)
+        self.mask = resize(self.mask, shape)
+        self.intensity = resize(self.t1w, shape)
 
         # resize additional
-        self.head_mask = resize(self.head_mask, shape).numpy().astype(bool)
-        self.skull = resize(self.skull, shape).numpy()
+        self.head_mask = resize(self.head_mask, shape).astype(bool)
+        self.skull = resize(self.skull, shape)
 
         new_shape = self.csf.shape
 

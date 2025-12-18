@@ -503,7 +503,10 @@ class FractureLesion(Lesion):
         self.theta_degree = theta
         self.mask = self.get_fractures(length=fracture_length, thickness=thickness)
         self.image = self.mask.astype(np.float32)
-        self.coords_voxel = tuple(map(int, center_of_mass(self.mask)))
+        if np.any(self.mask):
+            self.coords_voxel = tuple(map(int, center_of_mass(self.mask)))
+        else:
+            self.coords_voxel = (-1, -1, -1)
         self.volume_ml = np.sum(self.mask) * self.voxel_volume_ml
         self.intensity_hu = 0
 
