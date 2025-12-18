@@ -8,8 +8,7 @@ from shutil import rmtree
 results_dir = Path('tests')
 
 def test_control_study():
-    name = 'no-lesion'
-    output_dir = results_dir / name
+    output_dir = results_dir / 'no-lesion'
     if output_dir.exists():
         rmtree(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -31,8 +30,7 @@ def test_control_study():
         pass
 
 def test_mixed_study():
-    name = 'mixed-lesion'
-    output_dir = results_dir / name
+    output_dir = results_dir / 'mixed-lesion'
     if output_dir.exists():
         rmtree(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -59,11 +57,11 @@ def test_mixed_study():
 
 
 def test_IPH_study():
-    name = 'IPH'
-    output_dir = results_dir / name
+    output_dir = results_dir / 'IPH_study'
     if output_dir.exists():
         rmtree(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+
     desired_vol = dict(IPH=[11, 13])
     desired_atten = dict(IPH=[300, 310])
     study_list = ICHStudy.generate_from_distributions(
@@ -75,8 +73,9 @@ def test_IPH_study():
         views=[300],
         scan_coverage=(-10, 20),
         study_count=1,
-        output_directory=output_dir,
-        seed=206245)
+        seed=206245,
+        output_directory=output_dir)
+
     study = ICHStudy(study_list)
     study.run_all(overwrite=True, parallel=False)
     images = study.get_images(0)
@@ -93,11 +92,11 @@ def test_IPH_study():
 
 
 def test_EDH_study():
-    name = 'EDH'
-    output_dir = results_dir / name
+    output_dir = results_dir / 'EDH_study'
     if output_dir.exists():
         rmtree(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+
     desired_vol = dict(EDH=[11, 13])
     desired_atten = dict(EDH=[300, 310])
     study_list = ICHStudy.generate_from_distributions(
@@ -109,8 +108,8 @@ def test_EDH_study():
         views=[300],
         scan_coverage=(25, 55),
         study_count=1,
-        output_directory=output_dir,
-        seed=206245)
+        seed=206245,
+        output_directory=output_dir)
     study = ICHStudy(study_list)
     study.run_all(overwrite=True, parallel=False)
     images = study.get_images(0)
@@ -127,11 +126,11 @@ def test_EDH_study():
 
 
 def test_SDH_study():
-    name = 'SDH'
-    output_dir = results_dir / name
+    output_dir = results_dir / 'SDH_study'
     if output_dir.exists():
         rmtree(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+
     desired_vol = dict(SDH=[11, 13])
     desired_atten = dict(SDH=[300, 310])
     study_list = ICHStudy.generate_from_distributions(
@@ -143,8 +142,8 @@ def test_SDH_study():
         views=[300],
         scan_coverage=(25, 55),
         study_count=1,
-        output_directory=output_dir,
-        seed=206245)
+        seed=206245,
+        output_directory=output_dir)
     study = ICHStudy(study_list)
     study.run_all(overwrite=True, parallel=False)
     images = study.get_images(0)
