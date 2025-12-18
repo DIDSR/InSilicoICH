@@ -6,7 +6,6 @@ lesions.
 from typing import List, Tuple, Union
 
 import numpy as np
-from monai.transforms import Resize, RandAffine, Affine
 from scipy.ndimage import (center_of_mass,
                            distance_transform_edt,
                            map_coordinates)
@@ -16,18 +15,11 @@ from VITools import Phantom
 # Assuming these are local modules with the specified functions.
 # For this example, placeholder functions are used where necessary.
 from .. import lesion_definition as ld
+from ..transforms import resize, RandAffine, Affine
 
 # --- Type Aliases for Clarity ---
 Shape3D = Tuple[int, int, int]
 Spacing3D = Tuple[float, float, float]
-
-
-def resize(array: np.ndarray, shape: Shape3D, **kwargs) -> np.ndarray:
-    """Internal helper to resize a 3D array using MONAI."""
-    resize_transform = Resize(max(shape), size_mode='longest', **kwargs)
-    # MONAI transforms expect a channel-first format (C, H, W, D)
-    resized_array = resize_transform(array[None])[0]
-    return resized_array
 
 
 def get_mean_age(age_range: str):

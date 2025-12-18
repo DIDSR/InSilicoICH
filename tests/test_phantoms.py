@@ -3,10 +3,10 @@ test low level insilicoich phantom generation functionality
 '''
 from functools import partial
 
-from monai.transforms import RandAffine
 import numpy as np
 from VITools import get_available_phantoms
 
+from insilicoICH.transforms import RandAffine
 from insilicoICH.phantoms.head_phantoms import MIDA_Head
 from insilicoICH.lesion_definition import LesionFactory
 
