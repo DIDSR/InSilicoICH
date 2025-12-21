@@ -111,6 +111,14 @@ def generate_3d_perlin_texture(depth=32, height=128, width=128, scale=50.0,
     If `seed` is provided, it will be used to ensure reproducibility.
     If `seed` is None, a random seed will be used.
     """
+    if seed is None:
+        seed = np.random.randint(0, 2**32)
+
+    # The noise library (noise.pnoise3) segfaults for base values >= 22000.
+    # Refactoring options:
+    # 1. Modulo (seed % 22000): Simple, fast, and preserves relative spacing. (Recommended)
+    # 2. Hashing (hash(str(seed)) % 22000): Better distribution if input seeds are non-uniform.
+    seed = seed % 22000
     texture_array = np.zeros((depth, height, width))
     for z in range(depth):
         for y in range(height):
@@ -581,17 +589,42 @@ class FractureLesion(Lesion):
             return np.array([])
 
         # Filter for skull
-        skull_indices = self.skull[points_int[:, 0], points_int[:, 1], points_int[:, 2]] > 0
-        return points_int[skull_indices]
+        is_skull = self.skull[points_int[:, 0], points_int[:, 1], points_int[:, 2]] > 0
+        
+        if not np.any(is_skull):
+            return np.array([])
+            
+        # Find the first entry point
+        first_hit_idx = np.argmax(is_skull)
+        
+        # Check if there is an exit point after the first hit
+        # We look for the first False AFTER the first hit
+        # Slicing from first_hit_idx:
+        remaining = is_skull[first_hit_idx:]
+        if not np.all(remaining):
+            # There is a False (exit)
+            # The index of first False in 'remaining' is the relative exit index
+            # argmin on boolean array finds the first False (0)
+            exit_idx_rel = np.argmin(remaining)
+            exit_idx = first_hit_idx + exit_idx_rel
+            
+            # Keep only points up to exit
+            return points_int[first_hit_idx:exit_idx]
+        else:
+            # Stays inside skull until bounds (unlikely for ray from center, but possible)
+            return points_int[first_hit_idx:]
 
     def _random_walk_ray_casting(self, length, start_phi, start_theta):
         mask = np.zeros_like(self.skull, dtype=bool)
-        center_idx = np.array(self.skull.shape) / 2.0
+        # Use center of mass of the skull to ensure rays originate from inside/center
+        center_idx = np.array(center_of_mass(self.skull > 0))
         # rough max dimension for ray length
         max_dist = np.linalg.norm(self.skull.shape)
 
         phi, theta = start_phi, start_theta
-        step_size_deg = 1.0 # Angular step size
+        step_size_deg = 0.5 # Angular step size
+        d_phi, d_theta = 0, 0
+        momentum = 0.95 # Probability to continue in same direction
         
         # pre-calculate directions to avoid repeated Trig? 
         # For random walk, strictly sequential is inevitable.
@@ -607,10 +640,20 @@ class FractureLesion(Lesion):
             # 2. Random walk step
             # Bias slightly to continue in same direction (momentum)?
             # Simplified: just uniform random walk
-            if self.rng.random() < 0.5:
-                phi += step_size_deg * self.rng.choice([-1, 1])
+            # 2. Random walk step With Momentum
+            if self.rng.random() < momentum and (d_phi != 0 or d_theta != 0):
+                # Continue in same direction
+                pass
             else:
-                theta += step_size_deg * self.rng.choice([-1, 1])
+                # Change direction
+                d_phi, d_theta = 0, 0
+                if self.rng.random() < 0.5:
+                    d_phi = step_size_deg * self.rng.choice([-1, 1])
+                else:
+                    d_theta = step_size_deg * self.rng.choice([-1, 1])
+            
+            phi += d_phi
+            theta += d_theta
                 
         return mask
 

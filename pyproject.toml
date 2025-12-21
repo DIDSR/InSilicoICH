@@ -19,7 +19,6 @@ dependencies = [
   "requests",
   "noise",
   "tomli-w",
-  "pyvista",
   "VITools @ git+https://github.com/DIDSR/VITools.git"
 ]
 classifiers = [
@@ -44,3 +43,8 @@ recruit = "insilicoICH.study:recruit_patients_cli"
 
 [project.entry-points."VITools"] # Must match PROJECT_NAME
 head_phantoms = "insilicoICH.phantoms.head_phantoms"
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]

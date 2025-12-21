@@ -19,7 +19,7 @@ def synthetic_skull():
 def test_fracture_generation_defaults(synthetic_skull):
     """Test basic fracture generation with default parameters."""
     skull_mask, spacings = synthetic_skull
-    fracture = FractureLesion('linear fracture', skull_mask, spacings, seed=42)
+    fracture = FractureLesion('linear fracture', skull_mask, spacings=spacings, seed=42)
     fracture.generate(fracture_length=50)
     
     assert fracture.mask is not None
@@ -34,12 +34,12 @@ def test_fracture_generation_parameters(synthetic_skull):
     """Test fracture generation with specific parameters."""
     skull_mask, spacings = synthetic_skull
     # Use a fixed seed for reproducibility in tests
-    fracture = FractureLesion('linear fracture', skull_mask, spacings, seed=123)
+    fracture = FractureLesion('linear fracture', skull_mask, spacings=spacings, seed=123)
     
     # Test with specific angles, length, and thickness
     length = 40
     thickness = 2
-    fracture.generate(fracture_length=length, phi=30, theta=45, thickness=thickness)
+    fracture.generate(fracture_length=length, phi_degree=30, theta_degree=45, thickness=thickness)
     
     assert np.any(fracture.mask)
     assert fracture.volume_ml > 0
@@ -53,10 +53,10 @@ def test_fracture_consistency(synthetic_skull):
     skull_mask, spacings = synthetic_skull
     seed = 99
     
-    f1 = FractureLesion('linear fracture', skull_mask, spacings, seed=seed)
+    f1 = FractureLesion('linear fracture', skull_mask, spacings=spacings, seed=seed)
     f1.generate(fracture_length=50)
     
-    f2 = FractureLesion('linear fracture', skull_mask, spacings, seed=seed)
+    f2 = FractureLesion('linear fracture', skull_mask, spacings=spacings, seed=seed)
     f2.generate(fracture_length=50)
     
     np.testing.assert_array_equal(f1.mask, f2.mask)
@@ -64,11 +64,11 @@ def test_fracture_consistency(synthetic_skull):
 def test_fracture_lesion_properties(synthetic_skull):
     """Test that properties are correctly set after generation."""
     skull_mask, spacings = synthetic_skull
-    fracture = FractureLesion('linear fracture', skull_mask, spacings, seed=10)
+    fracture = FractureLesion('linear fracture', skull_mask, spacings=spacings, seed=10)
     fracture.generate(fracture_length=30)
     
-    # Intensity should be 0 by definition in FractureLesion
-    assert fracture.intensity_hu == 0
+    # Intensity should be -1000 by definition in FractureLesion (air)
+    assert fracture.intensity_hu == -1000
     
     # Center of mass should be calculated and 3-dimensional
     assert hasattr(fracture, 'coords_voxel')
@@ -82,7 +82,7 @@ def test_fracture_lesion_properties(synthetic_skull):
 def test_fracture_invalid_input(synthetic_skull):
     """Test behavior with likely invalid inputs if edge cases are handled."""
     skull_mask, spacings = synthetic_skull
-    fracture = FractureLesion('linear fracture', skull_mask, spacings)
+    fracture = FractureLesion('linear fracture', skull_mask, spacings=spacings)
     
     # Passing 0 length should probably result in empty or minimal mask, or error
     # Checking current implementation: 

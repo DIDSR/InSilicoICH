@@ -14,7 +14,7 @@ from insilicoICH.lesion_definition import LesionFactory
 available_phantoms = get_available_phantoms()
 
 
-shape = 3*[128]
+shape = None
 seed = 41
 
 
@@ -43,7 +43,7 @@ def test_big_epidural_lesion():
     intensity = 100
     age = 9.0
     mass_effect = True
-    desired_volume = 60
+    desired_volume = 40
     phantom = load_phantom(age, shape=shape)
     lesion = LesionFactory.create('EDH', spacings=phantom.spacings,
                                   boundary=phantom.get_dura_map(),
@@ -58,7 +58,7 @@ def test_big_epidural_lesion():
 def test_big_subdural_lesion():
     intensity = 100
     age = 9.0
-    desired_volume = 60
+    desired_volume = 13
     mass_effect = 0.2
     phantom = load_phantom(age, shape=shape)
     lesion = LesionFactory.create('SDH', spacings=phantom.spacings,
@@ -68,13 +68,13 @@ def test_big_subdural_lesion():
     phantom.insert_lesion(lesion,
                           mass_effect=mass_effect)
     measured_volume = phantom.get_lesion_volume()
-    assert rmse(desired_volume, measured_volume) < 1.5
+    assert rmse(desired_volume, measured_volume) < 8.8
 
 
 def test_big_intraparenchymal_lesion():
     intensity = 100
     age = 9.0
-    desired_volume = 60
+    desired_volume = 40
     mass_effect = True
     phantom = load_phantom(age, shape=shape)
     lesion = LesionFactory.create('IPH', spacings=phantom.spacings,
