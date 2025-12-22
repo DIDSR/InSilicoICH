@@ -34,6 +34,7 @@ def rmse(x, y): return np.sqrt(np.mean((x-y)**2))
 
 
 def test_resize():
+    shape = (50, 50, 50)
     age = 9.0
     phantom = load_phantom(age, shape=shape)
     assert max(phantom.shape) == max(shape)
