@@ -20,6 +20,7 @@ from scipy.ndimage import center_of_mass
 from VITools import Study, get_available_phantoms, load_vol, Scanner
 from .transforms import RandAffine
 from .phantoms.head_phantoms import LesionPhantom
+from . import lesion_definition as ld
 from .lesion_definition import LesionFactory
 
 # --- Constants and Configuration ---
@@ -181,6 +182,8 @@ class ICHStudy(Study):
         'EDH': {'vol_limit': float('inf'), 'att_limit': 45},
         'SDH': {'vol_limit': float('inf'), 'att_limit': 45},
         'IPH': {'vol_limit': 50, 'att_limit': 45},
+        'IVH': {'vol_limit': 100, 'att_limit': 45},
+        'SAH': {'vol_limit': 100, 'att_limit': 45},
         'Fracture': {'vol_limit': float('inf'), 'att_limit': -950}
     }
 
@@ -288,6 +291,11 @@ class ICHStudy(Study):
             boundary = phantom.get_material_mask('white matter')
         elif series.subtype == 'Fracture':
             boundary = phantom.get_skull_map()
+        elif series.subtype in ['IVH', 'SAH']:
+            csf = phantom.get_material_mask('CSF')
+            # Assuming partition function is exposed in ld
+            ventricles, sah = ld.partition_csf_to_ventricles_and_sah(csf)
+            boundary = ventricles if series.subtype == 'IVH' else sah
         else:
             boundary = None
 

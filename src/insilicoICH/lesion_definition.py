@@ -15,6 +15,9 @@ from scipy.ndimage import (
 )
 import noise
 
+from . import transforms
+from scipy.ndimage import label, measurements
+
 
 
 # --- Type Aliases for Clarity ---
@@ -134,6 +137,46 @@ def generate_3d_perlin_texture(depth=32, height=128, width=128, scale=50.0,
                                                        repeatz=depth,
                                                        base=seed)
     return texture_array
+def partition_csf_to_ventricles_and_sah(csf_mask: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Partitions a global CSF mask into ventricles (central) and subarachnoid space (peripheral).
+    Uses morphological opening to separate thick ventricles from thin sulci.
+    """
+    # 1. Morphological Opening to isolate ventricles (thick structures)
+    # Radius 2 (approx 3-5mm depending on spacing) should remove thin sulci
+    selem = ski.morphology.ball(2)
+    opened_mask = ski.morphology.binary_opening(csf_mask, selem)
+    
+    # 2. Identify Ventricles
+    # The ventricles are the largest components in the opened mask.
+    # We can filter by volume to remove any other small "thick" spots (like cisterns that survived)
+    # or just assume the opened mask is mostly ventricle.
+    # Let's keep only large components in opened mask.
+    temp_labels, num = label(opened_mask)
+    if num == 0:
+        # Fallback if everything disappeared (unlikely for normal ventricles, but possible in phantom)
+        # Try smaller radius?
+        selem = ski.morphology.ball(1)
+        opened_mask = ski.morphology.binary_opening(csf_mask, selem)
+        temp_labels, num = label(opened_mask)
+    
+    ventricle_mask = np.zeros_like(csf_mask, dtype=bool)
+    if num > 0:
+        volumes = measurements.sum(opened_mask, temp_labels, index=np.arange(1, num + 1))
+        # Keep components larger than 1 mL (approx 1000 voxels) or just top 2
+        # Ventricles are usually centrally located.
+        
+        # Simple heuristic: Keep everything in opened mask as "Ventricle Candidates" 
+        # but let's be cleaner:
+        # Just take the opened mask as "Core Ventricles"
+        ventricle_mask = opened_mask.copy()
+        
+    # 3. SAH is the rest
+    # SAH = Original CSF - Ventricles
+    sah_mask = csf_mask & ~ventricle_mask
+            
+    return ventricle_mask, sah_mask
+
 # =============================================================================
 # 2. ABSTRACT BASE CLASS FOR LESIONS
 # Defines the common interface and shared functionality for all lesion types.
@@ -657,6 +700,109 @@ class FractureLesion(Lesion):
                 
         return mask
 
+class IVHLesion(Lesion):
+    """Generates Intraventricular Hemorrhage (IVH) by filling ventricles with a fluid level."""
+
+    def __init__(self, lesion_type: str, boundary: np.ndarray, **kwargs):
+        super().__init__(lesion_type=lesion_type, **kwargs)
+        self.ventricle_mask = boundary
+
+    def generate(self, volume_ml: float, intensity_hu: float = 60, 
+                 texture_contrast: float = 0.0, texture_scale: float = 10.0, **kwargs) -> "IVHLesion":
+        """
+        Fills the ventricle mask from bottom-up (simulating gravity) to match volume.
+        """
+        target_voxels = volume_ml / self.voxel_volume_ml
+        total_ventricle_voxels = np.sum(self.ventricle_mask)
+        
+        if target_voxels > total_ventricle_voxels:
+            self.mask = self.ventricle_mask.copy()
+        else:
+            # Gravity fill: Fill by Z (slice indices) to start, effectively filling the bottom of the ventricles first.
+            coords = np.argwhere(self.ventricle_mask)
+            sorted_indices = np.argsort(coords[:, 0]) # Sort by Z
+            
+            # Select the first N voxels
+            selected_indices = sorted_indices[:int(target_voxels)]
+            selected_coords = coords[selected_indices]
+            
+            self.mask = np.zeros_like(self.ventricle_mask, dtype=bool)
+            self.mask[selected_coords[:, 0], selected_coords[:, 1], selected_coords[:, 2]] = True
+
+        self.volume_ml = np.sum(self.mask) * self.voxel_volume_ml
+        if self.mask.any():
+            self.coords_voxel = tuple(map(int, center_of_mass(self.mask)))
+        else:
+            self.coords_voxel = (0,0,0)
+
+        # Texture
+        texture = self._get_noise_texture(self.mask.shape, intensity_hu, texture_contrast, scale=texture_scale)
+        self.image = np.where(self.mask, texture, 0).astype(np.float32)
+        self.intensity_hu = intensity_hu
+        
+        return self
+
+
+class SAHLesion(Lesion):
+    """Generates Subarachnoid Hemorrhage (SAH) by filling sulcal spaces from a seed point."""
+
+    def __init__(self, lesion_type: str, boundary: np.ndarray, **kwargs):
+        super().__init__(lesion_type=lesion_type, **kwargs)
+        self.sah_mask = boundary
+
+    def generate(self, volume_ml: float, intensity_hu: float = 60, 
+                 texture_contrast: float = 0.0, texture_scale: float = 10.0, 
+                 seed_point: Optional[Point3D] = None, **kwargs) -> "SAHLesion":
+        """
+        Fills SAH space by spreading from a seed point along the mask manifold.
+        """
+        target_voxels = volume_ml / self.voxel_volume_ml
+        
+        # 1. Select Seed Point
+        if seed_point is None:
+            # Pick a random point in SAH mask
+            coords = np.argwhere(self.sah_mask)
+            if len(coords) == 0:
+                raise RuntimeError("Empty SAH mask provided.")
+            seed_point = coords[self.rng.integers(len(coords))]
+        
+        current_mask = np.zeros_like(self.sah_mask, dtype=bool)
+        current_mask[seed_point[0], seed_point[1], seed_point[2]] = True
+        
+        current_voxels = 1
+        # Structuring element: 3x3x3 connectivity
+        selem = ski.morphology.ball(1) 
+        
+        # Safety break
+        max_iters = 1000
+        for _ in range(max_iters):
+            if current_voxels >= target_voxels:
+                break
+            
+            # Dilate current mask
+            new_mask = ski.morphology.binary_dilation(current_mask, selem)
+            
+            # Constrain
+            new_mask = new_mask & self.sah_mask
+            
+            new_voxels = np.sum(new_mask)
+            if new_voxels == current_voxels:
+                break
+                
+            current_mask = new_mask
+            current_voxels = new_voxels
+            
+        self.mask = current_mask
+        self.volume_ml = current_voxels * self.voxel_volume_ml
+        self.coords_voxel = tuple(map(int, center_of_mass(self.mask)))
+        
+        # Texture
+        texture = self._get_noise_texture(self.mask.shape, intensity_hu, texture_contrast, scale=texture_scale)
+        self.image = np.where(self.mask, texture, 0).astype(np.float32)
+        self.intensity_hu = intensity_hu
+        
+        return self
+
 # =============================================================================
 # 4. LESION FACTORY
 # A simple factory to create the correct lesion object based on type.
@@ -671,6 +817,8 @@ class LesionFactory:
         'SDH': DuralLesion,
         'IPH': RoundLesion,
         'Fracture': FractureLesion,
+        'IVH': IVHLesion,
+        'SAH': SAHLesion,
     }
 
     @staticmethod
