@@ -792,7 +792,7 @@ class SAHLesion(Lesion):
             current_mask = new_mask
             current_voxels = new_voxels
             
-        self.mask = current_mask
+        self.mask = current_mask.astype(bool)
         self.volume_ml = current_voxels * self.voxel_volume_ml
         self.coords_voxel = tuple(map(int, center_of_mass(self.mask)))
         

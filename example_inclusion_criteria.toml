@@ -13,7 +13,7 @@ seed=42  # seed to reproduce dataset, set to false or integer
 age=[0, 100]  # range in yrs [min, max]
 
 [lesion]
-subtype=[false, 'IPH', 'SDH', 'EDH'] # add [false] for hemorrhage-absent cases
+subtype=[false, 'IPH', 'SDH', 'EDH', 'IVH', 'SAH'] # add [false] for hemorrhage-absent cases
 mass_effect=true  # whether lesions displace brain tissue
 edema=[0, 15]  # edema width range [min, max] in pixels
 lesion_volume='src/insilicoICH/distributions/BHSD_volume_distributions.csv'  # str or list
