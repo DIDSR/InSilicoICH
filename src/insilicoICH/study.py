@@ -537,6 +537,8 @@ def run_simulation_cli(arg_list: Optional[List[str]] = None):
     parser.add_argument('input_csv', nargs='?', help="Path to study plan CSV file.")
     parser.add_argument('--parallel', '-p', action='store_true', help="Run simulations in parallel.")
     parser.add_argument('--overwrite', '-o', action='store_true', help="Overwrites previous results")
+    parser.add_argument('--chunk_size', '-c', type=int, default=None,
+                        help='Number of simulations to run per chunk in parallel mode.')
     args = parser.parse_args(arg_list)
 
     input_csv_path = args.input_csv
@@ -547,7 +549,7 @@ def run_simulation_cli(arg_list: Optional[List[str]] = None):
         parser.error("An input CSV file is required either as an argument or via stdin.")
 
     print(f"Running study from: {input_csv_path}")
-    ICHStudy(input_csv_path).run_all(parallel=args.parallel, overwrite=args.overwrite)
+    ICHStudy(input_csv_path).run_all(parallel=args.parallel, overwrite=args.overwrite, chunk_size=args.chunk_size)
 
 
 if __name__ == '__main__':
