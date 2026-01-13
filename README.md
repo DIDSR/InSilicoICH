@@ -24,7 +24,7 @@ To address this data availability challenge, **InSilicoICH** supplements real pa
 
 Our simulation pipeline combines several state-of-the-art components:
 
-1.  **Digital Phantoms:** We use the MIDA phantom and the NIHPD head phantoms [1][2], which are detailed, anatomically-realistic models of the human body. Note that these are NOT the XCAT adult and pediatric phantoms.
+1.  **Digital Phantoms:** We use the MIDA phantom and the NIHPD head phantoms [1][2], which are detailed, anatomically-realistic patient-based models of the head.
 2.  **Hemorrhage Insertion:** A knowledge-based algorithm inserts synthetic hemorrhages into the phantoms. This algorithm controls the placement, shape, volume, and attenuation based on models from [real hemorrhage segmentation data](https://arxiv.org/abs/2308.11298).
 3.  **Physics-Based CT Simulation:** The final phantom, complete with the synthetic hemorrhage, is imaged using [**XCIST**](https://github.com/xcist/main), a realistic X-ray CT simulation framework that models the entire image acquisition process.
 
