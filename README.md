@@ -33,6 +33,8 @@ The tool currently supports three major hemorrhage subtypes:
 * **Epidural (EDH)**
 * **Subdural (SDH)**
 
+Intraventricular (IVH) and subarachnoid (SAH) hemorrhages are underdevelopment [here](https://github.com/DIDSR/InSilicoICH/tree/sah-ivh).
+
 ## Controllable Parameters
 
 The simulation is highly customizable, allowing you to control dozens of parameters.
