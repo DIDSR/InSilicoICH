@@ -24,7 +24,7 @@ To address this data availability challenge, **InSilicoICH** supplements real pa
 
 Our simulation pipeline combines several state-of-the-art components:
 
-1.  **Digital Phantoms:** We use the [pediatric and adult XCAT phantom cohort](https://aapm.onlinelibrary.wiley.com/doi/10.1118/1.3480985) and the [MIDA phantom](https://pmc.ncbi.nlm.nih.gov/articles/PMC4406723/), which are detailed, anatomically-realistic models of the human body.
+1.  **Digital Phantoms:** We use the MIDA phantom and the NIHPD head phantoms [1][2], which are detailed, anatomically-realistic models of the human body. Note that these are NOT the XCAT adult and pediatric phantoms.
 2.  **Hemorrhage Insertion:** A knowledge-based algorithm inserts synthetic hemorrhages into the phantoms. This algorithm controls the placement, shape, volume, and attenuation based on models from [real hemorrhage segmentation data](https://arxiv.org/abs/2308.11298).
 3.  **Physics-Based CT Simulation:** The final phantom, complete with the synthetic hemorrhage, is imaged using [**XCIST**](https://github.com/xcist/main), a realistic X-ray CT simulation framework that models the entire image acquisition process.
 
@@ -73,6 +73,10 @@ Below are example outputs using the MIDA phantom, showing the simulated CT image
   <img src="assets/MIDA_montage_Mask.png" alt="Montage of ground truth segmentation masks for the ICH" width="800">
 </p>
 
+## Tutorials and Usage
+
+For worked examples and tutorials on how to use the included functions and tools to generate phantoms with ICH and all relevant parameters, please refer to the `notebooks` folder.
+
 ---
 
 ## Installation and Setup
@@ -103,3 +107,8 @@ pip install git+https://github.com/DIDSR/InSilicoICH.git
     ```bash
     pip install .
     ```
+
+## References
+
+[1]	VS Fonov, AC Evans, K Botteron, CR Almli, RC McKinstry, DL Collins and BDCG, Unbiased average age-appropriate atlases for pediatric studies, NeuroImage, In Press, ISSN 1053–8119, DOI: 10.1016/j.neuroimage.2010.07.033
+[2]	VS Fonov, AC Evans, RC McKinstry, CR Almli and DL Collins Unbiased nonlinear average age-appropriate brain templates from birth to adulthood NeuroImage, Volume 47, Supplement 1, July 2009, Page S102 Organization for Human Brain Mapping 2009 Annual Meeting, DOI: 10.1016/S1053-8119(09)70884-5
