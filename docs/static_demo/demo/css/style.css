@@ -1,0 +1,130 @@
+body {
+    font-family: -apple-system,
+        BlinkMacSystemFont,
+        'Segoe UI',
+        Roboto,
+        Oxygen,
+        Ubuntu,
+        Cantarell,
+        'Open Sans',
+        'Helvetica Neue',
+        sans-serif;
+    height: calc(100% - 18px);
+    background-color: white;
+    color: #333333;
+    margin: auto;
+    max-width: 1400px;
+    box-shadow: rgba(0, 0, 0, 0.8) 0px 0px 30px;
+    height: 100%;
+    display: block;
+}
+
+a{
+    color:rgb(0, 124, 186);
+}
+
+h1 {
+    text-align: center;
+    padding:20px;
+    background:rgb(0, 124, 186);
+    color:white;
+    margin:10px 0 0 0;
+}
+
+.content{
+    display: none;
+    padding:10px;
+    clear:both;
+}
+
+img{
+    width:80%;
+    
+}
+
+.tabs{
+    margin:0;
+    margin-top:-40px;
+}
+
+.tabs li{
+    background:rgb(0, 124, 186);
+    color:white;
+    float:left;
+    list-style: none;
+    padding:5px 10px;
+    outline: 1px solid white;    margin-top: 1px;
+    margin-left: 1px;
+}
+
+.tabs li.active{
+    filter:brightness(1.3);
+}
+
+.tabs li:hover{
+    transition: .2s;
+    cursor: pointer;
+    filter:brightness(1.3)
+}
+
+p,.dt-container{
+    margin:5px 5px; 
+}
+table.dataTable{
+    width:100% !important;
+}
+/* Styles for tables in the description content */
+.content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+}
+
+.content table th,
+.content table td {
+    padding: 12px 15px;
+    text-align: left; /* Changed from center for better readability of text */
+}
+
+.content table th {
+    background-color: rgb(0, 124, 186);
+    color: #ffffff;
+    text-transform: uppercase;
+    font-weight: bold;
+}
+
+.content table tr {
+    background-color: rgb(198, 236, 255); /* Keeping original light blue theme */
+    border-bottom: 1px solid #dddddd;
+}
+
+.content table tr:nth-of-type(even) {
+    background-color: rgb(224, 244, 255);
+}
+
+.content table tr:last-of-type {
+    border-bottom: 2px solid rgb(0, 124, 186);
+}
+
+/* Original styles kept for reference or other tables */
+#ssynth-table tr td, #ssynth-table tr th{
+    text-align:center;
+    padding:5px 0px;
+}
+
+input.footer-search {
+    border: 1px solid #aaa;
+    border-radius: 3px;
+    padding: 5px;
+    background-color: white;
+    color: black;
+    margin-left: 3px;
+    width:75%
+}
+
+img.sample:hover{
+    cursor:pointer;
+    transform: scale(1.1);
+    transition: 0.25s;
+}

@@ -6,7 +6,7 @@ notebooks/*/*.png
 .pyradiomics
 .insilicoich
 build
-
+docs/_build
 batchmode_CT_dataset_pipeline.sge
 run_batchmode.sh
 *.csv
