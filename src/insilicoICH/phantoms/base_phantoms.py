@@ -50,6 +50,18 @@ class LesionPhantom(Phantom):
         'intensity': [-100, 100],
         'mass_effect': [True, False],
         'seed': None
+        },
+                    'IVH': {
+        'volume': [0, 100],  # Example range
+        'intensity': [40, 80],
+        'mass_effect': False, # Typically IVH doesn't deform skull/brain in the same way, but expands ventricles.
+        'seed': None
+        },
+                    'SAH': {
+        'volume': [0, 100], # Example range
+        'intensity': [40, 80],
+        'mass_effect': False,
+        'seed': None
         }
                     }
 

@@ -2,8 +2,7 @@ import numpy as np
 import pytest
 import sys
 import os
-sys.path.insert(0, os.path.abspath('src/insilicoICH'))
-from lesion_definition import FractureLesion
+from insilicoICH.lesion_definition import FractureLesion
 
 def test_fracture_lesion_instantiation():
     skull_shape = (50, 50, 50)

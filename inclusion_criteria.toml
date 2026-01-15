@@ -3,9 +3,9 @@
 #
 # uncommented parameters here will override defaults
 [general]
-output_directory="default_study"
-scan_coverage=[0, 10]  # scan range in mm, min max, comment out to scan whole range
-study_count=100  # desired dataset size
+output_directory="/projects01/didsr-aiml/brandon.nelson/pedsilicoICH/InSilicoICH5k"
+scan_coverage="dynamic"  # scan range in mm, min max, comment out to scan whole range
+study_count=5000  # desired dataset size
 remove_raw=true  # keep projection data
 seed=42  # seed to reproduce dataset, set to false or integer
 
@@ -20,14 +20,14 @@ lesion_volume='src/insilicoICH/distributions/BHSD_volume_distributions.csv'  # s
 lesion_attenuation='src/insilicoICH/distributions/BHSD_HU_distributions.csv'  # str or list
 
 [acquisition]
-scanner_model=['GE_Lightspeed16','Scanner_Default']
-views=[100]
-kVp=[120]  # Tube potential: The electric potential applied across an x-ray tube to accelerate electrons towards a target material, expressed in units of kilovolts (kV) 
-mA=[200]  # Tube current: Number of electrons accelerated across an x-ray tube per unit time, expressed in units of milliampere (mA)
-pitch=[0.5]  # pitch = 0 for axial model, pitch > 0 for helical, recommend pitch < 0.6 for head
+scanner_model=['Siemens_DefinitionFlash', 'GE_Lightspeed64']
+views=[1000]
+kVp=[100, 120, 140]  # Tube potential: The electric potential applied across an x-ray tube to accelerate electrons towards a target material, expressed in units of kilovolts (kV) 
+mA=[100, 150, 200, 250]  # Tube current: Number of electrons accelerated across an x-ray tube per unit time, expressed in units of milliampere (mA)
+pitch=[0]  # pitch = 0 for axial model, pitch > 0 for helical, recommend pitch < 0.6 for head
 #  Unitless parameter used to describe the table travel during helical CT; equal to table travel (mm) per gantry rotation ÷ total nominal beam width (mm) 
 
 [recon]
-recon_kernel=['standard']  # Reconstruction property that determines sharpness or smoothness of image in the axial plane 
-slice_thickness=[1]  # Nominal width of reconstructed image along the z axis 
+recon_kernel=['standard', 'soft']  # Reconstruction property that determines sharpness or smoothness of image in the axial plane 
+slice_thickness=[1, 3, 5]  # Nominal width of reconstructed image along the z axis 
 slice_increment=[1]  # Distance between adjacent slices in the z axis, should be equal to or greater than slice thickness
