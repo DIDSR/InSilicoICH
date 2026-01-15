@@ -371,7 +371,7 @@ class ICHStudy(Study):
 
         # Calculate metrics from the mask
         dcm = pydicom.dcmread(mask_path[0])
-        spacings = [float(dcm.SliceThickness)] + list(map(float, dcm.PixelSpacing))
+        spacings = [float(dcm.SliceIncrement)] + list(map(float, dcm.PixelSpacing))
         voxel_vol_ml = np.prod(spacings) / 1000.0
 
         for idx in range(len(recon)):
