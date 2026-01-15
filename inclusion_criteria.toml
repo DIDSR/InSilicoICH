@@ -3,8 +3,8 @@
 #
 # uncommented parameters here will override defaults
 [general]
-output_directory=" /projects01/didsr-aiml/brandon.nelson/pedsilicoICH/InSilicoICH5k"
-# scan_coverage=[0, 10]  # scan range in mm, min max, comment out to scan whole range
+output_directory="/projects01/didsr-aiml/brandon.nelson/pedsilicoICH/InSilicoICH5k"
+scan_coverage="dynamic"  # scan range in mm, min max, comment out to scan whole range
 study_count=5000  # desired dataset size
 remove_raw=true  # keep projection data
 seed=42  # seed to reproduce dataset, set to false or integer
@@ -21,7 +21,7 @@ lesion_attenuation='src/insilicoICH/distributions/BHSD_HU_distributions.csv'  # 
 
 [acquisition]
 scanner_model=['Siemens_DefinitionFlash', 'GE_Lightspeed64']
-views=[100]
+views=[1000]
 kVp=[100, 120, 140]  # Tube potential: The electric potential applied across an x-ray tube to accelerate electrons towards a target material, expressed in units of kilovolts (kV) 
 mA=[100, 150, 200, 250]  # Tube current: Number of electrons accelerated across an x-ray tube per unit time, expressed in units of milliampere (mA)
 pitch=[0]  # pitch = 0 for axial model, pitch > 0 for helical, recommend pitch < 0.6 for head
