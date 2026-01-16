@@ -6,12 +6,9 @@ notebooks/*/*.png
 .pyradiomics
 .insilicoich
 build
-<<<<<<< HEAD
 docs/_build
-=======
 results
 
->>>>>>> sah-ivh
 batchmode_CT_dataset_pipeline.sge
 run_batchmode.sh
 *.csv
