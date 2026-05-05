@@ -110,12 +110,12 @@ pip install git+https://github.com/DIDSR/InSilicoICH.git
     pip install .
     ```
 
-## References
-[^1]: U.S. Food and Drug Administration. (2023). MIDA: A Multimodal Imaging-Based Model of the Human Head and Neck (RST24NO05.01). <https://cdrh-rst.fda.gov/mida-multimodal-imaging-based-model-human-head-and-neck>
-[^2]: VS Fonov, AC Evans, K Botteron, CR Almli, RC McKinstry, DL Collins and BDCG, Unbiased average age-appropriate atlases for pediatric studies, NeuroImage, In Press, ISSN 1053–8119, DOI: 10.1016/j.neuroimage.2010.07.033
-[^3]:	VS Fonov, AC Evans, RC McKinstry, CR Almli and DL Collins Unbiased nonlinear average age-appropriate brain templates from birth to adulthood NeuroImage, Volume 47, Supplement 1, July 2009, Page S102 Organization for Human Brain Mapping 2009 Annual Meeting, DOI: 10.1016/S1053-8119(09)70884-5
-
 ## Disclaimer
 ### About the Catalog of Regulatory Science Tools
 The enclosed tool is part of the [Catalog of Regulatory Science Tools](https://cdrh-rst.fda.gov/), which provides a peer-reviewed resource for stakeholders to use where standards and qualified Medical Device Development Tools (MDDTs) do not yet exist. These tools do not replace FDA-recognized standards or MDDTs. This catalog collates a variety of regulatory science tools that the FDA’s Center for Devices and Radiological Health’s (CDRH) Office of Science and Engineering Labs (OSEL) developed. These tools use the most innovative science to support medical device development and patient access to safe and effective medical devices. If you are considering using a tool from this catalog in your marketing submissions, note that these tools have not been qualified as [Medical Device Development Tools](https://www.fda.gov/medical-devices/medical-device-development-tools-mddt) and the FDA has not evaluated the suitability of these tools within any specific context of use. You may [request feedback or meetings for medical device submissions](https://www.fda.gov/regulatory-information/search-fda-guidance-documents/requests-feedback-and-meetings-medical-device-submissions-q-submission-program) as part of the Q-Submission Program.
 For more information about the Catalog of Regulatory Science Tools, email [RST_CDRH@fda.hhs.gov](mailto:RST_CDRH@fda.hhs.gov).
+
+## References
+[^1]: U.S. Food and Drug Administration. (2023). MIDA: A Multimodal Imaging-Based Model of the Human Head and Neck (RST24NO05.01). <https://cdrh-rst.fda.gov/mida-multimodal-imaging-based-model-human-head-and-neck>
+[^2]: VS Fonov, AC Evans, K Botteron, CR Almli, RC McKinstry, DL Collins and BDCG, Unbiased average age-appropriate atlases for pediatric studies, NeuroImage, In Press, ISSN 1053–8119, DOI: 10.1016/j.neuroimage.2010.07.033
+[^3]:	VS Fonov, AC Evans, RC McKinstry, CR Almli and DL Collins Unbiased nonlinear average age-appropriate brain templates from birth to adulthood NeuroImage, Volume 47, Supplement 1, July 2009, Page S102 Organization for Human Brain Mapping 2009 Annual Meeting, DOI: 10.1016/S1053-8119(09)70884-5
